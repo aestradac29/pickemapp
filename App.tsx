@@ -1,0 +1,203 @@
+import React, { useState } from 'react';
+import { MATCHES, USERS } from './constants';
+import { MatchCard } from './components/MatchCard';
+import { Leaderboard } from './components/Leaderboard';
+import { Login } from './components/Login';
+import { Dashboard } from './components/Dashboard';
+import { RankingView } from './components/RankingView';
+import { CrystalBall } from './components/CrystalBall';
+import { FantasyView } from './components/FantasyView';
+import { MatchdayView } from './components/MatchdayView';
+import { SplitSelection } from './components/SplitSelection';
+import { ViewState, UserPrediction } from './types';
+import { Menu, X, Share2, Swords, LogOut, ChevronLeft } from 'lucide-react';
+
+const App: React.FC = () => {
+  const [view, setView] = useState<ViewState>(ViewState.LOGIN);
+  const [predictions, setPredictions] = useState<UserPrediction[]>([]);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [selectedSplit, setSelectedSplit] = useState<string | null>(null);
+
+  const handleLogin = (username: string) => {
+    setCurrentUser(username);
+    // After login, go to Split Selection instead of Dashboard
+    setView(ViewState.SPLIT_SELECTION);
+  };
+
+  const handleSplitSelect = (splitName: string) => {
+    setSelectedSplit(splitName);
+    setView(ViewState.DASHBOARD);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setSelectedSplit(null);
+    setView(ViewState.LOGIN);
+    setIsMenuOpen(false);
+  };
+
+  const handleSelectWinner = (matchId: string, teamId: string) => {
+    setPredictions(prev => {
+      const existing = prev.find(p => p.matchId === matchId);
+      if (existing) {
+        return prev.map(p => p.matchId === matchId ? { ...p, predictedWinnerId: teamId } : p);
+      }
+      return [...prev, { matchId, predictedWinnerId: teamId }];
+    });
+  };
+
+  // Render content based on current view
+  const renderContent = () => {
+    switch (view) {
+      case ViewState.LOGIN:
+        return <Login onLogin={handleLogin} />;
+      
+      case ViewState.SPLIT_SELECTION:
+        return <SplitSelection onSelect={handleSplitSelect} />;
+
+      case ViewState.DASHBOARD:
+        return <Dashboard onChangeView={setView} />;
+
+      case ViewState.RANKING:
+        return <RankingView />;
+
+      case ViewState.CRYSTAL_BALL:
+        return <CrystalBall />;
+
+      case ViewState.FANTASY:
+        return <FantasyView />;
+
+      case ViewState.MATCHDAY:
+        return <MatchdayView />;
+
+      case ViewState.PLAYOFFS:
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4">
+            <h2 className="text-2xl font-bold text-[#c8aa6e] mb-6 text-center uppercase">Playoffs {selectedSplit || 'Winter 2026'}</h2>
+            <div className="space-y-4">
+              {MATCHES.map(match => (
+                <MatchCard 
+                  key={match.id} 
+                  match={match}
+                  selectedWinnerId={predictions.find(p => p.matchId === match.id)?.predictedWinnerId}
+                  onSelectWinner={handleSelectWinner}
+                />
+              ))}
+            </div>
+             <div className="fixed bottom-8 left-0 right-0 px-4 flex justify-center pointer-events-none">
+              {predictions.length > 0 && (
+                <button className="pointer-events-auto shadow-2xl bg-hextech-900 border border-hextech-500 text-hextech-500 px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-hextech-500 hover:text-black transition-all transform hover:scale-105">
+                  <Share2 className="w-4 h-4" />
+                  Guardar ({predictions.length})
+                </button>
+              )}
+            </div>
+          </div>
+        );
+
+      case ViewState.RESULTS:
+        return (
+           <div className="animate-in fade-in slide-in-from-bottom-4">
+             <h2 className="text-2xl font-bold text-[#c8aa6e] mb-6 text-center uppercase">Resultados y Ranking</h2>
+             <Leaderboard users={USERS} />
+           </div>
+        );
+
+      default:
+        return <Dashboard onChangeView={setView} />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0a1428] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1a2c4e] via-[#0a1428] to-[#0a1428] text-[#f0e6d2] font-sans">
+      
+      {/* Navbar (Only show if logged in AND split is selected for full nav, otherwise just logout if in split selection) */}
+      {currentUser && (
+        <nav className="sticky top-0 z-50 bg-[#091428]/90 backdrop-blur-md border-b border-hextech-500/30">
+          <div className="max-w-5xl mx-auto px-4">
+            <div className="flex items-center justify-between h-16">
+              <div 
+                className={`flex items-center gap-3 ${selectedSplit ? 'cursor-pointer' : ''}`} 
+                onClick={() => selectedSplit && setView(ViewState.DASHBOARD)}
+              >
+                <div className="w-8 h-8 bg-gradient-to-br from-hextech-500 to-hextech-900 rounded rotate-45 flex items-center justify-center border border-hextech-400">
+                  <span className="text-white -rotate-45 font-bold text-sm">L</span>
+                </div>
+                <div className="flex flex-col">
+                    <h1 className="font-bold text-lg tracking-wide text-hextech-400 leading-none hidden sm:block">
+                        PICK'EM <span className="text-hextech-500">PRO</span>
+                    </h1>
+                    {selectedSplit && (
+                        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">{selectedSplit}</span>
+                    )}
+                </div>
+              </div>
+
+              {/* Desktop Nav Actions */}
+              <div className="hidden md:flex items-center gap-4">
+                {view !== ViewState.DASHBOARD && view !== ViewState.SPLIT_SELECTION && (
+                    <button 
+                        onClick={() => setView(ViewState.DASHBOARD)}
+                        className="text-gray-400 hover:text-[#c8aa6e] flex items-center gap-1 text-sm font-medium"
+                    >
+                        <ChevronLeft className="w-4 h-4" /> Volver al Inicio
+                    </button>
+                )}
+                
+                {/* Switch Split Button */}
+                {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
+                   <button 
+                        onClick={() => setView(ViewState.SPLIT_SELECTION)}
+                        className="text-xs border border-gray-700 rounded px-2 py-1 text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
+                   >
+                        Cambiar Split
+                   </button>
+                )}
+
+                <div className="h-6 w-px bg-gray-700 mx-2"></div>
+                <span className="text-sm text-gray-500 font-bold text-hextech-300">{currentUser}</span>
+                <button 
+                    onClick={handleLogout}
+                    className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                    title="Cerrar Sesión"
+                >
+                    <LogOut className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Mobile Menu Button */}
+              <div className="md:hidden">
+                <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-hextech-400 p-2">
+                  {isMenuOpen ? <X /> : <Menu />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Menu Dropdown */}
+          {isMenuOpen && (
+             <div className="md:hidden bg-[#091428] border-b border-gray-800">
+                <div className="px-4 py-2 space-y-1">
+                    {selectedSplit && (
+                        <>
+                            <button onClick={() => { setView(ViewState.DASHBOARD); setIsMenuOpen(false); }} className="block w-full text-left py-2 px-3 text-gray-300 hover:bg-gray-800 rounded">Inicio</button>
+                            <button onClick={() => { setView(ViewState.SPLIT_SELECTION); setIsMenuOpen(false); }} className="block w-full text-left py-2 px-3 text-gray-300 hover:bg-gray-800 rounded">Cambiar Split</button>
+                        </>
+                    )}
+                    <button onClick={handleLogout} className="block w-full text-left py-2 px-3 text-red-400 hover:bg-gray-800 rounded">Cerrar Sesión</button>
+                </div>
+             </div>
+          )}
+        </nav>
+      )}
+
+      {/* Main Content Area */}
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        {renderContent()}
+      </main>
+    </div>
+  );
+};
+
+export default App;

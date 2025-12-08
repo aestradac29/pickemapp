@@ -1,0 +1,195 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { ChevronDown, Search, Check } from 'lucide-react';
+
+export interface Option {
+  id: string;
+  label: string;
+  subLabel?: string;
+  image?: string;
+  color?: string;
+  imageClassName?: string; // New prop for styling images (e.g. inversion)
+}
+
+interface SearchableSelectProps {
+  label: string;
+  options: Option[];
+  placeholder?: string;
+  value?: string;
+  onChange: (value: string) => void;
+  className?: string;
+}
+
+export const SearchableSelect: React.FC<SearchableSelectProps> = ({ 
+  label, 
+  options, 
+  placeholder = "Seleccionar...", 
+  value, 
+  onChange,
+  className
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.id === value);
+
+  const filteredOptions = options.filter(o => 
+    o.label.toLowerCase().includes(search.toLowerCase()) || 
+    (o.subLabel && o.subLabel.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const handleSelect = (optionId: string) => {
+    onChange(optionId);
+    setIsOpen(false);
+    setSearch("");
+  };
+
+  // Helper component to handle image fallback
+  const SafeImage = ({ src, alt, className, fallbackColor, fallbackLabel }: any) => {
+    const [error, setError] = useState(false);
+    
+    if (error || !src) {
+        // Fallback generator
+        const bg = fallbackColor ? fallbackColor.replace('#', '') : '333';
+        const initial = fallbackLabel ? fallbackLabel[0] : '?';
+        const fallbackSrc = `https://ui-avatars.com/api/?name=${initial}&background=${bg}&color=fff&size=64&bold=true`;
+        
+        return <img src={fallbackSrc} alt={alt} className={className} />;
+    }
+
+    return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
+  };
+
+  return (
+    <div className={`relative group ${className}`} ref={dropdownRef}>
+      {label && (
+        <label className="block text-xs font-bold text-[#ac88d6] uppercase mb-2 tracking-wider flex items-center gap-2">
+            {label}
+            {selectedOption && <Check className="w-3 h-3 text-green-400" />}
+        </label>
+      )}
+      
+      {/* Trigger Button */}
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className={`
+          w-full bg-[#0a1428] min-h-[56px] px-4 py-2 rounded-lg border text-left flex items-center justify-between transition-all duration-300
+          ${isOpen ? 'border-[#ac88d6] ring-1 ring-[#ac88d6]' : 'border-gray-700 hover:border-gray-500'}
+        `}
+      >
+        {selectedOption ? (
+          <div className="flex items-center gap-3">
+            {selectedOption.image ? (
+               <div className="w-8 h-8 rounded bg-black/40 flex items-center justify-center overflow-hidden border border-gray-700">
+                  <SafeImage 
+                      src={selectedOption.image} 
+                      alt="" 
+                      className={`w-full h-full object-cover ${selectedOption.imageClassName || ''}`} 
+                      fallbackColor={selectedOption.color}
+                      fallbackLabel={selectedOption.label}
+                  />
+               </div>
+            ) : selectedOption.color ? (
+                <div className="w-8 h-8 rounded flex items-center justify-center font-bold text-xs" style={{ backgroundColor: selectedOption.color }}>
+                    {selectedOption.label[0]}
+                </div>
+            ) : (
+                <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center font-bold text-xs text-gray-400">
+                    {selectedOption.label[0]}
+                </div>
+            )}
+            
+            <div className="flex flex-col">
+                <span className="font-bold text-gray-200 leading-tight">{selectedOption.label}</span>
+                {selectedOption.subLabel && <span className="text-[10px] text-gray-500 uppercase">{selectedOption.subLabel}</span>}
+            </div>
+          </div>
+        ) : (
+          <span className="text-gray-500 italic text-sm">{placeholder}</span>
+        )}
+        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180 text-[#ac88d6]' : ''}`} />
+      </button>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <div className="absolute z-50 mt-2 min-w-[300px] w-full max-w-[90vw] -left-2 sm:left-0 bg-[#091428] border border-gray-600 rounded-lg shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95 origin-top">
+          {/* Search Input */}
+          <div className="p-3 border-b border-gray-700 bg-[#0f1d36]">
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input 
+                type="text" 
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar..."
+                className="w-full bg-[#050a14] text-white text-sm rounded pl-9 pr-3 py-2.5 border border-gray-700 focus:border-[#ac88d6] outline-none placeholder-gray-600"
+              />
+            </div>
+          </div>
+
+          {/* Options List */}
+          <div className="max-h-80 overflow-y-auto custom-scrollbar">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => handleSelect(option.id)}
+                  className={`
+                    w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-800 transition-colors border-l-4 border-transparent
+                    ${value === option.id ? 'bg-[#ac88d6]/10 border-l-[#ac88d6]' : ''}
+                  `}
+                >
+                  {option.image ? (
+                     <div className="w-12 h-12 rounded-lg bg-black/40 flex items-center justify-center overflow-hidden shadow-md border border-gray-700">
+                        <SafeImage 
+                            src={option.image} 
+                            alt="" 
+                            className={`w-full h-full object-cover p-0.5 ${option.imageClassName || ''}`} 
+                            fallbackColor={option.color}
+                            fallbackLabel={option.label}
+                        />
+                     </div>
+                  ) : option.color ? (
+                     <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg text-white shadow-md border border-white/10" style={{ backgroundColor: option.color }}>
+                        {option.label[0]}
+                     </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-gray-700 flex items-center justify-center font-bold text-lg text-gray-400 border border-gray-600">
+                        {option.label[0]}
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-col items-start gap-0.5">
+                    <span className={`text-base font-bold leading-none ${value === option.id ? 'text-[#ac88d6]' : 'text-gray-200'}`}>
+                        {option.label}
+                    </span>
+                    {option.subLabel && <span className="text-xs text-gray-500 uppercase tracking-wide font-medium bg-black/20 px-1.5 py-0.5 rounded">{option.subLabel}</span>}
+                  </div>
+
+                  {value === option.id && <Check className="w-5 h-5 text-[#ac88d6] ml-auto" />}
+                </button>
+              ))
+            ) : (
+                <div className="p-8 text-center text-gray-500 text-sm flex flex-col items-center">
+                    <Search className="w-8 h-8 mb-2 opacity-20" />
+                    No se encontraron resultados
+                </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
