@@ -10,6 +10,27 @@ export interface Option {
   imageClassName?: string; // New prop for styling images (e.g. inversion)
 }
 
+// Helper component to handle image fallback safely
+const SafeImage = ({ src, alt, className, fallbackColor, fallbackLabel }: any) => {
+  const [error, setError] = useState(false);
+  
+  // Reset error state if the source URL changes (important for reused components)
+  useEffect(() => {
+    setError(false);
+  }, [src]);
+
+  if (error || !src) {
+      // Fallback generator (UI Avatars)
+      const bg = fallbackColor ? fallbackColor.replace('#', '') : '333';
+      const initial = fallbackLabel ? fallbackLabel[0] : '?';
+      const fallbackSrc = `https://ui-avatars.com/api/?name=${initial}&background=${bg}&color=fff&size=64&bold=true`;
+      
+      return <img src={fallbackSrc} alt={alt} className={className} />;
+  }
+
+  return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
+};
+
 interface SearchableSelectProps {
   label: string;
   options: Option[];
@@ -55,22 +76,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     setSearch("");
   };
 
-  // Helper component to handle image fallback
-  const SafeImage = ({ src, alt, className, fallbackColor, fallbackLabel }: any) => {
-    const [error, setError] = useState(false);
-    
-    if (error || !src) {
-        // Fallback generator
-        const bg = fallbackColor ? fallbackColor.replace('#', '') : '333';
-        const initial = fallbackLabel ? fallbackLabel[0] : '?';
-        const fallbackSrc = `https://ui-avatars.com/api/?name=${initial}&background=${bg}&color=fff&size=64&bold=true`;
-        
-        return <img src={fallbackSrc} alt={alt} className={className} />;
-    }
-
-    return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
-  };
-
   return (
     <div className={`relative group ${className}`} ref={dropdownRef}>
       {label && (
@@ -91,11 +96,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         {selectedOption ? (
           <div className="flex items-center gap-3">
             {selectedOption.image ? (
-               <div className="w-8 h-8 rounded bg-black/40 flex items-center justify-center overflow-hidden border border-gray-700">
+               <div className="w-10 h-10 rounded bg-[#1a2c4e] flex items-center justify-center overflow-hidden border border-gray-600 shadow-inner">
                   <SafeImage 
                       src={selectedOption.image} 
                       alt="" 
-                      className={`w-full h-full object-cover ${selectedOption.imageClassName || ''}`} 
+                      // object-contain ensures the whole headshot or icon is visible without cropping
+                      className={`w-full h-full object-contain ${selectedOption.imageClassName || ''}`} 
                       fallbackColor={selectedOption.color}
                       fallbackLabel={selectedOption.label}
                   />
@@ -152,11 +158,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   `}
                 >
                   {option.image ? (
-                     <div className="w-12 h-12 rounded-lg bg-black/40 flex items-center justify-center overflow-hidden shadow-md border border-gray-700">
+                     <div className="w-12 h-12 rounded-lg bg-[#0f1923] flex items-center justify-center overflow-hidden shadow-md border border-gray-700">
                         <SafeImage 
                             src={option.image} 
                             alt="" 
-                            className={`w-full h-full object-cover p-0.5 ${option.imageClassName || ''}`} 
+                            // object-contain preserves aspect ratio for icons and headshots
+                            className={`w-full h-full object-contain ${option.imageClassName || ''}`} 
                             fallbackColor={option.color}
                             fallbackLabel={option.label}
                         />

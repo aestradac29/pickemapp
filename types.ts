@@ -48,6 +48,7 @@ export interface Player {
   photo?: string; // Optional real photo URL
   cost: number; // Fantasy cost
   averagePoints: number; // Average points per game
+  kda: number; // Kill Death Assist Ratio
 }
 
 export interface Match {
@@ -79,6 +80,7 @@ export interface User {
   };
   rank: number;
   pointsHistory: { day: string; points: number }[];
+  fantasyTeam?: Record<Role, string | null>; // The user's saved lineup
 }
 
 export interface AiAnalysisResult {

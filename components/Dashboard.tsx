@@ -10,8 +10,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
   const options = [
     {
       id: ViewState.MATCHDAY,
-      title: 'Jornada 1',
-      subtitle: 'Predicciones semanales',
+      title: 'Jornadas',
+      subtitle: 'Fase Regular (1-11)',
       icon: Swords, 
       color: 'text-blue-500',
       border: 'hover:border-blue-500',

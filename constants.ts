@@ -121,90 +121,90 @@ export const TEAMS: Record<string, Team> = {
 // Updated for Winter 2026 Fantasy Context
 export const PLAYERS: Player[] = [
   // --- G2 Esports (Premium Team) ---
-  { id: 'g2-top', name: "BrokenBlade", role: Role.TOP, teamId: "g2", cost: 330, averagePoints: 18.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868205763_BrokenBlade_G2_23.png" },
-  { id: 'g2-jng', name: "Yike", role: Role.JUNGLE, teamId: "g2", cost: 350, averagePoints: 21.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868352613_Yike_G2_23.png" },
-  { id: 'g2-mid', name: "Caps", role: Role.MID, teamId: "g2", cost: 390, averagePoints: 25.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868233777_Caps_G2_23.png" },
-  { id: 'g2-adc', name: "Hans Sama", role: Role.ADC, teamId: "g2", cost: 360, averagePoints: 22.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868285526_HansSama_G2_23.png" },
-  { id: 'g2-sup', name: "Mikyx", role: Role.SUPPORT, teamId: "g2", cost: 310, averagePoints: 17.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868323206_Mikyx_G2_23.png" },
+  { id: 'g2-top', name: "BrokenBlade", role: Role.TOP, teamId: "g2", cost: 330, averagePoints: 18.5, kda: 4.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868205763_BrokenBlade_G2_23.png" },
+  { id: 'g2-jng', name: "Yike", role: Role.JUNGLE, teamId: "g2", cost: 350, averagePoints: 21.2, kda: 5.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868352613_Yike_G2_23.png" },
+  { id: 'g2-mid', name: "Caps", role: Role.MID, teamId: "g2", cost: 390, averagePoints: 25.5, kda: 6.1, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868233777_Caps_G2_23.png" },
+  { id: 'g2-adc', name: "Hans Sama", role: Role.ADC, teamId: "g2", cost: 360, averagePoints: 22.0, kda: 5.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868285526_HansSama_G2_23.png" },
+  { id: 'g2-sup', name: "Mikyx", role: Role.SUPPORT, teamId: "g2", cost: 310, averagePoints: 17.8, kda: 4.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868323206_Mikyx_G2_23.png" },
   
   // --- Fnatic (High Tier) ---
-  { id: 'fnc-top', name: "Oscarinin", role: Role.TOP, teamId: "fnc", cost: 290, averagePoints: 15.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675953931604_FNC_Oscarinin.png" },
-  { id: 'fnc-jng', name: "Razork", role: Role.JUNGLE, teamId: "fnc", cost: 340, averagePoints: 20.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867946955_Razork_FNC_23.png" },
-  { id: 'fnc-mid', name: "Humanoid", role: Role.MID, teamId: "fnc", cost: 330, averagePoints: 19.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867909376_Humanoid_FNC_23.png" },
-  { id: 'fnc-adc', name: "Noah", role: Role.ADC, teamId: "fnc", cost: 320, averagePoints: 19.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1685626920364_FNC_Noah.png" },
-  { id: 'fnc-sup', name: "Jun", role: Role.SUPPORT, teamId: "fnc", cost: 280, averagePoints: 15.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1685626937222_FNC_Jun.png" },
+  { id: 'fnc-top', name: "Oscarinin", role: Role.TOP, teamId: "fnc", cost: 290, averagePoints: 15.5, kda: 3.1, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675953931604_FNC_Oscarinin.png" },
+  { id: 'fnc-jng', name: "Razork", role: Role.JUNGLE, teamId: "fnc", cost: 340, averagePoints: 20.8, kda: 4.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867946955_Razork_FNC_23.png" },
+  { id: 'fnc-mid', name: "Humanoid", role: Role.MID, teamId: "fnc", cost: 330, averagePoints: 19.5, kda: 3.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867909376_Humanoid_FNC_23.png" },
+  { id: 'fnc-adc', name: "Noah", role: Role.ADC, teamId: "fnc", cost: 320, averagePoints: 19.2, kda: 4.9, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1685626920364_FNC_Noah.png" },
+  { id: 'fnc-sup', name: "Jun", role: Role.SUPPORT, teamId: "fnc", cost: 280, averagePoints: 15.0, kda: 3.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1685626937222_FNC_Jun.png" },
   
   // --- Movistar KOI (Fan Favorites) ---
-  { id: 'koi-top', name: "Myrwn", role: Role.TOP, teamId: "mkoi", cost: 260, averagePoints: 14.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663673082_MKOI_Myrwn.png" },
-  { id: 'koi-jng', name: "Elyoya", role: Role.JUNGLE, teamId: "mkoi", cost: 340, averagePoints: 20.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663659430_MKOI_Elyoya.png" },
-  { id: 'koi-mid', name: "Jojo", role: Role.MID, teamId: "mkoi", cost: 250, averagePoints: 13.8 },
-  { id: 'koi-adc', name: "Supa", role: Role.ADC, teamId: "mkoi", cost: 310, averagePoints: 18.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663711913_MKOI_Supa.png" },
-  { id: 'koi-sup', name: "Alvaro", role: Role.SUPPORT, teamId: "mkoi", cost: 270, averagePoints: 15.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663595697_MKOI_Alvaro.png" },
+  { id: 'koi-top', name: "Myrwn", role: Role.TOP, teamId: "mkoi", cost: 260, averagePoints: 14.5, kda: 2.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663673082_MKOI_Myrwn.png" },
+  { id: 'koi-jng', name: "Elyoya", role: Role.JUNGLE, teamId: "mkoi", cost: 340, averagePoints: 20.5, kda: 4.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663659430_MKOI_Elyoya.png" },
+  { id: 'koi-mid', name: "Jojo", role: Role.MID, teamId: "mkoi", cost: 250, averagePoints: 13.8, kda: 2.9 },
+  { id: 'koi-adc', name: "Supa", role: Role.ADC, teamId: "mkoi", cost: 310, averagePoints: 18.0, kda: 4.1, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663711913_MKOI_Supa.png" },
+  { id: 'koi-sup', name: "Alvaro", role: Role.SUPPORT, teamId: "mkoi", cost: 270, averagePoints: 15.2, kda: 3.4, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663595697_MKOI_Alvaro.png" },
   
   // --- Team Heretics (Veteran Squad) ---
-  { id: 'th-top', name: "Wunder", role: Role.TOP, teamId: "th", cost: 270, averagePoints: 14.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705423853198_TH_Wunder.png" },
-  { id: 'th-jng', name: "Jankos", role: Role.JUNGLE, teamId: "th", cost: 290, averagePoints: 16.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705423689255_TH_Jankos.png" },
-  { id: 'th-mid', name: "Zwyroo", role: Role.MID, teamId: "th", cost: 240, averagePoints: 13.5 },
-  { id: 'th-adc', name: "Flakked", role: Role.ADC, teamId: "th", cost: 300, averagePoints: 17.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705423661555_TH_Flakked.png" },
-  { id: 'th-sup', name: "Trymbi", role: Role.SUPPORT, teamId: "th", cost: 280, averagePoints: 15.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675869408075_Trymbi_KOI_23.png" },
+  { id: 'th-top', name: "Wunder", role: Role.TOP, teamId: "th", cost: 270, averagePoints: 14.8, kda: 2.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705423853198_TH_Wunder.png" },
+  { id: 'th-jng', name: "Jankos", role: Role.JUNGLE, teamId: "th", cost: 290, averagePoints: 16.0, kda: 3.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705423689255_TH_Jankos.png" },
+  { id: 'th-mid', name: "Zwyroo", role: Role.MID, teamId: "th", cost: 240, averagePoints: 13.5, kda: 2.7 },
+  { id: 'th-adc', name: "Flakked", role: Role.ADC, teamId: "th", cost: 300, averagePoints: 17.5, kda: 4.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705423661555_TH_Flakked.png" },
+  { id: 'th-sup', name: "Trymbi", role: Role.SUPPORT, teamId: "th", cost: 280, averagePoints: 15.8, kda: 3.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675869408075_Trymbi_KOI_23.png" },
   
   // --- Karmine Corp (Rising Stars) ---
-  { id: 'kc-top', name: "Canna", role: Role.TOP, teamId: "kc", cost: 295, averagePoints: 16.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716474641662_KC_Canna.png" },
-  { id: 'kc-jng', name: "Closer", role: Role.JUNGLE, teamId: "kc", cost: 270, averagePoints: 14.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1711640161474_KC_Closer.png" },
-  { id: 'kc-mid', name: "Vladi", role: Role.MID, teamId: "kc", cost: 230, averagePoints: 12.5 },
-  { id: 'kc-adc', name: "Caliste", role: Role.ADC, teamId: "kc", cost: 330, averagePoints: 21.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716551820695_SK_Rahel.png" }, // Using placeholder or generic
-  { id: 'kc-sup', name: "Targamas", role: Role.SUPPORT, teamId: "kc", cost: 260, averagePoints: 13.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663456345_KC_Targamas.png" },
+  { id: 'kc-top', name: "Canna", role: Role.TOP, teamId: "kc", cost: 295, averagePoints: 16.5, kda: 2.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716474641662_KC_Canna.png" },
+  { id: 'kc-jng', name: "Closer", role: Role.JUNGLE, teamId: "kc", cost: 270, averagePoints: 14.0, kda: 2.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1711640161474_KC_Closer.png" },
+  { id: 'kc-mid', name: "Vladi", role: Role.MID, teamId: "kc", cost: 230, averagePoints: 12.5, kda: 2.2 },
+  { id: 'kc-adc', name: "Caliste", role: Role.ADC, teamId: "kc", cost: 330, averagePoints: 21.0, kda: 4.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716551820695_SK_Rahel.png" }, // Using placeholder or generic
+  { id: 'kc-sup', name: "Targamas", role: Role.SUPPORT, teamId: "kc", cost: 260, averagePoints: 13.5, kda: 2.6, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663456345_KC_Targamas.png" },
 
   // --- Team BDS (Consistent Performers) ---
-  { id: 'bds-top', name: "Adam", role: Role.TOP, teamId: "bds", cost: 310, averagePoints: 17.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867625121_Adam_BDS_23.png" },
-  { id: 'bds-jng', name: "Sheo", role: Role.JUNGLE, teamId: "bds", cost: 280, averagePoints: 15.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867674681_Sheo_BDS_23.png" },
-  { id: 'bds-mid', name: "nuc", role: Role.MID, teamId: "bds", cost: 290, averagePoints: 16.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867653556_Nuc_BDS_23.png" },
-  { id: 'bds-adc', name: "Ice", role: Role.ADC, teamId: "bds", cost: 300, averagePoints: 17.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705662709214_BDS_Ice.png" },
-  { id: 'bds-sup', name: "Labrov", role: Role.SUPPORT, teamId: "bds", cost: 295, averagePoints: 16.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867639572_Labrov_BDS_23.png" },
+  { id: 'bds-top', name: "Adam", role: Role.TOP, teamId: "bds", cost: 310, averagePoints: 17.5, kda: 3.1, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867625121_Adam_BDS_23.png" },
+  { id: 'bds-jng', name: "Sheo", role: Role.JUNGLE, teamId: "bds", cost: 280, averagePoints: 15.5, kda: 3.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867674681_Sheo_BDS_23.png" },
+  { id: 'bds-mid', name: "nuc", role: Role.MID, teamId: "bds", cost: 290, averagePoints: 16.2, kda: 3.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867653556_Nuc_BDS_23.png" },
+  { id: 'bds-adc', name: "Ice", role: Role.ADC, teamId: "bds", cost: 300, averagePoints: 17.8, kda: 4.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705662709214_BDS_Ice.png" },
+  { id: 'bds-sup', name: "Labrov", role: Role.SUPPORT, teamId: "bds", cost: 295, averagePoints: 16.5, kda: 3.6, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867639572_Labrov_BDS_23.png" },
 
   // --- SK Gaming (Budget Warriors) ---
-  { id: 'sk-top', name: "Irrelevant", role: Role.TOP, teamId: "sk", cost: 300, averagePoints: 17.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675869038222_Irrelevant_SK_23.png" },
-  { id: 'sk-jng', name: "Isma", role: Role.JUNGLE, teamId: "sk", cost: 250, averagePoints: 13.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705664188358_SK_Isma.png" },
-  { id: 'sk-mid', name: "Nisqy", role: Role.MID, teamId: "sk", cost: 285, averagePoints: 15.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705664197931_SK_Nisqy.png" },
-  { id: 'sk-adc', name: "Rahel", role: Role.ADC, teamId: "sk", cost: 260, averagePoints: 14.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716551820695_SK_Rahel.png" },
-  { id: 'sk-sup', name: "Luon", role: Role.SUPPORT, teamId: "sk", cost: 240, averagePoints: 12.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716551842831_SK_Luon.png" },
+  { id: 'sk-top', name: "Irrelevant", role: Role.TOP, teamId: "sk", cost: 300, averagePoints: 17.0, kda: 3.3, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675869038222_Irrelevant_SK_23.png" },
+  { id: 'sk-jng', name: "Isma", role: Role.JUNGLE, teamId: "sk", cost: 250, averagePoints: 13.5, kda: 2.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705664188358_SK_Isma.png" },
+  { id: 'sk-mid', name: "Nisqy", role: Role.MID, teamId: "sk", cost: 285, averagePoints: 15.8, kda: 3.4, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705664197931_SK_Nisqy.png" },
+  { id: 'sk-adc', name: "Rahel", role: Role.ADC, teamId: "sk", cost: 260, averagePoints: 14.5, kda: 3.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716551820695_SK_Rahel.png" },
+  { id: 'sk-sup', name: "Luon", role: Role.SUPPORT, teamId: "sk", cost: 240, averagePoints: 12.5, kda: 2.9, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716551842831_SK_Luon.png" },
 
   // --- Team Vitality (Volatile) ---
-  { id: 'vit-top', name: "Photon", role: Role.TOP, teamId: "vit", cost: 305, averagePoints: 17.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675869680327_Photon_VIT_23.png" },
-  { id: 'vit-jng', name: "Lyncas", role: Role.JUNGLE, teamId: "vit", cost: 285, averagePoints: 15.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716552174805_VIT_Lyncas.png" },
-  { id: 'vit-mid', name: "Czajek", role: Role.MID, teamId: "vit", cost: 250, averagePoints: 13.2 },
-  { id: 'vit-adc', name: "Carzzy", role: Role.ADC, teamId: "vit", cost: 310, averagePoints: 18.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868843232_Carzzy_MAD_23.png" },
-  { id: 'vit-sup', name: "Hylissang", role: Role.SUPPORT, teamId: "vit", cost: 270, averagePoints: 14.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868884947_Hylissang_MAD_23.png" },
+  { id: 'vit-top', name: "Photon", role: Role.TOP, teamId: "vit", cost: 305, averagePoints: 17.2, kda: 3.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675869680327_Photon_VIT_23.png" },
+  { id: 'vit-jng', name: "Lyncas", role: Role.JUNGLE, teamId: "vit", cost: 285, averagePoints: 15.8, kda: 3.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716552174805_VIT_Lyncas.png" },
+  { id: 'vit-mid', name: "Czajek", role: Role.MID, teamId: "vit", cost: 250, averagePoints: 13.2, kda: 2.5 },
+  { id: 'vit-adc', name: "Carzzy", role: Role.ADC, teamId: "vit", cost: 310, averagePoints: 18.0, kda: 3.9, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868843232_Carzzy_MAD_23.png" },
+  { id: 'vit-sup', name: "Hylissang", role: Role.SUPPORT, teamId: "vit", cost: 270, averagePoints: 14.5, kda: 2.1, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675868884947_Hylissang_MAD_23.png" },
 
   // --- GIANTX (Underdogs) ---
-  { id: 'gx-top', name: "Th3Antonio", role: Role.TOP, teamId: "gx", cost: 230, averagePoints: 11.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716550756303_GX_Th3Antonio.png" },
-  { id: 'gx-jng', name: "Juhan", role: Role.JUNGLE, teamId: "gx", cost: 250, averagePoints: 13.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716550742183_GX_Juhan.png" },
-  { id: 'gx-mid', name: "Jackies", role: Role.MID, teamId: "gx", cost: 270, averagePoints: 14.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663158025_GX_Jackies.png" },
-  { id: 'gx-adc', name: "Patrik", role: Role.ADC, teamId: "gx", cost: 280, averagePoints: 15.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663188836_GX_Patrik.png" },
-  { id: 'gx-sup', name: "Ignar", role: Role.SUPPORT, teamId: "gx", cost: 260, averagePoints: 13.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663140505_GX_Ignar.png" },
+  { id: 'gx-top', name: "Th3Antonio", role: Role.TOP, teamId: "gx", cost: 230, averagePoints: 11.5, kda: 2.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716550756303_GX_Th3Antonio.png" },
+  { id: 'gx-jng', name: "Juhan", role: Role.JUNGLE, teamId: "gx", cost: 250, averagePoints: 13.0, kda: 2.4, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716550742183_GX_Juhan.png" },
+  { id: 'gx-mid', name: "Jackies", role: Role.MID, teamId: "gx", cost: 270, averagePoints: 14.8, kda: 2.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663158025_GX_Jackies.png" },
+  { id: 'gx-adc', name: "Patrik", role: Role.ADC, teamId: "gx", cost: 280, averagePoints: 15.5, kda: 3.1, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663188836_GX_Patrik.png" },
+  { id: 'gx-sup', name: "Ignar", role: Role.SUPPORT, teamId: "gx", cost: 260, averagePoints: 13.5, kda: 2.7, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663140505_GX_Ignar.png" },
 
   // --- SPECIAL TEAMS (Guest Teams - Variable Pricing) ---
   
   // Los Ratones (Hype Team - High Variance)
-  { id: 'rat-top', name: "Alois", role: Role.TOP, teamId: "rat", cost: 280, averagePoints: 15.0 },
-  { id: 'rat-jng', name: "Caudillas", role: Role.JUNGLE, teamId: "rat", cost: 240, averagePoints: 12.0 },
-  { id: 'rat-mid', name: "Nemesis", role: Role.MID, teamId: "rat", cost: 350, averagePoints: 21.5 },
-  { id: 'rat-adc', name: "Crownie", role: Role.ADC, teamId: "rat", cost: 310, averagePoints: 18.5 },
-  { id: 'rat-sup', name: "Sanchez", role: Role.SUPPORT, teamId: "rat", cost: 210, averagePoints: 10.0 },
+  { id: 'rat-top', name: "Alois", role: Role.TOP, teamId: "rat", cost: 280, averagePoints: 15.0, kda: 3.2 },
+  { id: 'rat-jng', name: "Caudillas", role: Role.JUNGLE, teamId: "rat", cost: 240, averagePoints: 12.0, kda: 2.5 },
+  { id: 'rat-mid', name: "Nemesis", role: Role.MID, teamId: "rat", cost: 350, averagePoints: 21.5, kda: 5.2 },
+  { id: 'rat-adc', name: "Crownie", role: Role.ADC, teamId: "rat", cost: 310, averagePoints: 18.5, kda: 4.5 },
+  { id: 'rat-sup', name: "Sanchez", role: Role.SUPPORT, teamId: "rat", cost: 210, averagePoints: 10.0, kda: 2.0 },
 
   // Natus Vincere (The "Super Team" Guest)
-  { id: 'nvi-top', name: "Odoamne", role: Role.TOP, teamId: "nvi", cost: 285, averagePoints: 15.2 },
-  { id: 'nvi-jng', name: "Selfmade", role: Role.JUNGLE, teamId: "nvi", cost: 310, averagePoints: 17.5 },
-  { id: 'nvi-mid', name: "Perkz", role: Role.MID, teamId: "nvi", cost: 330, averagePoints: 19.5 },
-  { id: 'nvi-adc', name: "Upset", role: Role.ADC, teamId: "nvi", cost: 340, averagePoints: 20.2 },
-  { id: 'nvi-sup', name: "Kaiser", role: Role.SUPPORT, teamId: "nvi", cost: 290, averagePoints: 16.0 },
+  { id: 'nvi-top', name: "Odoamne", role: Role.TOP, teamId: "nvi", cost: 285, averagePoints: 15.2, kda: 3.1 },
+  { id: 'nvi-jng', name: "Selfmade", role: Role.JUNGLE, teamId: "nvi", cost: 310, averagePoints: 17.5, kda: 3.8 },
+  { id: 'nvi-mid', name: "Perkz", role: Role.MID, teamId: "nvi", cost: 330, averagePoints: 19.5, kda: 3.6 },
+  { id: 'nvi-adc', name: "Upset", role: Role.ADC, teamId: "nvi", cost: 340, averagePoints: 20.2, kda: 4.8 },
+  { id: 'nvi-sup', name: "Kaiser", role: Role.SUPPORT, teamId: "nvi", cost: 290, averagePoints: 16.0, kda: 3.5 },
 
   // Karmine Corp Blue (Academy Talent - Budget Options)
-  { id: 'kcb-top', name: "Maynter", role: Role.TOP, teamId: "kcb", cost: 220, averagePoints: 11.5 },
-  { id: 'kcb-jng', name: "113", role: Role.JUNGLE, teamId: "kcb", cost: 230, averagePoints: 12.0 },
-  { id: 'kcb-mid', name: "Abbedagge", role: Role.MID, teamId: "kcb", cost: 275, averagePoints: 15.0 },
-  { id: 'kcb-adc', name: "Keduii", role: Role.ADC, teamId: "kcb", cost: 240, averagePoints: 13.0 },
-  { id: 'kcb-sup', name: "Hantera", role: Role.SUPPORT, teamId: "kcb", cost: 210, averagePoints: 10.5 },
+  { id: 'kcb-top', name: "Maynter", role: Role.TOP, teamId: "kcb", cost: 220, averagePoints: 11.5, kda: 2.2 },
+  { id: 'kcb-jng', name: "113", role: Role.JUNGLE, teamId: "kcb", cost: 230, averagePoints: 12.0, kda: 2.3 },
+  { id: 'kcb-mid', name: "Abbedagge", role: Role.MID, teamId: "kcb", cost: 275, averagePoints: 15.0, kda: 3.1 },
+  { id: 'kcb-adc', name: "Keduii", role: Role.ADC, teamId: "kcb", cost: 240, averagePoints: 13.0, kda: 2.9 },
+  { id: 'kcb-sup', name: "Hantera", role: Role.SUPPORT, teamId: "kcb", cost: 210, averagePoints: 10.5, kda: 2.4 },
 ];
 
 // Mock Matches
@@ -243,32 +243,67 @@ export const MATCHES: Match[] = [
   },
 ];
 
-export const JORNADA_MATCHES: Match[] = [
-    {
-        id: 'j1-1',
-        teamA: TEAMS.th,
-        teamB: TEAMS.vit,
-        startTime: new Date(Date.now() + 10000000).toISOString(),
+// Helper to generate a predictable 11-day Round Robin schedule for 12 teams
+export const getMatchesForDay = (day: number): Match[] => {
+  const teamsArray = Object.values(TEAMS); // 12 teams
+  const numTeams = teamsArray.length;
+  
+  if (numTeams % 2 !== 0) return []; // Should be even for round robin
+  
+  const matches: Match[] = [];
+  const matchesPerDay = numTeams / 2;
+
+  // Simple rotation algorithm for round robin
+  // Fix the first team, rotate the rest
+  // Array indices for this day calculation
+  const indices = Array.from({ length: numTeams }, (_, i) => i);
+  
+  // Rotate based on day (day 1 = 0 rotation)
+  // Logic: 
+  // Fixed: index 0
+  // Rotated: indices 1 to 11
+  
+  const rotationOffset = day - 1;
+  const rotatedIndices = [
+    indices[0],
+    ...indices.slice(1).map((val, i, arr) => {
+       // current position in the rotating sub-array
+       const newPos = (i + rotationOffset) % arr.length;
+       return arr[newPos];
+    })
+  ];
+  
+  // Pair up: (0 vs 11), (1 vs 10), (2 vs 9), etc in the rotated array context? 
+  // Standard circle method:
+  // T0   T1   T2   T3   T4   T5
+  // T11  T10  T9   T8   T7   T6
+  
+  const topRow = rotatedIndices.slice(0, numTeams / 2);
+  const bottomRow = rotatedIndices.slice(numTeams / 2).reverse();
+  
+  for (let i = 0; i < matchesPerDay; i++) {
+     const teamAIndex = topRow[i];
+     const teamBIndex = bottomRow[i];
+     
+     // Deterministic start time for mock purposes
+     // Day 1 starts "Tomorrow", Day 2 "Tomorrow + 1", etc.
+     // Matches staggered by 1 hour
+     const baseDate = new Date();
+     baseDate.setDate(baseDate.getDate() + day);
+     baseDate.setHours(17 + i, 0, 0, 0);
+
+     matches.push({
+        id: `d${day}-m${i}`,
+        teamA: teamsArray[teamAIndex],
+        teamB: teamsArray[teamBIndex],
+        startTime: baseDate.toISOString(),
         stage: Stage.GROUPS,
-        isCompleted: false,
-    },
-    {
-        id: 'j1-2',
-        teamA: TEAMS.sk,
-        teamB: TEAMS.gx,
-        startTime: new Date(Date.now() + 14000000).toISOString(),
-        stage: Stage.GROUPS,
-        isCompleted: false,
-    },
-    {
-        id: 'j1-3',
-        teamA: TEAMS.g2,
-        teamB: TEAMS.bds,
-        startTime: new Date(Date.now() + 18000000).toISOString(),
-        stage: Stage.GROUPS,
-        isCompleted: false,
-    }
-];
+        isCompleted: false
+     });
+  }
+
+  return matches;
+};
 
 // Mock Leaderboard
 export const USERS: User[] = [
@@ -290,7 +325,15 @@ export const USERS: User[] = [
         { day: 'Day 2', points: 120 },
         { day: 'Day 3', points: 210 },
         { day: 'Day 4', points: 345 },
-    ]
+    ],
+    // Mock Fantasy Team (High Value)
+    fantasyTeam: {
+        [Role.TOP]: 'g2-top',
+        [Role.JUNGLE]: 'fnc-jng',
+        [Role.MID]: 'rat-mid',
+        [Role.ADC]: 'kc-adc',
+        [Role.SUPPORT]: 'th-sup',
+    }
   },
   { 
     id: 'u2', 
@@ -310,6 +353,14 @@ export const USERS: User[] = [
         { day: 'Day 2', points: 100 },
         { day: 'Day 3', points: 180 },
         { day: 'Day 4', points: 310 },
-    ]
+    ],
+    // Mock Fantasy Team (Budget / Meta)
+    fantasyTeam: {
+        [Role.TOP]: 'sk-top',
+        [Role.JUNGLE]: 'mkoi-jng',
+        [Role.MID]: 'nvi-mid',
+        [Role.ADC]: 'th-adc',
+        [Role.SUPPORT]: 'gx-sup',
+    }
   },
 ];
