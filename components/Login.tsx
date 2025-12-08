@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, User, Mail, Lock, AlertCircle, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
+import { Shield, User, Mail, Lock, AlertCircle, Eye, EyeOff, Loader2, CheckCircle2, ArrowLeft, KeyRound } from 'lucide-react';
 import { authService } from '../services/authService';
 import { isSupabaseConfigured } from '../lib/supabase';
 
@@ -9,6 +9,7 @@ interface LoginProps {
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isResetting, setIsResetting] = useState(false); // New state for Password Reset
   const [isLoading, setIsLoading] = useState(false);
   
   // Login State
@@ -43,6 +44,16 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
 
     try {
+        if (isResetting) {
+            // RECUPERACIÓN DE CONTRASEÑA
+            if (!identifier) throw new Error('Por favor introduce tu correo electrónico.');
+            
+            await authService.resetPasswordForEmail(identifier);
+            setSuccessMessage(`Si existe una cuenta con ${identifier}, recibirás un correo con instrucciones.`);
+            setIsLoading(false);
+            return;
+        }
+
         if (isRegistering) {
           // VALIDACIONES REGISTRO
           if (!username || !registerEmail || !password || !confirmPassword) {
@@ -58,14 +69,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           // LLAMADA A SUPABASE
           const data = await authService.signUp(registerEmail, password, username);
           
-          // Si Supabase pide confirmación de email, data.session será null
           if (data.user && !data.session) {
-             setSuccessMessage(`¡Cuenta creada! Hemos enviado un enlace de confirmación a ${registerEmail}. Por favor revisa tu correo.`);
-             setIsRegistering(false); // Volver al login
-             setIdentifier(registerEmail); // Pre-rellenar email
+             // MENSAJE ACTUALIZADO PARA SPAM
+             setSuccessMessage(`¡Cuenta creada con éxito! Hemos enviado un enlace de confirmación a ${registerEmail}. Es IMPORTANTE que confirmes tu cuenta antes de entrar. Por favor revisa tu bandeja de entrada y la carpeta de SPAM.`);
+             setIsRegistering(false); 
+             setIdentifier(registerEmail); 
              setPassword('');
           } else {
-             // Si no pide confirmación, entramos directo
              onLogin(username);
           }
           
@@ -84,13 +94,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         console.error(err);
         setError(err.message || "Ocurrió un error inesperado.");
     } finally {
-        setIsLoading(false);
+        if (!isResetting) setIsLoading(false);
     }
   };
 
   const toggleMode = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsRegistering(!isRegistering);
+    setIsResetting(false);
     setError(null);
     setSuccessMessage(null);
     setIdentifier('');
@@ -98,6 +109,15 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setUsername('');
     setPassword('');
     setConfirmPassword('');
+  };
+
+  const toggleResetMode = (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResetting(!isResetting);
+      setIsRegistering(false);
+      setError(null);
+      setSuccessMessage(null);
+      // Keep identifier if entered
   };
 
   return (
@@ -112,13 +132,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         <div className="flex flex-col items-center mb-6">
           <div className="w-16 h-16 bg-gradient-to-br from-[#c8aa6e] to-[#091428] rounded-full p-0.5 mb-4 border border-[#c8aa6e] flex items-center justify-center shadow-lg">
-             <Shield className="w-8 h-8 text-[#f0e6d2]" />
+             {isResetting ? <KeyRound className="w-8 h-8 text-[#f0e6d2]" /> : <Shield className="w-8 h-8 text-[#f0e6d2]" />}
           </div>
           <h1 className="text-3xl font-bold text-[#f0e6d2] tracking-wider uppercase text-center">
             Pick'em <span className="text-[#c8aa6e]">Pro</span>
           </h1>
           <p className="text-[#a09b8c] text-sm mt-2 text-center">
-            {isRegistering ? 'Crea tu cuenta de invocador' : 'Identifícate para comenzar'}
+            {isResetting ? 'Recupera el acceso a tu cuenta' : 
+             isRegistering ? 'Crea tu cuenta de invocador' : 'Identifícate para comenzar'}
           </p>
           {!isSupabaseConfigured() && (
              <p className="text-red-400 text-xs mt-2 font-bold bg-red-900/30 px-2 py-1 rounded border border-red-500">
@@ -127,11 +148,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           )}
         </div>
 
-        {/* Success Message (e.g. Email Verification) */}
+        {/* Success Message */}
         {successMessage && (
           <div className="mb-4 p-3 bg-green-900/50 border border-green-500/50 rounded flex items-start gap-2 text-green-200 text-sm animate-in fade-in slide-in-from-top-2">
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <span>{successMessage}</span>
+            <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5 text-green-400" />
+            <span className="leading-snug">{successMessage}</span>
           </div>
         )}
 
@@ -145,8 +166,26 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           
-          {/* REGISTER: Username & Email explicitly */}
-          {isRegistering ? (
+          {/* RESET PASSWORD MODE */}
+          {isResetting ? (
+              <div className="space-y-1 animate-in fade-in slide-in-from-right-4 duration-300">
+                <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Correo Electrónico</label>
+                <div className="relative group">
+                    <input 
+                    type="email" 
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="tucorreo@ejemplo.com"
+                    className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 pl-10 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all"
+                    />
+                    <Mail className="w-5 h-5 text-gray-500 absolute left-3 top-3.5 group-focus-within:text-[#c8aa6e] transition-colors" />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                    Te enviaremos un enlace mágico para restablecer tu contraseña.
+                </p>
+              </div>
+          ) : isRegistering ? (
+             // REGISTER FORM
             <>
                 <div className="space-y-1 animate-in fade-in slide-in-from-right-4 duration-300">
                     <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Nombre de Usuario</label>
@@ -176,7 +215,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 </div>
             </>
           ) : (
-            /* LOGIN: Single Identifier Field */
+            // LOGIN FORM
             <div className="space-y-1 animate-in fade-in slide-in-from-left-4 duration-300">
                 <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Usuario o Correo</label>
                 <div className="relative group">
@@ -192,27 +231,40 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
           )}
           
-          {/* PASSWORD FIELD */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Contraseña</label>
-            <div className="relative group">
-              <input 
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 pl-10 pr-10 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all"
-              />
-              <Lock className="w-5 h-5 text-gray-500 absolute left-3 top-3.5 group-focus-within:text-[#c8aa6e] transition-colors" />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3.5 text-gray-500 hover:text-[#c8aa6e] transition-colors focus:outline-none"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+          {/* PASSWORD FIELD (Hidden in Reset Mode) */}
+          {!isResetting && (
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Contraseña</label>
+                    {!isRegistering && (
+                        <button 
+                            type="button" 
+                            onClick={toggleResetMode}
+                            className="text-[10px] text-gray-400 hover:text-[#c8aa6e] hover:underline"
+                        >
+                            ¿Olvidaste la contraseña?
+                        </button>
+                    )}
+                </div>
+                <div className="relative group">
+                <input 
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 pl-10 pr-10 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all"
+                />
+                <Lock className="w-5 h-5 text-gray-500 absolute left-3 top-3.5 group-focus-within:text-[#c8aa6e] transition-colors" />
+                <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3.5 text-gray-500 hover:text-[#c8aa6e] transition-colors focus:outline-none"
+                >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+                </div>
             </div>
-          </div>
+          )}
 
           {/* CONFIRM PASSWORD (Register only) */}
           {isRegistering && (
@@ -243,19 +295,29 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             disabled={isLoading}
             className="w-full bg-gradient-to-r from-[#c8aa6e] to-[#917640] hover:from-[#e6cf9b] hover:to-[#a88a4d] text-[#0a1428] font-bold py-3 px-4 rounded transform transition-all duration-200 hover:scale-[1.02] shadow-lg mt-6 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
           >
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isRegistering ? 'Crear Cuenta' : 'Acceder')}
+            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+             (isResetting ? 'Enviar Enlace' : isRegistering ? 'Crear Cuenta' : 'Acceder')}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <button 
-            onClick={toggleMode}
-            className="text-xs text-[#c8aa6e] hover:text-[#f0e6d2] hover:underline transition-colors focus:outline-none"
-          >
-            {isRegistering 
-              ? '¿Ya tienes cuenta? Inicia sesión aquí' 
-              : '¿No tienes cuenta? Regístrate gratis'}
-          </button>
+            {isResetting ? (
+                <button 
+                    onClick={toggleResetMode}
+                    className="flex items-center justify-center gap-2 mx-auto text-xs text-[#c8aa6e] hover:text-[#f0e6d2] transition-colors focus:outline-none"
+                >
+                    <ArrowLeft className="w-3 h-3" /> Volver al Inicio de Sesión
+                </button>
+            ) : (
+                <button 
+                    onClick={toggleMode}
+                    className="text-xs text-[#c8aa6e] hover:text-[#f0e6d2] hover:underline transition-colors focus:outline-none"
+                >
+                    {isRegistering 
+                    ? '¿Ya tienes cuenta? Inicia sesión aquí' 
+                    : '¿No tienes cuenta? Regístrate gratis'}
+                </button>
+            )}
         </div>
       </div>
     </div>

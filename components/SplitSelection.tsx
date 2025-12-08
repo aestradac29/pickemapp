@@ -1,5 +1,5 @@
 import React from 'react';
-import { Snowflake, Sun, Flower2, ArrowRight } from 'lucide-react';
+import { Snowflake, Sun, Flower2, ArrowRight, Lock } from 'lucide-react';
 
 interface SplitSelectionProps {
   onSelect: (splitName: string) => void;
@@ -52,56 +52,72 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-[1400px]">
-        {splits.map((split) => (
-          <button
-            key={split.id}
-            onClick={() => onSelect(split.name)}
-            className={`
-              group relative h-[400px] rounded-2xl overflow-hidden border-2 transition-all duration-500 hover:scale-105
-              ${split.borderColor} ${split.shadow} shadow-2xl
-            `}
-          >
-            {/* Background Image with Overlay */}
-            <div className="absolute inset-0">
-              {/* object-right-top for Summer, object-center for others to center them horizontally and vertically */}
-              <img 
-                src={split.bgImage} 
-                alt={split.name} 
-                className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 grayscale group-hover:grayscale-0 ${split.id === 'summer' ? 'object-right-top' : 'object-center'}`} 
-              />
-              <div className="absolute inset-0 bg-black/70 group-hover:bg-black/40 transition-colors duration-500"></div>
-            </div>
-
-            {/* Content */}
-            <div className="relative z-10 h-full flex flex-col items-center justify-center p-6 text-center">
-              <div className={`
-                w-20 h-20 rounded-full bg-gradient-to-br ${split.color} 
-                flex items-center justify-center mb-6 shadow-lg transform group-hover:-translate-y-2 transition-transform duration-500
-              `}>
-                <split.icon className="w-10 h-10 text-black/70" />
+        {splits.map((split) => {
+          const isLocked = split.status === 'Próximamente';
+          
+          return (
+            <button
+              key={split.id}
+              onClick={() => !isLocked && onSelect(split.name)}
+              disabled={isLocked}
+              className={`
+                group relative h-[400px] rounded-2xl overflow-hidden border-2 transition-all duration-500
+                ${isLocked 
+                  ? 'border-gray-800 opacity-60 cursor-not-allowed' 
+                  : `${split.borderColor} ${split.shadow} shadow-2xl hover:scale-105 cursor-pointer`
+                }
+              `}
+            >
+              {/* Background Image with Overlay */}
+              <div className="absolute inset-0">
+                <img 
+                  src={split.bgImage} 
+                  alt={split.name} 
+                  className={`
+                    w-full h-full object-cover transition-transform duration-700 
+                    ${isLocked ? 'grayscale' : 'grayscale group-hover:grayscale-0 group-hover:scale-110'} 
+                    ${split.id === 'summer' ? 'object-right-top' : 'object-center'}
+                  `} 
+                />
+                <div className={`absolute inset-0 transition-colors duration-500 ${isLocked ? 'bg-black/80' : 'bg-black/70 group-hover:bg-black/40'}`}></div>
               </div>
 
-              <h3 className="text-2xl font-bold text-white mb-2 uppercase tracking-wide group-hover:scale-110 transition-transform">
-                {split.name}
-              </h3>
+              {/* Content */}
+              <div className="relative z-10 h-full flex flex-col items-center justify-center p-6 text-center">
+                <div className={`
+                  w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-lg transition-transform duration-500
+                  ${isLocked 
+                    ? 'bg-gray-800 border border-gray-700' 
+                    : `bg-gradient-to-br ${split.color} transform group-hover:-translate-y-2`
+                  }
+                `}>
+                  {isLocked ? <Lock className="w-8 h-8 text-gray-500" /> : <split.icon className="w-10 h-10 text-black/70" />}
+                </div>
 
-              <span className={`
-                text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border mb-8
-                ${split.id === 'winter' ? 'bg-green-500/20 border-green-500 text-green-300' : 'bg-gray-800/50 border-gray-600 text-gray-400'}
-              `}>
-                {split.status}
-              </span>
+                <h3 className={`text-2xl font-bold mb-2 uppercase tracking-wide transition-transform ${isLocked ? 'text-gray-500' : 'text-white group-hover:scale-110'}`}>
+                  {split.name}
+                </h3>
 
-              <div className={`
-                flex items-center gap-2 text-sm font-bold uppercase tracking-widest opacity-0 transform translate-y-4
-                group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300
-                bg-white/10 backdrop-blur px-4 py-2 rounded-lg border border-white/20 hover:bg-white/20
-              `}>
-                Entrar <ArrowRight className="w-4 h-4" />
+                <span className={`
+                  text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border mb-8
+                  ${split.id === 'winter' ? 'bg-green-500/20 border-green-500 text-green-300' : 'bg-gray-800/50 border-gray-600 text-gray-400'}
+                `}>
+                  {split.status}
+                </span>
+
+                {!isLocked && (
+                  <div className={`
+                    flex items-center gap-2 text-sm font-bold uppercase tracking-widest opacity-0 transform translate-y-4
+                    group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300
+                    bg-white/10 backdrop-blur px-4 py-2 rounded-lg border border-white/20 hover:bg-white/20
+                  `}>
+                    Entrar <ArrowRight className="w-4 h-4" />
+                  </div>
+                )}
               </div>
-            </div>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

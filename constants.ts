@@ -180,7 +180,7 @@ export const PLAYERS: Player[] = [
   { id: 'gx-top', name: "Th3Antonio", role: Role.TOP, teamId: "gx", cost: 230, averagePoints: 11.5, kda: 2.0, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716550756303_GX_Th3Antonio.png" },
   { id: 'gx-jng', name: "Juhan", role: Role.JUNGLE, teamId: "gx", cost: 250, averagePoints: 13.0, kda: 2.4, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716550742183_GX_Juhan.png" },
   { id: 'gx-mid', name: "Jackies", role: Role.MID, teamId: "gx", cost: 270, averagePoints: 14.8, kda: 2.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663158025_GX_Jackies.png" },
-  { id: 'gx-adc', name: "Patrik", role: Role.ADC, teamId: "gx", cost: 280, averagePoints: 15.5, kda: 3.1, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663188836_GX_Patrik.png" },
+  { id: 'gx-adc', name: "Patrik", role: Role.ADC, teamId: "gx", cost: 280, averagePoints: 15.5, kda: 3.1, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663188356_GX_Patrik.png" },
   { id: 'gx-sup', name: "Ignar", role: Role.SUPPORT, teamId: "gx", cost: 260, averagePoints: 13.5, kda: 2.7, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663140505_GX_Ignar.png" },
 
   // --- SPECIAL TEAMS (Guest Teams - Variable Pricing) ---
@@ -207,10 +207,10 @@ export const PLAYERS: Player[] = [
   { id: 'kcb-sup', name: "Hantera", role: Role.SUPPORT, teamId: "kcb", cost: 210, averagePoints: 10.5, kda: 2.4 },
 ];
 
-// Mock Matches
+// Mock Matches with VALID UUIDs
 export const MATCHES: Match[] = [
   {
-    id: 'm1',
+    id: '11111111-0000-0000-0000-000000000001', 
     teamA: TEAMS.g2,
     teamB: TEAMS.kc,
     startTime: new Date(Date.now() + 86400000).toISOString(),
@@ -218,7 +218,7 @@ export const MATCHES: Match[] = [
     isCompleted: false,
   },
   {
-    id: 'm2',
+    id: '11111111-0000-0000-0000-000000000002',
     teamA: TEAMS.fnc,
     teamB: TEAMS.mkoi,
     startTime: new Date(Date.now() + 90000000).toISOString(),
@@ -226,7 +226,7 @@ export const MATCHES: Match[] = [
     isCompleted: false,
   },
   {
-    id: 'm3',
+    id: '11111111-0000-0000-0000-000000000003',
     teamA: TEAMS.rat, // Los Ratones
     teamB: TEAMS.kcb, // KC Blue
     startTime: new Date(Date.now() + 95000000).toISOString(),
@@ -234,7 +234,7 @@ export const MATCHES: Match[] = [
     isCompleted: false,
   },
   {
-    id: 'm4',
+    id: '11111111-0000-0000-0000-000000000004',
     teamA: TEAMS.nvi, // NAVI
     teamB: TEAMS.sk,
     startTime: new Date(Date.now() + 100000000).toISOString(),
@@ -254,29 +254,16 @@ export const getMatchesForDay = (day: number): Match[] => {
   const matchesPerDay = numTeams / 2;
 
   // Simple rotation algorithm for round robin
-  // Fix the first team, rotate the rest
-  // Array indices for this day calculation
   const indices = Array.from({ length: numTeams }, (_, i) => i);
-  
-  // Rotate based on day (day 1 = 0 rotation)
-  // Logic: 
-  // Fixed: index 0
-  // Rotated: indices 1 to 11
   
   const rotationOffset = day - 1;
   const rotatedIndices = [
     indices[0],
     ...indices.slice(1).map((val, i, arr) => {
-       // current position in the rotating sub-array
        const newPos = (i + rotationOffset) % arr.length;
        return arr[newPos];
     })
   ];
-  
-  // Pair up: (0 vs 11), (1 vs 10), (2 vs 9), etc in the rotated array context? 
-  // Standard circle method:
-  // T0   T1   T2   T3   T4   T5
-  // T11  T10  T9   T8   T7   T6
   
   const topRow = rotatedIndices.slice(0, numTeams / 2);
   const bottomRow = rotatedIndices.slice(numTeams / 2).reverse();
@@ -285,15 +272,18 @@ export const getMatchesForDay = (day: number): Match[] => {
      const teamAIndex = topRow[i];
      const teamBIndex = bottomRow[i];
      
-     // Deterministic start time for mock purposes
-     // Day 1 starts "Tomorrow", Day 2 "Tomorrow + 1", etc.
-     // Matches staggered by 1 hour
      const baseDate = new Date();
      baseDate.setDate(baseDate.getDate() + day);
      baseDate.setHours(17 + i, 0, 0, 0);
 
+     // Generar ID compatible con UUID (8-4-4-4-12 chars)
+     // Formato: 00000000-0000-0000-0000-000000DD00MM
+     const dayStr = day.toString().padStart(2, '0');
+     const indexStr = i.toString().padStart(2, '0');
+     const uuid = `00000000-0000-0000-0000-000000${dayStr}${indexStr}00`;
+
      matches.push({
-        id: `d${day}-m${i}`,
+        id: uuid, 
         teamA: teamsArray[teamAIndex],
         teamB: teamsArray[teamBIndex],
         startTime: baseDate.toISOString(),

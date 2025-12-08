@@ -41,10 +41,10 @@ export const dataService = {
             .eq('user_id', userId);
 
         if (error) {
-            console.error("Error cargando predicciones:", error);
+            console.error("Error cargando predicciones:", JSON.stringify(error, null, 2));
             return [];
         }
-        return data.map(p => ({ matchId: p.match_id, predictedWinnerId: p.predicted_winner_id }));
+        return data.map((p: any) => ({ matchId: p.match_id, predictedWinnerId: p.predicted_winner_id }));
     },
 
     async savePrediction(userId: string, matchId: string, teamId: string) {
@@ -61,8 +61,10 @@ export const dataService = {
                 { onConflict: 'user_id, match_id' }
             );
         
-        if (error) console.error("Error guardando predicción:", error);
-        return error;
+        if (error) {
+            console.error("Error guardando predicción:", JSON.stringify(error, null, 2));
+            throw new Error(error.message);
+        }
     },
 
     // --- FANTASY TEAM ---
@@ -99,11 +101,7 @@ export const dataService = {
             updated_at: new Date().toISOString()
         };
 
-        // Nota: Asumiendo que 'fantasy_teams' tiene una restricción única en user_id + split_id
-        // Si no tienes esa restricción en la BD, esto creará filas nuevas cada vez.
-        // Para simplificar, intentamos borrar el anterior o usar upsert si hay PK.
-        
-        // Estrategia simple: Check if exists first
+        // Check if exists first
         const { data: existing } = await supabase
             .from('fantasy_teams')
             .select('id')
@@ -125,7 +123,9 @@ export const dataService = {
              error = result.error;
         }
 
-        if (error) console.error("Error guardando fantasy team:", error);
-        return error;
+        if (error) {
+            console.error("Error guardando fantasy team:", JSON.stringify(error, null, 2));
+            throw new Error(error.message);
+        }
     }
 };

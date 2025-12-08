@@ -10,7 +10,7 @@ import { FantasyView } from './components/FantasyView';
 import { MatchdayView } from './components/MatchdayView';
 import { SplitSelection } from './components/SplitSelection';
 import { ViewState, UserPrediction } from './types';
-import { Menu, X, Share2, Swords, LogOut, ChevronLeft } from 'lucide-react';
+import { Menu, X, Share2, LogOut, ChevronLeft, KeyRound, Loader2, Save } from 'lucide-react';
 import { authService } from './services/authService';
 import { dataService } from './services/dataService';
 import { supabase } from './lib/supabase';
@@ -24,6 +24,12 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedSplit, setSelectedSplit] = useState<string | null>(null);
+
+  // Recovery State
+  const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // --- SUPABASE SESSION HANDLER ---
   useEffect(() => {
@@ -48,12 +54,20 @@ const App: React.FC = () => {
     checkUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        // Detectar si el usuario llega por recuperación de contraseña
+        if (event === 'PASSWORD_RECOVERY') {
+            setShowPasswordResetModal(true);
+        }
+
         if (event === 'SIGNED_IN' && session) {
             const username = session.user.user_metadata?.username || session.user.email?.split('@')[0];
             setCurrentUser(username);
             setCurrentUserId(session.user.id);
             loadUserData(session.user.id);
-            setView(ViewState.SPLIT_SELECTION);
+            // Solo cambiamos la vista si no estamos recuperando contraseña
+            if (!showPasswordResetModal) {
+                 setView(ViewState.SPLIT_SELECTION);
+            }
         } else if (event === 'SIGNED_OUT') {
             setCurrentUser(null);
             setCurrentUserId(null);
@@ -65,7 +79,7 @@ const App: React.FC = () => {
     return () => {
         authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [showPasswordResetModal]);
 
   const loadUserData = async (userId: string) => {
       const preds = await dataService.getUserPredictions(userId);
@@ -73,7 +87,6 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (username: string) => {
-    // Fallback manual login UI update
     setCurrentUser(username);
     setView(ViewState.SPLIT_SELECTION);
   };
@@ -90,6 +103,30 @@ const App: React.FC = () => {
     setSelectedSplit(null);
     setView(ViewState.LOGIN);
     setIsMenuOpen(false);
+  };
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsSavingPassword(true);
+      setPasswordError(null);
+
+      if (newPassword.length < 6) {
+          setPasswordError("La contraseña debe tener al menos 6 caracteres.");
+          setIsSavingPassword(false);
+          return;
+      }
+
+      try {
+          await authService.updateUserPassword(newPassword);
+          setShowPasswordResetModal(false);
+          setNewPassword('');
+          // Force view refresh just in case
+          setView(ViewState.SPLIT_SELECTION);
+      } catch (error: any) {
+          setPasswordError(error.message || "Error al actualizar la contraseña.");
+      } finally {
+          setIsSavingPassword(false);
+      }
   };
 
   const handleSelectWinner = async (matchId: string, teamId: string) => {
@@ -131,7 +168,7 @@ const App: React.FC = () => {
         return <FantasyView currentUserId={currentUserId} />;
 
       case ViewState.MATCHDAY:
-        return <MatchdayView />;
+        return <MatchdayView currentUserId={currentUserId} initialPredictions={predictions} />;
 
       case ViewState.PLAYOFFS:
         return (
@@ -175,7 +212,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#0a1428] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1a2c4e] via-[#0a1428] to-[#0a1428] text-[#f0e6d2] font-sans">
       
       {/* Navbar */}
-      {currentUser && (
+      {currentUser && !showPasswordResetModal && (
         <nav className="sticky top-0 z-50 bg-[#091428]/90 backdrop-blur-md border-b border-hextech-500/30">
           <div className="max-w-5xl mx-auto px-4">
             <div className="flex items-center justify-between h-16">
@@ -257,6 +294,50 @@ const App: React.FC = () => {
       <main className="max-w-4xl mx-auto px-4 py-6">
         {renderContent()}
       </main>
+
+      {/* PASSWORD RESET MODAL */}
+      {showPasswordResetModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="w-full max-w-md bg-[#091428] border-2 border-[#c8aa6e] rounded-xl p-8 shadow-[0_0_50px_rgba(200,170,110,0.2)] animate-in zoom-in-95">
+                  <div className="text-center mb-6">
+                      <div className="w-16 h-16 bg-gradient-to-br from-[#c8aa6e] to-[#091428] rounded-full p-0.5 mb-4 border border-[#c8aa6e] flex items-center justify-center shadow-lg mx-auto">
+                          <KeyRound className="w-8 h-8 text-[#f0e6d2]" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-white uppercase">Nueva Contraseña</h2>
+                      <p className="text-gray-400 text-sm mt-2">Introduce tu nueva contraseña para recuperar el acceso.</p>
+                  </div>
+
+                  {passwordError && (
+                      <div className="mb-4 p-3 bg-red-900/50 border border-red-500/50 rounded text-red-200 text-sm text-center">
+                          {passwordError}
+                      </div>
+                  )}
+
+                  <form onSubmit={handlePasswordUpdate}>
+                      <div className="space-y-4 mb-6">
+                          <div>
+                            <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Nueva Contraseña</label>
+                            <input 
+                                type="password" 
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="••••••••"
+                                className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all mt-1"
+                            />
+                          </div>
+                      </div>
+                      <button 
+                        type="submit"
+                        disabled={isSavingPassword}
+                        className="w-full bg-gradient-to-r from-[#c8aa6e] to-[#917640] hover:from-[#e6cf9b] hover:to-[#a88a4d] text-[#0a1428] font-bold py-3 px-4 rounded transform transition-all shadow-lg uppercase tracking-widest flex justify-center items-center gap-2"
+                      >
+                        {isSavingPassword ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        Guardar Contraseña
+                      </button>
+                  </form>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

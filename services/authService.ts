@@ -4,6 +4,19 @@ export interface AuthError {
     message: string;
 }
 
+// URL de producción de la aplicación
+const PRODUCTION_URL = 'https://lol-pick-em-pro-606660166462.us-west1.run.app';
+
+// Helper para determinar a dónde redirigir al usuario tras confirmar email
+const getRedirectUrl = () => {
+    // Si estamos ejecutando en localhost, permitimos redirección a localhost para facilitar el desarrollo.
+    // En cualquier otro caso (o si window no está definido), usamos la URL de producción.
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+        return window.location.origin;
+    }
+    return PRODUCTION_URL;
+};
+
 export const authService = {
     // Registro
     async signUp(email: string, password: string, username: string) {
@@ -11,6 +24,8 @@ export const authService = {
             email,
             password,
             options: {
+                // Especificamos explícitamente la URL de redirección
+                emailRedirectTo: getRedirectUrl(),
                 data: {
                     username: username,
                     avatar_url: `https://ui-avatars.com/api/?name=${username}&background=random`
@@ -21,9 +36,6 @@ export const authService = {
         if (error) throw error;
         
         // Crear perfil en la tabla 'profiles'
-        // NOTA: Si 'Confirm Email' está activado en Supabase, data.session será null.
-        // En ese caso, la inserción podría fallar si tus políticas RLS requieren estar logueado.
-        // Lo intentamos de todas formas, pero no bloqueamos el flujo si falla.
         if (data.user) {
             try {
                 const { error: profileError } = await supabase.from('profiles').insert([
@@ -61,7 +73,6 @@ export const authService = {
                 .single();
 
             if (error || !data) {
-                // Mensaje más descriptivo
                 throw new Error('Usuario no encontrado. Si te acabas de registrar, intenta entrar con tu CORREO directamente.');
             }
             
@@ -74,7 +85,6 @@ export const authService = {
         });
         
         if (error) {
-            // Traducir error común de Supabase
             if (error.message.includes("Email not confirmed")) {
                 throw new Error("Tu correo no ha sido confirmado. Por favor revisa tu bandeja de entrada (y spam).");
             }
@@ -83,6 +93,27 @@ export const authService = {
             }
             throw error;
         }
+        return data;
+    },
+
+    // Enviar correo de restablecimiento de contraseña
+    async resetPasswordForEmail(email: string) {
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+            // Usamos la URL correcta para que el link del correo funcione en producción
+            redirectTo: getRedirectUrl(),
+        });
+        
+        if (error) throw error;
+        return data;
+    },
+
+    // Actualizar la contraseña (se usa después de que el usuario entra con el link de recuperación o desde perfil)
+    async updateUserPassword(newPassword: string) {
+        const { data, error } = await supabase.auth.updateUser({
+            password: newPassword
+        });
+
+        if (error) throw error;
         return data;
     },
 

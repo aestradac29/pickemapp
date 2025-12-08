@@ -338,8 +338,7 @@ export const FantasyView: React.FC<FantasyViewProps> = ({ currentUserId }) => {
     setIsSaving(true);
     setSaveStatus('idle');
     try {
-        const error = await dataService.saveFantasyTeam(currentUserId, myTeam);
-        if (error) throw error;
+        await dataService.saveFantasyTeam(currentUserId, myTeam);
         setSaveStatus('success');
         setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (e) {
