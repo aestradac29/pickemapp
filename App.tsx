@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MATCHES, USERS } from './constants';
 import { MatchCard } from './components/MatchCard';
 import { Leaderboard } from './components/Leaderboard';
@@ -11,17 +11,70 @@ import { MatchdayView } from './components/MatchdayView';
 import { SplitSelection } from './components/SplitSelection';
 import { ViewState, UserPrediction } from './types';
 import { Menu, X, Share2, Swords, LogOut, ChevronLeft } from 'lucide-react';
+import { authService } from './services/authService';
+import { dataService } from './services/dataService';
+import { supabase } from './lib/supabase';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.LOGIN);
   const [predictions, setPredictions] = useState<UserPrediction[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // Auth State
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedSplit, setSelectedSplit] = useState<string | null>(null);
 
+  // --- SUPABASE SESSION HANDLER ---
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const user = await authService.getCurrentUser();
+        if (user) {
+           setCurrentUser(user.profile?.username || user.email?.split('@')[0] || 'Invocador');
+           setCurrentUserId(user.id);
+           
+           // Load User Data
+           loadUserData(user.id);
+
+           if (view === ViewState.LOGIN) {
+              setView(ViewState.SPLIT_SELECTION);
+           }
+        }
+      } catch (error) {
+        console.error("No active session", error);
+      }
+    };
+    checkUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+            const username = session.user.user_metadata?.username || session.user.email?.split('@')[0];
+            setCurrentUser(username);
+            setCurrentUserId(session.user.id);
+            loadUserData(session.user.id);
+            setView(ViewState.SPLIT_SELECTION);
+        } else if (event === 'SIGNED_OUT') {
+            setCurrentUser(null);
+            setCurrentUserId(null);
+            setPredictions([]);
+            setView(ViewState.LOGIN);
+        }
+    });
+
+    return () => {
+        authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const loadUserData = async (userId: string) => {
+      const preds = await dataService.getUserPredictions(userId);
+      setPredictions(preds);
+  };
+
   const handleLogin = (username: string) => {
+    // Fallback manual login UI update
     setCurrentUser(username);
-    // After login, go to Split Selection instead of Dashboard
     setView(ViewState.SPLIT_SELECTION);
   };
 
@@ -30,14 +83,17 @@ const App: React.FC = () => {
     setView(ViewState.DASHBOARD);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await authService.signOut();
     setCurrentUser(null);
+    setCurrentUserId(null);
     setSelectedSplit(null);
     setView(ViewState.LOGIN);
     setIsMenuOpen(false);
   };
 
-  const handleSelectWinner = (matchId: string, teamId: string) => {
+  const handleSelectWinner = async (matchId: string, teamId: string) => {
+    // Optimistic UI Update
     setPredictions(prev => {
       const existing = prev.find(p => p.matchId === matchId);
       if (existing) {
@@ -45,6 +101,11 @@ const App: React.FC = () => {
       }
       return [...prev, { matchId, predictedWinnerId: teamId }];
     });
+
+    // Save to DB
+    if (currentUserId) {
+        await dataService.savePrediction(currentUserId, matchId, teamId);
+    }
   };
 
   // Render content based on current view
@@ -66,7 +127,8 @@ const App: React.FC = () => {
         return <CrystalBall />;
 
       case ViewState.FANTASY:
-        return <FantasyView />;
+        // Pass currentUserId to FantasyView so it can save/load
+        return <FantasyView currentUserId={currentUserId} />;
 
       case ViewState.MATCHDAY:
         return <MatchdayView />;
@@ -87,10 +149,10 @@ const App: React.FC = () => {
             </div>
              <div className="fixed bottom-8 left-0 right-0 px-4 flex justify-center pointer-events-none">
               {predictions.length > 0 && (
-                <button className="pointer-events-auto shadow-2xl bg-hextech-900 border border-hextech-500 text-hextech-500 px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-hextech-500 hover:text-black transition-all transform hover:scale-105">
+                <div className="pointer-events-auto bg-hextech-900 border border-hextech-500 text-hextech-500 px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-[0_0_20px_rgba(200,170,110,0.3)] animate-in slide-in-from-bottom-2">
                   <Share2 className="w-4 h-4" />
-                  Guardar ({predictions.length})
-                </button>
+                  <span>Predicciones guardadas</span>
+                </div>
               )}
             </div>
           </div>
@@ -112,7 +174,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#0a1428] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1a2c4e] via-[#0a1428] to-[#0a1428] text-[#f0e6d2] font-sans">
       
-      {/* Navbar (Only show if logged in AND split is selected for full nav, otherwise just logout if in split selection) */}
+      {/* Navbar */}
       {currentUser && (
         <nav className="sticky top-0 z-50 bg-[#091428]/90 backdrop-blur-md border-b border-hextech-500/30">
           <div className="max-w-5xl mx-auto px-4">
@@ -145,7 +207,6 @@ const App: React.FC = () => {
                     </button>
                 )}
                 
-                {/* Switch Split Button */}
                 {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
                    <button 
                         onClick={() => setView(ViewState.SPLIT_SELECTION)}

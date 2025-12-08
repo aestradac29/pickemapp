@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TEAMS, PLAYERS, ROLE_ICONS, WHITE_LOGO_TEAMS, USERS } from '../constants';
 import { Role, User } from '../types';
-import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, AlertTriangle, Swords, Eye, Search, ChevronRight, ArrowLeft, User as UserIcon } from 'lucide-react';
+import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, AlertTriangle, Swords, Eye, Search, ChevronRight, ArrowLeft, User as UserIcon, Loader2, CheckCircle2 } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
+import { dataService } from '../services/dataService';
 
 // Budget Constants
 const MAX_BUDGET = 1500;
@@ -284,7 +285,11 @@ const UserSearchModal: React.FC<UserSearchModalProps> = ({ isOpen, onClose, onSe
     );
 };
 
-export const FantasyView: React.FC = () => {
+interface FantasyViewProps {
+    currentUserId?: string | null;
+}
+
+export const FantasyView: React.FC<FantasyViewProps> = ({ currentUserId }) => {
   // Local state for "My Team"
   const [myTeam, setMyTeam] = useState<Record<Role, string | null>>({
     [Role.TOP]: null,
@@ -293,6 +298,20 @@ export const FantasyView: React.FC = () => {
     [Role.ADC]: null,
     [Role.SUPPORT]: null,
   });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  // Load team from DB on mount
+  useEffect(() => {
+      if (currentUserId) {
+          dataService.getFantasyTeam(currentUserId).then(team => {
+              if (team) {
+                  setMyTeam(team);
+              }
+          });
+      }
+  }, [currentUserId]);
 
   // State for which user's team we are viewing (null = me)
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
@@ -309,6 +328,25 @@ export const FantasyView: React.FC = () => {
     // Only allow modification if viewing my own team
     if (!isReadOnly) {
         setMyTeam(prev => ({ ...prev, [role]: playerId }));
+        setSaveStatus('idle'); // Reset status on change
+    }
+  };
+
+  const handleSave = async () => {
+    if (!currentUserId) return;
+    
+    setIsSaving(true);
+    setSaveStatus('idle');
+    try {
+        const error = await dataService.saveFantasyTeam(currentUserId, myTeam);
+        if (error) throw error;
+        setSaveStatus('success');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (e) {
+        console.error(e);
+        setSaveStatus('error');
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -487,15 +525,21 @@ export const FantasyView: React.FC = () => {
                 <span className="hidden sm:inline">Reiniciar</span>
                 </button>
                 
-                <button className={`
+                <button 
+                    onClick={handleSave}
+                    disabled={isSaving || isOverBudget}
+                    className={`
                     font-bold px-10 py-3 rounded-xl shadow-lg transition-all transform hover:scale-105 flex items-center gap-2
                     ${isFullTeam && !isOverBudget
                         ? 'bg-gradient-to-r from-[#0ac8b9] to-[#0a7e78] text-black shadow-[0_0_20px_rgba(10,200,185,0.4)]' 
                         : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'
                     }
                 `}>
-                <Save className="w-5 h-5" />
-                Guardar Alineación
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+                 saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> : 
+                 <Save className="w-5 h-5" />}
+                
+                {saveStatus === 'success' ? '¡Guardado!' : 'Guardar Alineación'}
                 </button>
             </div>
         </div>

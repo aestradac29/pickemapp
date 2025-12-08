@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Shield, User, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Shield, User, Mail, Lock, AlertCircle, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
+import { authService } from '../services/authService';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 interface LoginProps {
   onLogin: (username: string) => void;
@@ -7,13 +9,14 @@ interface LoginProps {
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Login State
-  const [loginIdentifier, setLoginIdentifier] = useState(''); // Stores either username or email
+  const [identifier, setIdentifier] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
 
   // Register State
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
   // Shared State
@@ -23,41 +26,65 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  // Error State
+  // Feedback State
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
 
-    if (isRegistering) {
-      // REGISTRATION LOGIC
-      if (!username || !email || !password || !confirmPassword) {
-        setError('Por favor completa todos los campos.');
+    if (!isSupabaseConfigured()) {
+        setError('⚠️ Falta configurar Supabase en lib/supabase.ts');
+        setIsLoading(false);
         return;
-      }
+    }
 
-      if (password !== confirmPassword) {
-        setError('Las contraseñas no coinciden.');
-        return;
-      }
-      if (password.length < 6) {
-        setError('La contraseña debe tener al menos 6 caracteres.');
-        return;
-      }
-      // Simulate Registration
-      console.log("Registrando usuario:", { username, email });
-      onLogin(username);
-    } else {
-      // LOGIN LOGIC
-      if (!loginIdentifier || !password) {
-        setError('Por favor introduce tu usuario o correo y contraseña.');
-        return;
-      }
-      // Simulate Login
-      console.log("Iniciando sesión:", { loginIdentifier });
-      // Use the identifier as the display name for this mock
-      onLogin(loginIdentifier);
+    try {
+        if (isRegistering) {
+          // VALIDACIONES REGISTRO
+          if (!username || !registerEmail || !password || !confirmPassword) {
+            throw new Error('Por favor completa todos los campos.');
+          }
+          if (password !== confirmPassword) {
+            throw new Error('Las contraseñas no coinciden.');
+          }
+          if (password.length < 6) {
+             throw new Error('La contraseña debe tener al menos 6 caracteres.');
+          }
+          
+          // LLAMADA A SUPABASE
+          const data = await authService.signUp(registerEmail, password, username);
+          
+          // Si Supabase pide confirmación de email, data.session será null
+          if (data.user && !data.session) {
+             setSuccessMessage(`¡Cuenta creada! Hemos enviado un enlace de confirmación a ${registerEmail}. Por favor revisa tu correo.`);
+             setIsRegistering(false); // Volver al login
+             setIdentifier(registerEmail); // Pre-rellenar email
+             setPassword('');
+          } else {
+             // Si no pide confirmación, entramos directo
+             onLogin(username);
+          }
+          
+        } else {
+          // VALIDACIONES LOGIN
+          if (!identifier || !password) {
+            throw new Error('Por favor introduce tu usuario/correo y contraseña.');
+          }
+          
+          // LLAMADA A SUPABASE
+          const result = await authService.signIn(identifier, password);
+          const userProfile = result.user.user_metadata;
+          onLogin(userProfile.username || identifier.split('@')[0]);
+        }
+    } catch (err: any) {
+        console.error(err);
+        setError(err.message || "Ocurrió un error inesperado.");
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -65,14 +92,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     e.preventDefault();
     setIsRegistering(!isRegistering);
     setError(null);
-    // Reset all fields to avoid confusion
-    setLoginIdentifier('');
+    setSuccessMessage(null);
+    setIdentifier('');
+    setRegisterEmail('');
     setUsername('');
-    setEmail('');
     setPassword('');
     setConfirmPassword('');
-    setShowPassword(false);
-    setShowConfirmPassword(false);
   };
 
   return (
@@ -95,68 +120,79 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <p className="text-[#a09b8c] text-sm mt-2 text-center">
             {isRegistering ? 'Crea tu cuenta de invocador' : 'Identifícate para comenzar'}
           </p>
+          {!isSupabaseConfigured() && (
+             <p className="text-red-400 text-xs mt-2 font-bold bg-red-900/30 px-2 py-1 rounded border border-red-500">
+                 Modo Demo: Configura Supabase para conectar
+             </p>
+          )}
         </div>
 
+        {/* Success Message (e.g. Email Verification) */}
+        {successMessage && (
+          <div className="mb-4 p-3 bg-green-900/50 border border-green-500/50 rounded flex items-start gap-2 text-green-200 text-sm animate-in fade-in slide-in-from-top-2">
+            <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
+        {/* Error Message */}
         {error && (
-          <div className="mb-4 p-3 bg-red-900/50 border border-red-500/50 rounded flex items-center gap-2 text-red-200 text-sm animate-in fade-in slide-in-from-top-2">
-            <AlertCircle className="w-4 h-4" />
-            {error}
+          <div className="mb-4 p-3 bg-red-900/50 border border-red-500/50 rounded flex items-start gap-2 text-red-200 text-sm animate-in fade-in slide-in-from-top-2">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           
-          {/* LOGIN VIEW: Single User/Email Field */}
-          {!isRegistering && (
+          {/* REGISTER: Username & Email explicitly */}
+          {isRegistering ? (
+            <>
+                <div className="space-y-1 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Nombre de Usuario</label>
+                    <div className="relative group">
+                    <input 
+                        type="text" 
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="FakerFan23"
+                        className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 pl-10 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all"
+                    />
+                    <User className="w-5 h-5 text-gray-500 absolute left-3 top-3.5 group-focus-within:text-[#c8aa6e] transition-colors" />
+                    </div>
+                </div>
+                <div className="space-y-1 animate-in fade-in slide-in-from-left-4 duration-300">
+                    <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Correo Electrónico</label>
+                    <div className="relative group">
+                        <input 
+                        type="email" 
+                        value={registerEmail}
+                        onChange={(e) => setRegisterEmail(e.target.value)}
+                        placeholder="invocador@ejemplo.com"
+                        className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 pl-10 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all"
+                        />
+                        <Mail className="w-5 h-5 text-gray-500 absolute left-3 top-3.5 group-focus-within:text-[#c8aa6e] transition-colors" />
+                    </div>
+                </div>
+            </>
+          ) : (
+            /* LOGIN: Single Identifier Field */
             <div className="space-y-1 animate-in fade-in slide-in-from-left-4 duration-300">
-              <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Usuario o Correo Electrónico</label>
-              <div className="relative group">
-                <input 
-                  type="text" 
-                  value={loginIdentifier}
-                  onChange={(e) => setLoginIdentifier(e.target.value)}
-                  placeholder="FakerFan23 o ejemplo@correo.com"
-                  className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 pl-10 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all"
-                />
-                <User className="w-5 h-5 text-gray-500 absolute left-3 top-3.5 group-focus-within:text-[#c8aa6e] transition-colors" />
-              </div>
+                <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Usuario o Correo</label>
+                <div className="relative group">
+                    <input 
+                    type="text" 
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="Usuario o email"
+                    className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 pl-10 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all"
+                    />
+                    <User className="w-5 h-5 text-gray-500 absolute left-3 top-3.5 group-focus-within:text-[#c8aa6e] transition-colors" />
+                </div>
             </div>
           )}
-
-          {/* REGISTER VIEW: Separate Fields */}
-          {isRegistering && (
-            <>
-              <div className="space-y-1 animate-in fade-in slide-in-from-right-4 duration-300">
-                <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Nombre de Usuario</label>
-                <div className="relative group">
-                  <input 
-                    type="text" 
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="FakerFan23"
-                    className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 pl-10 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all"
-                  />
-                  <User className="w-5 h-5 text-gray-500 absolute left-3 top-3.5 group-focus-within:text-[#c8aa6e] transition-colors" />
-                </div>
-              </div>
-
-              <div className="space-y-1 animate-in fade-in slide-in-from-right-4 duration-300">
-                <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Correo Electrónico</label>
-                <div className="relative group">
-                  <input 
-                    type="email" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="invocador@ejemplo.com"
-                    className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 pl-10 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all"
-                  />
-                  <Mail className="w-5 h-5 text-gray-500 absolute left-3 top-3.5 group-focus-within:text-[#c8aa6e] transition-colors" />
-                </div>
-              </div>
-            </>
-          )}
           
-          {/* PASSWORD FIELD (Common for both) */}
+          {/* PASSWORD FIELD */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Contraseña</label>
             <div className="relative group">
@@ -204,9 +240,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <button 
             type="submit"
-            className="w-full bg-gradient-to-r from-[#c8aa6e] to-[#917640] hover:from-[#e6cf9b] hover:to-[#a88a4d] text-[#0a1428] font-bold py-3 px-4 rounded transform transition-all duration-200 hover:scale-[1.02] shadow-lg mt-6 uppercase tracking-widest"
+            disabled={isLoading}
+            className="w-full bg-gradient-to-r from-[#c8aa6e] to-[#917640] hover:from-[#e6cf9b] hover:to-[#a88a4d] text-[#0a1428] font-bold py-3 px-4 rounded transform transition-all duration-200 hover:scale-[1.02] shadow-lg mt-6 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
           >
-            {isRegistering ? 'Crear Cuenta' : 'Acceder'}
+            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isRegistering ? 'Crear Cuenta' : 'Acceder')}
           </button>
         </form>
 
