@@ -45,6 +45,7 @@ const App: React.FC = () => {
         const user = await authService.getCurrentUser();
         if (user) {
            setCurrentUser(user.profile?.username || user.email?.split('@')[0] || 'Invocador');
+           // getCurrentUser ya devuelve el ID del perfil correcto gracias al fix en authService
            setCurrentUserId(user.id);
            
            // Load User Data
@@ -65,17 +66,34 @@ const App: React.FC = () => {
     };
     checkUser();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
         // Detectar si el usuario llega por recuperación de contraseña
         if (event === 'PASSWORD_RECOVERY') {
             setShowPasswordResetModal(true);
         }
 
         if (event === 'SIGNED_IN' && session) {
-            const username = session.user.user_metadata?.username || session.user.email?.split('@')[0];
+            const userEmail = session.user.email;
+            let realUserId = session.user.id;
+            let username = session.user.user_metadata?.username || session.user.email?.split('@')[0];
+
+            // FIX: Buscar el perfil real por email para asegurar que tenemos el ID correcto (e025...)
+            // y no el ID de Auth (1516...) si están desincronizados.
+            if (userEmail) {
+                try {
+                    const profile = await authService.getProfileByEmail(userEmail);
+                    if (profile) {
+                        realUserId = profile.id;
+                        username = profile.username;
+                    }
+                } catch (e) {
+                    console.error("Error syncing profile on auth change:", e);
+                }
+            }
+
             setCurrentUser(username);
-            setCurrentUserId(session.user.id);
-            loadUserData(session.user.id);
+            setCurrentUserId(realUserId);
+            loadUserData(realUserId);
             
             // Solo redirigir si el usuario estaba en Login. 
             // Si ya estaba en Dashboard (por ejemplo al refrescar token), no hacemos nada.

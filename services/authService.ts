@@ -101,18 +101,46 @@ export const authService = {
         if (error) throw error;
     },
 
-    // Obtener Usuario Actual (y asegurar perfil)
+    // Helper: Obtener Perfil Real por Email
+    // Crucial para corregir desajustes entre Auth.ID y Profile.ID
+    async getProfileByEmail(email: string) {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', email)
+            .single();
+        
+        if (error) return null;
+        return data;
+    },
+
+    // Obtener Usuario Actual (y asegurar perfil correcto)
     async getCurrentUser() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return null;
 
+        // 1. Intentamos buscar por ID directo (Comportamiento estándar)
         let { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', user.id)
             .single();
 
-        // FIX: Auto-crear perfil si falta (para usuarios antiguos o errores de registro)
+        // 2. Fallback: Si no se encuentra por ID, buscamos por Email (Fix para tu caso específico)
+        if (!profile && user.email) {
+            console.log("Perfil no encontrado por Auth ID, buscando por Email...");
+            const { data: profileByEmail } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('email', user.email)
+                .single();
+            
+            if (profileByEmail) {
+                profile = profileByEmail;
+            }
+        }
+
+        // 3. Fallback Final: Auto-crear perfil si falta
         if (!profile) {
             console.log("Perfil no encontrado, intentando reparar...");
             const username = user.user_metadata?.username || user.email?.split('@')[0] || 'User';
@@ -135,6 +163,9 @@ export const authService = {
 
         return {
             ...user,
+            // Sobreescribimos el ID del usuario Auth con el ID del Perfil Real
+            // Esto asegura que el resto de la app use el UUID correcto (e025...)
+            id: profile?.id || user.id,
             profile: profile || user.user_metadata
         };
     }
