@@ -1,19 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { TEAMS, PLAYERS, ROLE_ICONS, WHITE_LOGO_TEAMS } from '../constants';
-import { Sparkles, RefreshCw, Trophy, User, Sword, Shield, Hash } from 'lucide-react';
+import { ROLE_ICONS, WHITE_LOGO_TEAMS } from '../constants';
+import { Sparkles, RefreshCw, Trophy, User, Sword, Shield, Hash, Loader2 } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { getChampions } from '../services/riotService';
-import { Role } from '../types';
+import { dataService } from '../services/dataService';
+import { Role, Player, Team } from '../types';
 
 export const CrystalBall: React.FC = () => {
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [championOptions, setChampionOptions] = useState<Option[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  
+  const [loadingChamps, setLoadingChamps] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
+  
   const [pentakills, setPentakills] = useState<string>('');
 
+  // Load App Data (Players & Teams)
+  useEffect(() => {
+    const loadData = async () => {
+        setLoadingData(true);
+        try {
+            const [playersList, teamsMap] = await Promise.all([
+                dataService.getPlayers(),
+                dataService.getTeams()
+            ]);
+            setPlayers(playersList);
+            setTeams(Object.values(teamsMap));
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoadingData(false);
+        }
+    };
+    loadData();
+  }, []);
+
+  // Load Riot Data (Champions)
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
+      setLoadingChamps(true);
       try {
         const champs = await getChampions();
         const sorted = champs.sort((a, b) => a.label.localeCompare(b.label));
@@ -21,7 +48,7 @@ export const CrystalBall: React.FC = () => {
       } catch (error) {
         console.error("Failed to load champions", error);
       } finally {
-        setLoading(false);
+        setLoadingChamps(false);
       }
     };
     fetchData();
@@ -31,10 +58,10 @@ export const CrystalBall: React.FC = () => {
     setSelections(prev => ({ ...prev, [key]: value }));
   };
 
-  const mapToOption = (p: any): Option => {
-    const team = TEAMS[p.teamId];
+  const mapToOption = (p: Player): Option => {
+    const team = teams.find(t => t.id === p.teamId);
     return {
-        id: p.name,
+        id: p.name, // Logic uses name for uniqueness in crystal ball usually
         label: p.name,
         subLabel: team ? team.name : 'Agente Libre',
         image: p.photo || ROLE_ICONS[p.role as Role], 
@@ -42,7 +69,7 @@ export const CrystalBall: React.FC = () => {
     };
   };
 
-  const teamOptions: Option[] = Object.values(TEAMS).map(t => ({
+  const teamOptions: Option[] = teams.map(t => ({
     id: t.id,
     label: t.name,
     subLabel: t.region,
@@ -51,12 +78,12 @@ export const CrystalBall: React.FC = () => {
     imageClassName: WHITE_LOGO_TEAMS.includes(t.id) ? 'brightness-0 invert' : ''
   }));
 
-  const allPlayerOptions: Option[] = PLAYERS
+  const allPlayerOptions: Option[] = players
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(mapToOption);
 
   const getPlayerOptionsByRole = (role: Role): Option[] => {
-    return PLAYERS
+    return players
       .filter(p => p.role === role)
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(mapToOption);
@@ -68,6 +95,15 @@ export const CrystalBall: React.FC = () => {
     { id: '2', label: '2' },
     { id: '+3', label: '+3' }
   ];
+
+  if (loadingData) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[500px] text-purple-300">
+            <Loader2 className="w-12 h-12 animate-spin mb-4" />
+            <p>Consultando a los astros...</p>
+        </div>
+      );
+  }
 
   return (
       <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 mb-24">
@@ -87,7 +123,7 @@ export const CrystalBall: React.FC = () => {
 
         <div className="space-y-12">
           
-          {/* SECTION 1: TEAMS - Now 3 columns in one row */}
+          {/* SECTION 1: TEAMS */}
           <section>
             <div className="flex items-center gap-3 mb-4">
                <div className="p-2 bg-purple-500/10 rounded-lg border border-purple-500/30">
@@ -207,7 +243,7 @@ export const CrystalBall: React.FC = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-[#0f1923]/50 rounded-xl border border-gray-800">
-              {loading ? (
+              {loadingChamps ? (
                  <div className="md:col-span-3 flex flex-col items-center justify-center p-8 text-purple-300/50">
                     <RefreshCw className="w-8 h-8 animate-spin mb-2" />
                     <span className="text-xs">Cargando datos de Riot Games...</span>

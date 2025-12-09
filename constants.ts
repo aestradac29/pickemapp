@@ -207,10 +207,10 @@ export const PLAYERS: Player[] = [
   { id: 'kcb-sup', name: "Hantera", role: Role.SUPPORT, teamId: "kcb", cost: 210, averagePoints: 10.5, kda: 2.4 },
 ];
 
-// Mock Matches with VALID UUIDs
+// Mock Matches
 export const MATCHES: Match[] = [
   {
-    id: '11111111-0000-0000-0000-000000000001', 
+    id: 'playoff-1', 
     teamA: TEAMS.g2,
     teamB: TEAMS.kc,
     startTime: new Date(Date.now() + 86400000).toISOString(),
@@ -218,7 +218,7 @@ export const MATCHES: Match[] = [
     isCompleted: false,
   },
   {
-    id: '11111111-0000-0000-0000-000000000002',
+    id: 'playoff-2',
     teamA: TEAMS.fnc,
     teamB: TEAMS.mkoi,
     startTime: new Date(Date.now() + 90000000).toISOString(),
@@ -226,7 +226,7 @@ export const MATCHES: Match[] = [
     isCompleted: false,
   },
   {
-    id: '11111111-0000-0000-0000-000000000003',
+    id: 'playoff-3',
     teamA: TEAMS.rat, // Los Ratones
     teamB: TEAMS.kcb, // KC Blue
     startTime: new Date(Date.now() + 95000000).toISOString(),
@@ -234,7 +234,7 @@ export const MATCHES: Match[] = [
     isCompleted: false,
   },
   {
-    id: '11111111-0000-0000-0000-000000000004',
+    id: 'playoff-4',
     teamA: TEAMS.nvi, // NAVI
     teamB: TEAMS.sk,
     startTime: new Date(Date.now() + 100000000).toISOString(),
@@ -276,14 +276,11 @@ export const getMatchesForDay = (day: number): Match[] => {
      baseDate.setDate(baseDate.getDate() + day);
      baseDate.setHours(17 + i, 0, 0, 0);
 
-     // Generar ID compatible con UUID (8-4-4-4-12 chars)
-     // Formato: 00000000-0000-0000-0000-000000DD00MM
-     const dayStr = day.toString().padStart(2, '0');
-     const indexStr = i.toString().padStart(2, '0');
-     const uuid = `00000000-0000-0000-0000-000000${dayStr}${indexStr}00`;
+     // Revert to simple ID format
+     const matchId = `d${day}-m${i}`;
 
      matches.push({
-        id: uuid, 
+        id: matchId, 
         teamA: teamsArray[teamAIndex],
         teamB: teamsArray[teamBIndex],
         startTime: baseDate.toISOString(),

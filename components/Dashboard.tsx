@@ -65,12 +65,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
   ];
 
   return (
-    <div className="px-4 py-8 animate-in slide-in-from-bottom-8 duration-500">
+    <div className="px-4 py-8 animate-in slide-in-from-bottom-8 duration-500 pb-20">
       <h2 className="text-2xl font-bold text-center mb-8 text-[#f0e6d2] uppercase tracking-widest">
         Panel de Control
       </h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-12">
         {options.map((option) => (
           <button
             key={option.id}

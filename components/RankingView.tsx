@@ -1,30 +1,43 @@
-import React, { useState } from 'react';
-import { TEAMS, WHITE_LOGO_TEAMS } from '../constants';
+import React, { useState, useEffect } from 'react';
+import { WHITE_LOGO_TEAMS } from '../constants';
 import { Team } from '../types';
-import { GripVertical, Save, Trophy, AlertOctagon } from 'lucide-react';
+import { GripVertical, Save, Trophy, AlertOctagon, Loader2, RefreshCw } from 'lucide-react';
+import { dataService } from '../services/dataService';
 
 export const RankingView: React.FC = () => {
-  // Initial state is just the list of values from constants
-  const [rankedTeams, setRankedTeams] = useState<Team[]>(Object.values(TEAMS));
+  const [rankedTeams, setRankedTeams] = useState<Team[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadTeams = async () => {
+        setIsLoading(true);
+        try {
+            const teamsMap = await dataService.getTeams();
+            const teamsList = Object.values(teamsMap);
+            // Default sort could be alphabetical or by region, here just taking DB order
+            setRankedTeams(teamsList);
+        } catch (error) {
+            console.error("Failed to load teams", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    loadTeams();
+  }, []);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
-    // Needed for Firefox
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault(); // Essential to allow dropping
+    e.preventDefault();
     if (draggedIndex === null || draggedIndex === index) return;
 
-    // Swap logic for real-time visual feedback
     const newOrder = [...rankedTeams];
     const draggedItem = newOrder[draggedIndex];
-    
-    // Remove from old pos
     newOrder.splice(draggedIndex, 1);
-    // Insert at new pos
     newOrder.splice(index, 0, draggedItem);
 
     setRankedTeams(newOrder);
@@ -34,6 +47,15 @@ export const RankingView: React.FC = () => {
   const handleDragEnd = () => {
     setDraggedIndex(null);
   };
+
+  if (isLoading) {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-[400px] text-[#c8aa6e]">
+              <Loader2 className="w-10 h-10 animate-spin mb-4" />
+              <p>Cargando equipos...</p>
+          </div>
+      );
+  }
 
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 mb-20">
@@ -94,7 +116,7 @@ export const RankingView: React.FC = () => {
                   {index + 1}º
                 </div>
                 
-                {/* Logo Container - Background separated from Image to prevent inversion of background */}
+                {/* Logo Container */}
                 <div className="relative w-10 h-10 rounded shadow-sm bg-gray-800 flex items-center justify-center overflow-hidden">
                   {team.logo ? (
                     <img 

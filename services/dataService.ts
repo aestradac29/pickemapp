@@ -1,8 +1,9 @@
 import { supabase } from '../lib/supabase';
-import { Team, Region, Role } from '../types';
+import { Team, Region, Role, Player } from '../types';
 import { TEAMS } from '../constants'; // Fallback
 
-// Mapper de base de datos (snake_case) a App (camelCase)
+// --- MAPPERS (DB -> App) ---
+
 const mapTeamFromDB = (dbTeam: any): Team => ({
     id: dbTeam.id,
     name: dbTeam.name,
@@ -12,16 +13,27 @@ const mapTeamFromDB = (dbTeam: any): Team => ({
     logo: dbTeam.logo_url
 });
 
+const mapPlayerFromDB = (dbPlayer: any): Player => ({
+    id: dbPlayer.id,
+    name: dbPlayer.name,
+    role: dbPlayer.role as Role,
+    teamId: dbPlayer.team_id,
+    photo: dbPlayer.photo_url,
+    cost: dbPlayer.fantasy_cost || 0,
+    averagePoints: dbPlayer.stats_avg_points || 0,
+    kda: dbPlayer.stats_kda || 0
+});
+
 export const dataService = {
-    // Obtener equipos
+    // --- TEAMS ---
     async getTeams(): Promise<Record<string, Team>> {
         const { data, error } = await supabase
             .from('teams')
             .select('*');
 
         if (error || !data || data.length === 0) {
-            console.warn("Usando datos locales (Fallback) para equipos. Si acabas de crear la BD, asegúrate de poblar la tabla 'teams'.");
-            return TEAMS; 
+            console.warn("Error o sin datos en DB para equipos. Usando Fallback.", error);
+            return TEAMS;
         }
 
         const teamsMap: Record<string, Team> = {};
@@ -30,6 +42,20 @@ export const dataService = {
         });
         
         return teamsMap;
+    },
+
+    // --- PLAYERS ---
+    async getPlayers(): Promise<Player[]> {
+        const { data, error } = await supabase
+            .from('players')
+            .select('*');
+            
+        if (error || !data) {
+            console.error("Error fetching players:", error);
+            return [];
+        }
+
+        return data.map(mapPlayerFromDB);
     },
 
     // --- PREDICCIONES (PICK'EM) ---
@@ -48,7 +74,6 @@ export const dataService = {
     },
 
     async savePrediction(userId: string, matchId: string, teamId: string) {
-        // Upsert: Insertar o Actualizar si ya existe
         const { error } = await supabase
             .from('predictions')
             .upsert(
@@ -74,7 +99,7 @@ export const dataService = {
             .from('fantasy_teams')
             .select('*')
             .eq('user_id', userId)
-            .order('updated_at', { ascending: false }) // Obtener el más reciente
+            .order('updated_at', { ascending: false }) 
             .limit(1)
             .single();
 
@@ -92,7 +117,7 @@ export const dataService = {
     async saveFantasyTeam(userId: string, team: Record<Role, string | null>) {
         const payload = {
             user_id: userId,
-            split_id: 'winter_2026', // Valor por defecto o dinámico
+            split_id: 'winter_2026', 
             top_player_id: team[Role.TOP],
             jng_player_id: team[Role.JUNGLE],
             mid_player_id: team[Role.MID],
@@ -101,7 +126,6 @@ export const dataService = {
             updated_at: new Date().toISOString()
         };
 
-        // Check if exists first
         const { data: existing } = await supabase
             .from('fantasy_teams')
             .select('id')
