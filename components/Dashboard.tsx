@@ -4,9 +4,10 @@ import { Trophy, ListOrdered, Sparkles, CalendarCheck, Swords, UserPlus } from '
 
 interface DashboardProps {
   onChangeView: (view: ViewState) => void;
+  currentUser?: string | null;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser }) => {
   const options = [
     {
       id: ViewState.MATCHDAY,

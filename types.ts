@@ -15,6 +15,7 @@ export enum ViewState {
   LOGIN = 'LOGIN',
   SPLIT_SELECTION = 'SPLIT_SELECTION', // New View
   DASHBOARD = 'DASHBOARD',
+  ADMIN = 'ADMIN', // New Admin View
   RANKING = 'RANKING', // Clasificación Winter 2026
   PLAYOFFS = 'PLAYOFFS', // Playoffs
   MATCHDAY = 'MATCHDAY', // Jornada (Regular Season)
@@ -59,6 +60,7 @@ export interface Match {
   stage: Stage;
   isCompleted: boolean;
   winnerId?: string; // If completed
+  day?: number; // Optional day number for filtering
 }
 
 export interface UserPrediction {

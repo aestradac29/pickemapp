@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
-import { Team, Region, Role, Player } from '../types';
-import { TEAMS } from '../constants'; // Fallback
+import { Team, Region, Role, Player, Match, Stage } from '../types';
+import { TEAMS } from '../constants'; 
 
 // --- MAPPERS (DB -> App) ---
 
@@ -24,7 +24,32 @@ const mapPlayerFromDB = (dbPlayer: any): Player => ({
     kda: dbPlayer.stats_kda || 0
 });
 
+const mapMatchFromDB = (dbMatch: any, teams: Record<string, Team>, computedDay: number): Match => ({
+    id: dbMatch.id,
+    teamA: teams[dbMatch.team_a_id] || { ...TEAMS.fnc, name: 'Unknown A', id: dbMatch.team_a_id },
+    teamB: teams[dbMatch.team_b_id] || { ...TEAMS.g2, name: 'Unknown B', id: dbMatch.team_b_id },
+    startTime: dbMatch.start_time,
+    stage: dbMatch.stage as Stage, 
+    isCompleted: dbMatch.status === 'finished',
+    winnerId: dbMatch.winner_id,
+    day: dbMatch.day || computedDay
+});
+
 export const dataService = {
+    // --- SPLITS ---
+    async getSplits() {
+        const { data, error } = await supabase
+            .from('splits')
+            .select('*')
+            .order('start_date', { ascending: true });
+        
+        if (error) {
+            console.error("Error fetching splits:", error);
+            return [];
+        }
+        return data;
+    },
+
     // --- TEAMS ---
     async getTeams(): Promise<Record<string, Team>> {
         const { data, error } = await supabase
@@ -32,7 +57,7 @@ export const dataService = {
             .select('*');
 
         if (error || !data || data.length === 0) {
-            console.warn("Error o sin datos en DB para equipos. Usando Fallback.", error);
+            console.warn("Error o sin datos en DB para equipos.", error);
             return TEAMS;
         }
 
@@ -58,8 +83,76 @@ export const dataService = {
         return data.map(mapPlayerFromDB);
     },
 
-    // --- PREDICCIONES (PICK'EM) ---
+    // --- MATCHES ---
+    async getMatches(day?: number): Promise<Match[]> {
+        const teamsMap = await dataService.getTeams();
+        
+        const { data, error } = await supabase
+            .from('matches')
+            .select('*')
+            .order('start_time', { ascending: true });
 
+        if (error) {
+            console.error("Error fetching matches:", error);
+            return [];
+        }
+
+        if (!data || data.length === 0) return [];
+
+        const uniqueDates = Array.from(new Set(data.map((m: any) => 
+            new Date(m.start_time).toDateString()
+        )));
+
+        uniqueDates.sort((a: any, b: any) => new Date(a).getTime() - new Date(b).getTime());
+
+        const matchesWithDay = data.map((m: any) => {
+            const dateStr = new Date(m.start_time).toDateString();
+            const dayIndex = uniqueDates.indexOf(dateStr) + 1; 
+            return mapMatchFromDB(m, teamsMap, dayIndex);
+        });
+
+        if (day) {
+            return matchesWithDay.filter(m => m.day === day);
+        }
+
+        return matchesWithDay;
+    },
+
+    // Crear un nuevo partido (Admin)
+    async createMatch(match: {
+        split_id: string,
+        team_a_id: string,
+        team_b_id: string,
+        start_time: string,
+        stage: string,
+        status: string,
+        day: number
+    }) {
+        const { error } = await supabase
+            .from('matches')
+            .insert([match]);
+        
+        if (error) throw error;
+    },
+
+    // Actualizar un partido (Admin)
+    async updateMatch(matchId: string, updates: { 
+        winner_id?: string | null, 
+        status?: 'scheduled' | 'live' | 'finished', 
+        start_time?: string,
+        team_a_id?: string,
+        team_b_id?: string,
+        day?: number
+    }) {
+        const { error } = await supabase
+            .from('matches')
+            .update(updates)
+            .eq('id', matchId);
+        
+        if (error) throw error;
+    },
+
+    // --- PREDICCIONES (PICK'EM) ---
     async getUserPredictions(userId: string) {
         const { data, error } = await supabase
             .from('predictions')
@@ -74,6 +167,8 @@ export const dataService = {
     },
 
     async savePrediction(userId: string, matchId: string, teamId: string) {
+        if (matchId.startsWith('temp-')) return;
+
         const { error } = await supabase
             .from('predictions')
             .upsert(
@@ -92,8 +187,34 @@ export const dataService = {
         }
     },
 
-    // --- FANTASY TEAM ---
+    // Guardado masivo (Batch Save)
+    async savePredictions(predictions: { user_id: string, match_id: string, predicted_winner_id: string }[]) {
+         if (predictions.length === 0) return;
+         
+         const timestamp = new Date().toISOString();
+         
+         // Limpieza: IDs temporales fuera
+         const validPredictions = predictions.filter(p => !p.match_id.startsWith('temp-'));
+         if (validPredictions.length === 0) return;
 
+         const dataToSave = validPredictions.map(p => ({ 
+            user_id: p.user_id,
+            match_id: p.match_id,
+            predicted_winner_id: p.predicted_winner_id,
+            created_at: timestamp 
+         }));
+
+         const { error } = await supabase
+            .from('predictions')
+            .upsert(dataToSave, { onConflict: 'user_id, match_id' });
+         
+         if (error) {
+            console.error("Error guardando lote de predicciones:", JSON.stringify(error, null, 2));
+            throw new Error(error.message);
+         }
+    },
+
+    // --- FANTASY TEAM ---
     async getFantasyTeam(userId: string) {
         const { data, error } = await supabase
             .from('fantasy_teams')

@@ -1,46 +1,62 @@
-import React from 'react';
-import { Snowflake, Sun, Flower2, ArrowRight, Lock } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Snowflake, Sun, Flower2, ArrowRight, Lock, Loader2 } from 'lucide-react';
+import { dataService } from '../services/dataService';
 
 interface SplitSelectionProps {
   onSelect: (splitName: string) => void;
 }
 
-export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect }) => {
-  const splits = [
-    {
-      id: 'winter',
-      name: 'Winter 2026',
-      icon: Snowflake,
-      color: 'from-blue-400 to-cyan-300',
-      borderColor: 'border-blue-400',
-      shadow: 'shadow-blue-500/20',
-      // Official Splash Art: Snow Day Bard (Fits Winter Theme perfectly)
-      bgImage: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Bard_1.jpg',
-      status: 'En curso'
+// Metadata visual (colores, imágenes) que la DB no tiene
+const VISUAL_METADATA: Record<string, any> = {
+    'winter': {
+        icon: Snowflake,
+        color: 'from-blue-400 to-cyan-300',
+        borderColor: 'border-blue-400',
+        shadow: 'shadow-blue-500/20',
+        bgImage: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Bard_1.jpg'
     },
-    {
-      id: 'spring',
-      name: 'Spring 2026',
-      icon: Flower2,
-      color: 'from-emerald-400 to-green-300',
-      borderColor: 'border-emerald-400',
-      shadow: 'shadow-emerald-500/20',
-      // Official Splash Art: Elderwood Ornn (Fits Spring/Forest Theme)
-      bgImage: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ornn_2.jpg',
-      status: 'Próximamente'
+    'spring': {
+        icon: Flower2,
+        color: 'from-emerald-400 to-green-300',
+        borderColor: 'border-emerald-400',
+        shadow: 'shadow-emerald-500/20',
+        bgImage: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ornn_2.jpg'
     },
-    {
-      id: 'summer',
-      name: 'Summer 2026',
-      icon: Sun,
-      color: 'from-amber-400 to-orange-300',
-      borderColor: 'border-amber-400',
-      shadow: 'shadow-amber-500/20',
-      // Official Splash Art: Pool Party Leona (Fits Summer Theme)
-      bgImage: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Leona_4.jpg',
-      status: 'Próximamente'
+    'summer': {
+        icon: Sun,
+        color: 'from-amber-400 to-orange-300',
+        borderColor: 'border-amber-400',
+        shadow: 'shadow-amber-500/20',
+        bgImage: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Leona_4.jpg'
     }
-  ];
+};
+
+export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect }) => {
+  const [splits, setSplits] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadSplits = async () => {
+        try {
+            const dbSplits = await dataService.getSplits();
+            setSplits(dbSplits);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    loadSplits();
+  }, []);
+
+  if (loading) {
+      return (
+          <div className="min-h-[70vh] flex flex-col items-center justify-center text-[#c8aa6e]">
+              <Loader2 className="w-10 h-10 animate-spin mb-4" />
+              <p>Cargando temporadas...</p>
+          </div>
+      );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 animate-in fade-in duration-700">
@@ -53,7 +69,14 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-[1400px]">
         {splits.map((split) => {
-          const isLocked = split.status === 'Próximamente';
+          // Determinar qué estilo visual usar basado en el ID o nombre
+          let styleKey = 'winter';
+          if (split.id.includes('spring')) styleKey = 'spring';
+          else if (split.id.includes('summer')) styleKey = 'summer';
+          
+          const visual = VISUAL_METADATA[styleKey];
+          const Icon = visual.icon;
+          const isLocked = split.status !== 'active';
           
           return (
             <button
@@ -64,19 +87,19 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect }) => {
                 group relative h-[400px] rounded-2xl overflow-hidden border-2 transition-all duration-500
                 ${isLocked 
                   ? 'border-gray-800 opacity-60 cursor-not-allowed' 
-                  : `${split.borderColor} ${split.shadow} shadow-2xl hover:scale-105 cursor-pointer`
+                  : `${visual.borderColor} ${visual.shadow} shadow-2xl hover:scale-105 cursor-pointer`
                 }
               `}
             >
               {/* Background Image with Overlay */}
               <div className="absolute inset-0">
                 <img 
-                  src={split.bgImage} 
+                  src={visual.bgImage} 
                   alt={split.name} 
                   className={`
                     w-full h-full object-cover transition-transform duration-700 
                     ${isLocked ? 'grayscale' : 'grayscale group-hover:grayscale-0 group-hover:scale-110'} 
-                    ${split.id === 'summer' ? 'object-right-top' : 'object-center'}
+                    ${styleKey === 'summer' ? 'object-right-top' : 'object-center'}
                   `} 
                 />
                 <div className={`absolute inset-0 transition-colors duration-500 ${isLocked ? 'bg-black/80' : 'bg-black/70 group-hover:bg-black/40'}`}></div>
@@ -88,10 +111,10 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect }) => {
                   w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-lg transition-transform duration-500
                   ${isLocked 
                     ? 'bg-gray-800 border border-gray-700' 
-                    : `bg-gradient-to-br ${split.color} transform group-hover:-translate-y-2`
+                    : `bg-gradient-to-br ${visual.color} transform group-hover:-translate-y-2`
                   }
                 `}>
-                  {isLocked ? <Lock className="w-8 h-8 text-gray-500" /> : <split.icon className="w-10 h-10 text-black/70" />}
+                  {isLocked ? <Lock className="w-8 h-8 text-gray-500" /> : <Icon className="w-10 h-10 text-black/70" />}
                 </div>
 
                 <h3 className={`text-2xl font-bold mb-2 uppercase tracking-wide transition-transform ${isLocked ? 'text-gray-500' : 'text-white group-hover:scale-110'}`}>
@@ -100,9 +123,9 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect }) => {
 
                 <span className={`
                   text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border mb-8
-                  ${split.id === 'winter' ? 'bg-green-500/20 border-green-500 text-green-300' : 'bg-gray-800/50 border-gray-600 text-gray-400'}
+                  ${split.status === 'active' ? 'bg-green-500/20 border-green-500 text-green-300' : 'bg-gray-800/50 border-gray-600 text-gray-400'}
                 `}>
-                  {split.status}
+                  {split.status === 'active' ? 'En Curso' : (split.status === 'completed' ? 'Finalizado' : 'Próximamente')}
                 </span>
 
                 {!isLocked && (
@@ -118,6 +141,11 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect }) => {
             </button>
           );
         })}
+        {splits.length === 0 && !loading && (
+             <div className="col-span-3 text-center text-gray-500">
+                 No se encontraron temporadas en la base de datos.
+             </div>
+        )}
       </div>
     </div>
   );

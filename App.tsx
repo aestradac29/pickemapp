@@ -23,13 +23,20 @@ const App: React.FC = () => {
   // Auth State
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [selectedSplit, setSelectedSplit] = useState<string | null>(null);
+  
+  // Inicializar selectedSplit desde localStorage si existe
+  const [selectedSplit, setSelectedSplit] = useState<string | null>(() => {
+    return localStorage.getItem('selectedSplit');
+  });
 
   // Recovery State
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  // Admin Check
+  const isAdmin = currentUser === 'aestrada';
 
   // --- SUPABASE SESSION HANDLER ---
   useEffect(() => {
@@ -43,8 +50,13 @@ const App: React.FC = () => {
            // Load User Data
            loadUserData(user.id);
 
+           // Lógica de navegación inicial
            if (view === ViewState.LOGIN) {
-              setView(ViewState.SPLIT_SELECTION);
+              if (selectedSplit) {
+                  setView(ViewState.DASHBOARD);
+              } else {
+                  setView(ViewState.SPLIT_SELECTION);
+              }
            }
         }
       } catch (error) {
@@ -64,14 +76,22 @@ const App: React.FC = () => {
             setCurrentUser(username);
             setCurrentUserId(session.user.id);
             loadUserData(session.user.id);
-            // Solo cambiamos la vista si no estamos recuperando contraseña
-            if (!showPasswordResetModal) {
-                 setView(ViewState.SPLIT_SELECTION);
-            }
+            
+            // Solo redirigir si el usuario estaba en Login. 
+            // Si ya estaba en Dashboard (por ejemplo al refrescar token), no hacemos nada.
+            setView((prevView) => {
+                if (prevView === ViewState.LOGIN && !showPasswordResetModal) {
+                     return localStorage.getItem('selectedSplit') ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION;
+                }
+                return prevView;
+            });
+
         } else if (event === 'SIGNED_OUT') {
             setCurrentUser(null);
             setCurrentUserId(null);
             setPredictions([]);
+            localStorage.removeItem('selectedSplit'); // Limpiar split al cerrar sesión
+            setSelectedSplit(null);
             setView(ViewState.LOGIN);
         }
     });
@@ -86,13 +106,26 @@ const App: React.FC = () => {
       setPredictions(preds);
   };
 
+  const refreshPredictions = async () => {
+    if (currentUserId) {
+        const preds = await dataService.getUserPredictions(currentUserId);
+        setPredictions(preds);
+    }
+  };
+
   const handleLogin = (username: string) => {
     setCurrentUser(username);
-    setView(ViewState.SPLIT_SELECTION);
+    // Verificar si ya hay un split guardado para saltar selección
+    if (selectedSplit) {
+        setView(ViewState.DASHBOARD);
+    } else {
+        setView(ViewState.SPLIT_SELECTION);
+    }
   };
 
   const handleSplitSelect = (splitName: string) => {
     setSelectedSplit(splitName);
+    localStorage.setItem('selectedSplit', splitName); // Guardar selección
     setView(ViewState.DASHBOARD);
   };
 
@@ -101,6 +134,7 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setCurrentUserId(null);
     setSelectedSplit(null);
+    localStorage.removeItem('selectedSplit');
     setView(ViewState.LOGIN);
     setIsMenuOpen(false);
   };
@@ -121,7 +155,7 @@ const App: React.FC = () => {
           setShowPasswordResetModal(false);
           setNewPassword('');
           // Force view refresh just in case
-          setView(ViewState.SPLIT_SELECTION);
+          setView(selectedSplit ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION);
       } catch (error: any) {
           setPasswordError(error.message || "Error al actualizar la contraseña.");
       } finally {
@@ -155,7 +189,9 @@ const App: React.FC = () => {
         return <SplitSelection onSelect={handleSplitSelect} />;
 
       case ViewState.DASHBOARD:
-        return <Dashboard onChangeView={setView} />;
+        return <Dashboard onChangeView={setView} currentUser={currentUser} />;
+
+      // Removed explicit ADMIN view case, integrated into components
 
       case ViewState.RANKING:
         return <RankingView />;
@@ -168,7 +204,14 @@ const App: React.FC = () => {
         return <FantasyView currentUserId={currentUserId} />;
 
       case ViewState.MATCHDAY:
-        return <MatchdayView currentUserId={currentUserId} initialPredictions={predictions} />;
+        return (
+            <MatchdayView 
+                currentUserId={currentUserId} 
+                initialPredictions={predictions} 
+                isAdmin={isAdmin}
+                onPredictionsSaved={refreshPredictions}
+            />
+        );
 
       case ViewState.PLAYOFFS:
         return (
@@ -204,7 +247,7 @@ const App: React.FC = () => {
         );
 
       default:
-        return <Dashboard onChangeView={setView} />;
+        return <Dashboard onChangeView={setView} currentUser={currentUser} />;
     }
   };
 

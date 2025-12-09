@@ -7,10 +7,7 @@ export interface AuthError {
 // URL de producción de la aplicación
 const PRODUCTION_URL = 'https://lol-pick-em-pro-606660166462.us-west1.run.app';
 
-// Helper para determinar a dónde redirigir al usuario tras confirmar email
 const getRedirectUrl = () => {
-    // Si estamos ejecutando en localhost, permitimos redirección a localhost para facilitar el desarrollo.
-    // En cualquier otro caso (o si window no está definido), usamos la URL de producción.
     if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
         return window.location.origin;
     }
@@ -24,7 +21,6 @@ export const authService = {
             email,
             password,
             options: {
-                // Especificamos explícitamente la URL de redirección
                 emailRedirectTo: getRedirectUrl(),
                 data: {
                     username: username,
@@ -35,7 +31,7 @@ export const authService = {
 
         if (error) throw error;
         
-        // Crear perfil en la tabla 'profiles'
+        // Crear perfil inicial
         if (data.user) {
             try {
                 const { error: profileError } = await supabase.from('profiles').insert([
@@ -49,7 +45,7 @@ export const authService = {
                 ]);
                 
                 if (profileError) {
-                    console.warn("No se pudo crear el perfil automáticamente (posiblemente falta confirmar email o RLS):", profileError);
+                    console.warn("No se pudo crear el perfil automáticamente:", profileError);
                 }
             } catch (e) {
                 console.warn("Error creando perfil:", e);
@@ -59,13 +55,10 @@ export const authService = {
         return data;
     },
 
-    // Iniciar Sesión (Soporta Email o Usuario)
     async signIn(identifier: string, password: string) {
         let emailToLogin = identifier;
 
-        // Si NO tiene @, asumimos que es un nombre de usuario
         if (!identifier.includes('@')) {
-            // Buscamos el email asociado al username en la tabla profiles
             const { data, error } = await supabase
                 .from('profiles')
                 .select('email')
@@ -73,9 +66,8 @@ export const authService = {
                 .single();
 
             if (error || !data) {
-                throw new Error('Usuario no encontrado. Si te acabas de registrar, intenta entrar con tu CORREO directamente.');
+                throw new Error('Usuario no encontrado.');
             }
-            
             emailToLogin = data.email;
         }
 
@@ -84,56 +76,62 @@ export const authService = {
             password
         });
         
-        if (error) {
-            if (error.message.includes("Email not confirmed")) {
-                throw new Error("Tu correo no ha sido confirmado. Por favor revisa tu bandeja de entrada (y spam).");
-            }
-            if (error.message.includes("Invalid login credentials")) {
-                throw new Error("Credenciales incorrectas.");
-            }
-            throw error;
-        }
-        return data;
-    },
-
-    // Enviar correo de restablecimiento de contraseña
-    async resetPasswordForEmail(email: string) {
-        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-            // Usamos la URL correcta para que el link del correo funcione en producción
-            redirectTo: getRedirectUrl(),
-        });
-        
         if (error) throw error;
         return data;
     },
 
-    // Actualizar la contraseña (se usa después de que el usuario entra con el link de recuperación o desde perfil)
+    async resetPasswordForEmail(email: string) {
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: getRedirectUrl(),
+        });
+        if (error) throw error;
+        return data;
+    },
+
     async updateUserPassword(newPassword: string) {
         const { data, error } = await supabase.auth.updateUser({
             password: newPassword
         });
-
         if (error) throw error;
         return data;
     },
 
-    // Cerrar Sesión
     async signOut() {
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
     },
 
-    // Obtener Usuario Actual
+    // Obtener Usuario Actual (y asegurar perfil)
     async getCurrentUser() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return null;
 
-        // Intentar obtener datos extra del perfil
-        const { data: profile } = await supabase
+        let { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', user.id)
             .single();
+
+        // FIX: Auto-crear perfil si falta (para usuarios antiguos o errores de registro)
+        if (!profile) {
+            console.log("Perfil no encontrado, intentando reparar...");
+            const username = user.user_metadata?.username || user.email?.split('@')[0] || 'User';
+            const newProfile = {
+                id: user.id,
+                username: username, 
+                email: user.email, 
+                avatar_url: user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${username}&background=random`,
+                total_score: 0
+            };
+
+            const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
+            
+            if (!insertError) {
+                profile = newProfile;
+            } else {
+                console.error("Error fatal reparando perfil:", insertError);
+            }
+        }
 
         return {
             ...user,
