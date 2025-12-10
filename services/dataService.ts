@@ -1,7 +1,7 @@
-import { Team, Player, Match, Role, Stage } from '../types';
+import { Team, Player, Match, Role, Stage, User } from '../types';
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay } from '../constants';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 
 // Helper CRÍTICO: Elimina recursivamente cualquier campo 'undefined' del objeto.
 // Firestore lanza una excepción si encuentra un 'undefined', lo que rompía el borrado.
@@ -233,6 +233,32 @@ export const dataService = {
             // CRÍTICO: Usamos cleanPayload para sanear TODO el array antes de reescribirlo.
             await setDoc(docRef, { allMatches: cleanPayload(newMatches) });
             console.log("Partido borrado correctamente en DB.");
+        }
+    },
+
+    // --- USERS & LEADERBOARD ---
+    async getAllUsers(): Promise<User[]> {
+        try {
+            const usersRef = collection(db, "users");
+            // Limit to 100 for safety in this version, or paginate if needed
+            const q = query(usersRef, orderBy("username"), limit(100));
+            const snapshot = await getDocs(q);
+            
+            return snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    name: data.username || 'Invocador',
+                    avatar: data.avatar_url || `https://ui-avatars.com/api/?name=${data.username || 'User'}&background=random`,
+                    score: 0, // Simplified for search
+                    scoreBreakdown: { matchday: 0, ranking: 0, playoffs: 0, crystalBall: 0, fantasy: 0 },
+                    rank: 0,
+                    pointsHistory: []
+                };
+            });
+        } catch (e) {
+            console.error("Error fetching all users:", e);
+            return [];
         }
     },
 

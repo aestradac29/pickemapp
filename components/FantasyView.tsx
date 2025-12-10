@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ROLE_ICONS, WHITE_LOGO_TEAMS, USERS } from '../constants';
-import { Role, Player, Team } from '../types';
+import { ROLE_ICONS, WHITE_LOGO_TEAMS } from '../constants';
+import { Role, Player, Team, User } from '../types';
 import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2 } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { dataService } from '../services/dataService';
@@ -197,7 +197,101 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, playerId, onSelect, readO
   );
 };
 
-// ... UserSearchModal remains the same ...
+// --- USER SEARCH MODAL ---
+interface UserSummary {
+    id: string;
+    name: string;
+    avatar: string;
+}
+
+const UserSearchModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean; onClose: () => void; onSelect: (user: UserSummary) => void }) => {
+    const [searchTerm, setSearchTerm] = useState("");
+    const [users, setUsers] = useState<UserSummary[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            const fetchUsers = async () => {
+                setIsLoading(true);
+                try {
+                    // Fetch real users from DB
+                    const realUsers = await dataService.getAllUsers();
+                    setUsers(realUsers.map(u => ({ id: u.id, name: u.name, avatar: u.avatar })));
+                } catch (e) {
+                    console.error(e);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            fetchUsers();
+        }
+    }, [isOpen]);
+    
+    // Filter users based on search
+    const filteredUsers = users.filter(u => 
+        u.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="w-full max-w-lg bg-[#091428] border-2 border-[#0ac8b9] rounded-xl overflow-hidden shadow-[0_0_50px_rgba(10,200,185,0.2)] animate-in zoom-in-95">
+                <div className="p-4 border-b border-gray-700 flex items-center justify-between bg-[#0f1923]">
+                    <h3 className="text-lg font-bold text-white uppercase flex items-center gap-2">
+                        <Search className="w-5 h-5 text-[#0ac8b9]" />
+                        Explorar Rivales
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+                
+                <div className="p-4 bg-[#0a1428]">
+                    <div className="relative mb-4">
+                        <input 
+                            type="text" 
+                            placeholder="Buscar invocador..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            autoFocus
+                            className="w-full bg-[#1e293b] text-white rounded-lg pl-10 pr-4 py-3 border border-gray-600 focus:border-[#0ac8b9] focus:outline-none"
+                        />
+                        <Search className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
+                    </div>
+
+                    <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                        {isLoading ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 className="w-8 h-8 animate-spin text-[#0ac8b9]" />
+                            </div>
+                        ) : filteredUsers.length > 0 ? (
+                            filteredUsers.map(user => (
+                                <button 
+                                    key={user.id} 
+                                    onClick={() => onSelect(user)}
+                                    className="w-full flex items-center justify-between p-3 rounded-lg bg-[#0f1923] border border-gray-700 hover:border-[#0ac8b9] hover:bg-[#162236] transition-all group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full border border-gray-600 group-hover:border-[#0ac8b9]" />
+                                        <div className="text-left">
+                                            <div className="font-bold text-gray-200 group-hover:text-white">{user.name}</div>
+                                        </div>
+                                    </div>
+                                    <ArrowLeft className="w-4 h-4 text-gray-600 group-hover:text-[#0ac8b9] rotate-180" />
+                                </button>
+                            ))
+                        ) : (
+                            <div className="text-center py-8 text-gray-500">
+                                No se encontraron usuarios
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 interface FantasyViewProps {
     currentUserId?: string | null;
@@ -216,6 +310,9 @@ export const FantasyView: React.FC<FantasyViewProps> = ({ currentUserId }) => {
     [Role.ADC]: null,
     [Role.SUPPORT]: null,
   });
+
+  // State for "Other User's Team" (loaded dynamically)
+  const [otherTeam, setOtherTeam] = useState<Record<Role, string | null> | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -250,11 +347,38 @@ export const FantasyView: React.FC<FantasyViewProps> = ({ currentUserId }) => {
 
   // State for which user's team we are viewing (null = me)
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
+  const [viewingUser, setViewingUser] = useState<UserSummary | null>(null);
+  
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-
-  const viewingUser = viewingUserId ? USERS.find(u => u.id === viewingUserId) : null;
-  const displayTeam = viewingUser && viewingUser.fantasyTeam ? viewingUser.fantasyTeam : myTeam;
   const isReadOnly = !!viewingUserId;
+
+  // Effect: Load opponent's team when viewingUserId changes
+  useEffect(() => {
+    const loadOpponentTeam = async () => {
+        if (viewingUserId) {
+            setIsLoadingData(true);
+            try {
+                const team = await dataService.getFantasyTeam(viewingUserId);
+                setOtherTeam(team || {
+                    [Role.TOP]: null,
+                    [Role.JUNGLE]: null,
+                    [Role.MID]: null,
+                    [Role.ADC]: null,
+                    [Role.SUPPORT]: null,
+                });
+            } catch (e) {
+                console.error("Error loading opponent team", e);
+            } finally {
+                setIsLoadingData(false);
+            }
+        } else {
+            setOtherTeam(null);
+        }
+    };
+    loadOpponentTeam();
+  }, [viewingUserId]);
+
+  const displayTeam = isReadOnly && otherTeam ? otherTeam : myTeam;
 
   const handleSelect = (role: Role, playerId: string | null) => {
     if (!isReadOnly) {
@@ -283,27 +407,31 @@ export const FantasyView: React.FC<FantasyViewProps> = ({ currentUserId }) => {
   const { totalCost, totalPoints } = useMemo(() => {
     let cost = 0;
     let points = 0;
-    Object.values(displayTeam).forEach(playerId => {
-      if (playerId) {
-        const player = players.find(p => p.id === playerId);
-        if (player) {
-          cost += player.cost;
-          points += player.averagePoints;
+    
+    // Safely iterate over displayTeam values, checking if it exists
+    if (displayTeam) {
+        Object.values(displayTeam).forEach(playerId => {
+        if (playerId) {
+            const player = players.find(p => p.id === playerId);
+            if (player) {
+            cost += player.cost;
+            points += player.averagePoints;
+            }
         }
-      }
-    });
+        });
+    }
     return { totalCost: cost, totalPoints: points };
   }, [displayTeam, players]);
 
   const remainingBudget = MAX_BUDGET - totalCost;
   const isOverBudget = remainingBudget < 0;
-  const isFullTeam = Object.values(displayTeam).every(v => v !== null);
+  const isFullTeam = displayTeam ? Object.values(displayTeam).every(v => v !== null) : false;
 
-  if (isLoadingData) {
+  if (isLoadingData && !isSearchOpen) {
       return (
           <div className="w-full h-[60vh] flex flex-col items-center justify-center text-[#0ac8b9]">
               <Loader2 className="w-12 h-12 animate-spin mb-4" />
-              <p>Cargando mercado de fichajes...</p>
+              <p>Cargando datos...</p>
           </div>
       );
   }
@@ -314,19 +442,22 @@ export const FantasyView: React.FC<FantasyViewProps> = ({ currentUserId }) => {
       {/* Top Navigation */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 px-2">
         <div className="w-full md:w-auto flex items-center gap-4">
-            {isReadOnly ? (
+            {isReadOnly && viewingUser ? (
                 <div className="flex items-center gap-3 bg-[#0f1923] border border-[#c8aa6e]/50 p-2 pr-6 rounded-full animate-in slide-in-from-left-4">
                     <button 
-                        onClick={() => setViewingUserId(null)}
+                        onClick={() => {
+                            setViewingUserId(null);
+                            setViewingUser(null);
+                        }}
                         className="w-10 h-10 rounded-full bg-[#0a1428] border border-gray-600 flex items-center justify-center hover:bg-gray-800 hover:text-[#c8aa6e] transition-colors"
                         title="Volver a mi equipo"
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </button>
-                    <img src={viewingUser?.avatar} alt={viewingUser?.name} className="w-10 h-10 rounded-full object-cover border border-[#c8aa6e]" />
+                    <img src={viewingUser.avatar} alt={viewingUser.name} className="w-10 h-10 rounded-full object-cover border border-[#c8aa6e]" />
                     <div className="flex flex-col">
                         <span className="text-[10px] uppercase font-bold text-[#c8aa6e] tracking-widest leading-none mb-0.5">Viendo a</span>
-                        <span className="font-bold text-white text-lg leading-none">{viewingUser?.name}</span>
+                        <span className="font-bold text-white text-lg leading-none">{viewingUser.name}</span>
                     </div>
                 </div>
             ) : (
@@ -393,7 +524,7 @@ export const FantasyView: React.FC<FantasyViewProps> = ({ currentUserId }) => {
           <PlayerCard 
             key={role} 
             role={role} 
-            playerId={displayTeam[role]} 
+            playerId={displayTeam ? displayTeam[role] : null} 
             onSelect={handleSelect} 
             readOnly={isReadOnly}
             players={players}
@@ -449,8 +580,16 @@ export const FantasyView: React.FC<FantasyViewProps> = ({ currentUserId }) => {
         </div>
       )}
 
-      {/* User Search Modal (Using USERS constant for now as user search isn't in DB yet) */}
-      {/* ... UserSearchModal Implementation would go here or imported ... */}
+      {/* User Search Modal */}
+      <UserSearchModal 
+          isOpen={isSearchOpen} 
+          onClose={() => setIsSearchOpen(false)}
+          onSelect={(user) => {
+              setViewingUserId(user.id);
+              setViewingUser(user);
+              setIsSearchOpen(false);
+          }}
+      />
     </div>
   );
 };
