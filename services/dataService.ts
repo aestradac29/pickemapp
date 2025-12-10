@@ -90,6 +90,26 @@ export const dataService = {
         }
     },
 
+    async updatePlayer(playerId: string, updates: Partial<Player>) {
+        const docRef = doc(db, "admin_data", "players");
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) return;
+
+        let currentList: Player[] = docSnap.data().list || [];
+        const index = currentList.findIndex(p => p.id === playerId);
+
+        if (index === -1) throw new Error("Player not found");
+
+        // Update specific fields
+        currentList[index] = {
+            ...currentList[index],
+            ...updates
+        };
+
+        await setDoc(docRef, { list: cleanPayload(currentList) }, { merge: true });
+    },
+
     // --- MATCHES (Database First + Auto-Seed + Team Hydration) ---
     async getMatches(day?: number): Promise<Match[]> {
         try {

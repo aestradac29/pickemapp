@@ -154,7 +154,7 @@ const App: React.FC = () => {
       case ViewState.CRYSTAL_BALL:
         return <CrystalBall currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.FANTASY:
-        return <FantasyView currentUserId={currentUserId} />;
+        return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.MATCHDAY:
         return (
             <MatchdayView 

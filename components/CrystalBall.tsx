@@ -336,7 +336,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
                <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/30">
                  <Sword className="w-5 h-5 text-red-400" />
                </div>
-               <h3 className="text-xl font-bold text-white uppercase tracking-wide">Meta & Campeones (Riot API)</h3>
+               <h3 className="text-xl font-bold text-white uppercase tracking-wide">Meta & Campeones</h3>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-[#0f1923]/50 rounded-xl border border-gray-800">
