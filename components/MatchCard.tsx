@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Match, Team } from '../types';
-import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2 } from 'lucide-react';
+import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2, AlertTriangle } from 'lucide-react';
 import { WHITE_LOGO_TEAMS } from '../constants';
 
 interface MatchCardProps {
@@ -112,6 +112,9 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  // Local delete confirmation state (to avoid window.confirm blocking)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Effective Lock: Global Day Lock OR Individual Time Lock
   const isTimeLocked = new Date() > new Date(match.startTime) && !match.isCompleted;
@@ -158,6 +161,28 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       }
   };
 
+  const handleConfirmDelete = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Delete confirmed for match:", match.id);
+      if (onDelete) {
+          onDelete();
+      }
+      setShowDeleteConfirm(false);
+  };
+
+  const handleCancelDelete = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setShowDeleteConfirm(false);
+  };
+
+  const triggerDeleteMode = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setShowDeleteConfirm(true);
+  };
+
   // --- ADMIN EDIT MODE RENDER ---
   if (isEditing) {
       // Format date for input: Convert UTC ISO to Local formatted string for input type="datetime-local"
@@ -166,17 +191,43 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       const isoDate = new Date(safeDate.getTime() - (safeDate.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
 
       return (
-          <div className="w-full bg-red-950/20 backdrop-blur-sm rounded-xl border border-red-500/30 overflow-hidden mb-4 shadow-xl p-4 animate-in fade-in">
+          <div className="w-full bg-red-950/20 backdrop-blur-sm rounded-xl border border-red-500/30 overflow-hidden mb-4 shadow-xl p-4 animate-in fade-in relative">
+              
+              {/* Overlay de confirmación de borrado */}
+              {showDeleteConfirm && (
+                  <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4 text-center animate-in fade-in">
+                      <AlertTriangle className="w-10 h-10 text-red-500 mb-2" />
+                      <h4 className="text-white font-bold text-lg mb-1">¿Borrar Partido?</h4>
+                      <p className="text-gray-400 text-xs mb-4">Esta acción no se puede deshacer.</p>
+                      <div className="flex gap-3">
+                          <button 
+                              onClick={handleCancelDelete}
+                              className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold"
+                          >
+                              Cancelar
+                          </button>
+                          <button 
+                              onClick={handleConfirmDelete}
+                              className="px-4 py-2 rounded bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-2"
+                          >
+                              <Trash2 className="w-3 h-3" />
+                              Confirmar
+                          </button>
+                      </div>
+                  </div>
+              )}
+
               <div className="flex items-center justify-between mb-4 border-b border-red-900/50 pb-2">
                   <span className="text-xs font-bold text-red-400 uppercase tracking-widest">
                       {match.id.startsWith('temp') ? 'Creando Nuevo Partido' : 'Editando Partido'}
                   </span>
                   <div className="flex items-center gap-2">
-                    {/* Botón de borrar si existe la prop y no es un partido temporal */}
+                    {/* Botón de borrar: Ahora activa el modo confirmación */}
                     {!match.id.startsWith('temp') && onDelete && (
                         <button 
-                            onClick={onDelete}
-                            className="text-red-500 hover:text-red-300 bg-red-900/30 p-1.5 rounded border border-red-900 mr-2"
+                            type="button"
+                            onClick={triggerDeleteMode}
+                            className="text-red-500 hover:text-red-300 bg-red-900/30 p-1.5 rounded border border-red-900 mr-2 transition-colors hover:bg-red-900/50 z-20 cursor-pointer"
                             title="Borrar Partido"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -273,6 +324,19 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                     </select>
                   </div>
               </div>
+              
+              {/* Extra delete button for visibility */}
+               {!match.id.startsWith('temp') && onDelete && (
+                  <div className="mt-4 pt-4 border-t border-red-900/30 flex justify-end">
+                      <button 
+                        type="button"
+                        onClick={triggerDeleteMode}
+                        className="text-xs text-red-500 hover:text-red-300 underline font-bold px-2 py-1"
+                      >
+                          Eliminar Partido Definitivamente
+                      </button>
+                  </div>
+               )}
           </div>
       );
   }

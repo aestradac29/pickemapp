@@ -3,13 +3,10 @@ import { TEAMS, PLAYERS, MATCHES, getMatchesForDay } from '../constants';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 
-// Helper para asegurar que no hay undefineds (Firestore lo odia)
-const sanitizeMatch = (match: Match): Match => {
-    return {
-        ...match,
-        winnerId: match.winnerId || null,
-        day: match.day || null,
-    };
+// Helper CRÍTICO: Elimina recursivamente cualquier campo 'undefined' del objeto.
+// Firestore lanza una excepción si encuentra un 'undefined', lo que rompía el borrado.
+const cleanPayload = (data: any): any => {
+    return JSON.parse(JSON.stringify(data));
 };
 
 export const dataService = {
@@ -58,7 +55,7 @@ export const dataService = {
                 return docSnap.data().data as Record<string, Team>;
             } else {
                 console.log("Seeding Teams to Database...");
-                await setDoc(docRef, { data: TEAMS });
+                await setDoc(docRef, { data: cleanPayload(TEAMS) });
                 return TEAMS;
             }
         } catch (e) {
@@ -77,7 +74,7 @@ export const dataService = {
                 return docSnap.data().list as Player[];
             } else {
                 console.log("Seeding Players to Database...");
-                await setDoc(docRef, { list: PLAYERS });
+                await setDoc(docRef, { list: cleanPayload(PLAYERS) });
                 return PLAYERS;
             }
         } catch (e) {
@@ -90,7 +87,6 @@ export const dataService = {
     async getMatches(day?: number): Promise<Match[]> {
         try {
             // OPTIMIZACIÓN: Cargamos Matches y Teams en paralelo.
-            // Esto es crucial: Usamos la colección 'teams' como la fuente de verdad para los logos.
             const [matchesSnap, teamsSnap] = await Promise.all([
                 getDoc(doc(db, "admin_data", "matches")),
                 getDoc(doc(db, "admin_data", "teams"))
@@ -111,21 +107,21 @@ export const dataService = {
                 // con los datos frescos de la colección 'teams'.
                 allMatches = rawMatches.map((m: Match) => ({
                     ...m,
-                    teamA: teamsMap[m.teamA.id] || m.teamA, // Si existe en DB usa ese, si no, usa el guardado en el match
+                    teamA: teamsMap[m.teamA.id] || m.teamA, 
                     teamB: teamsMap[m.teamB.id] || m.teamB
                 }));
 
             } else {
                 // Seed inicial si está vacío
                 console.log("Seeding Matches (Days 1-11) to Database...");
-                const seedMatches = [...MATCHES].map(sanitizeMatch);
+                const seedMatches = [...MATCHES];
                 let generatedMatches: Match[] = [];
                 for (let i = 1; i <= 11; i++) {
-                    const dayMatches = getMatchesForDay(i).map(sanitizeMatch);
+                    const dayMatches = getMatchesForDay(i);
                     generatedMatches = [...generatedMatches, ...dayMatches];
                 }
                 allMatches = [...seedMatches, ...generatedMatches];
-                await setDoc(doc(db, "admin_data", "matches"), { allMatches });
+                await setDoc(doc(db, "admin_data", "matches"), { allMatches: cleanPayload(allMatches) });
             }
 
             if (day) {
@@ -135,7 +131,7 @@ export const dataService = {
 
         } catch (e) {
             console.error("Error getting matches:", e);
-            return day ? getMatchesForDay(day) : MATCHES;
+            return [];
         }
     },
 
@@ -164,8 +160,10 @@ export const dataService = {
             day: updates.day || currentMatch.day || null
         };
 
-        allMatches[index] = sanitizeMatch(updatedMatch);
-        await setDoc(docRef, { allMatches }, { merge: true });
+        allMatches[index] = updatedMatch;
+        
+        // CLEAN antes de guardar
+        await setDoc(docRef, { allMatches: cleanPayload(allMatches) }, { merge: true });
     },
 
     async createMatch(matchData: any) {
@@ -186,17 +184,31 @@ export const dataService = {
             winnerId: null
         };
 
-        allMatches.push(sanitizeMatch(newMatch));
-        await setDoc(docRef, { allMatches }, { merge: true });
+        allMatches.push(newMatch);
+        // CLEAN antes de guardar
+        await setDoc(docRef, { allMatches: cleanPayload(allMatches) }, { merge: true });
     },
 
     async deleteMatch(matchId: string) {
+        console.log("Intentando borrar partido:", matchId);
         const docRef = doc(db, "admin_data", "matches");
         const docSnap = await getDoc(docRef);
+        
         if (docSnap.exists()) {
             let allMatches: Match[] = docSnap.data().allMatches || [];
+            
+            const initialCount = allMatches.length;
             const newMatches = allMatches.filter(m => m.id !== matchId);
-            await setDoc(docRef, { allMatches: newMatches });
+            
+            if (newMatches.length === initialCount) {
+                console.warn("No se encontró el partido para borrar en la DB");
+                return;
+            }
+
+            console.log("Guardando lista de partidos actualizada...");
+            // CRÍTICO: Usamos cleanPayload para sanear TODO el array antes de reescribirlo.
+            await setDoc(docRef, { allMatches: cleanPayload(newMatches) });
+            console.log("Partido borrado correctamente en DB.");
         }
     },
 
@@ -229,7 +241,7 @@ export const dataService = {
             }
         });
 
-        await setDoc(docRef, { list: currentPreds }, { merge: true });
+        await setDoc(docRef, { list: cleanPayload(currentPreds) }, { merge: true });
     },
 
     async clearAllUserPredictions(userId: string) {
@@ -250,6 +262,6 @@ export const dataService = {
 
     async saveFantasyTeam(userId: string, team: Record<Role, string | null>) {
         const docRef = doc(db, "users", userId, "fantasy", "winter_2026");
-        await setDoc(docRef, { team }, { merge: true });
+        await setDoc(docRef, { team: cleanPayload(team) }, { merge: true });
     }
 };

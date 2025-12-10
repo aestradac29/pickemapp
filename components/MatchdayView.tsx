@@ -173,19 +173,29 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   };
 
   const handleAdminDelete = async (matchId: string) => {
-      if (!confirm("¿Estás seguro de que quieres borrar este partido?")) return;
+      // El confirm() nativo se ha movido al componente MatchCard para evitar bloqueos
+      
+      // OPTIMISTIC UPDATE: Remove from UI immediately for better feel
+      const originalMatches = [...matches];
+      setMatches(prev => prev.filter(m => m.id !== matchId));
+
       try {
           if (matchId.startsWith('temp-')) {
               setNewMatch(null);
               return;
           }
           await dataService.deleteMatch(matchId);
-          const updatedMatches = await dataService.getMatches(currentDay);
-          const sorted = updatedMatches.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-          setMatches(sorted);
-      } catch (error) {
-          console.error("Error deleting match", error);
-          alert("Error al borrar el partido.");
+          // Re-fetch to confirm state (optional delay to ensure propagation)
+          setTimeout(async () => {
+              const updatedMatches = await dataService.getMatches(currentDay);
+              const sorted = updatedMatches.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+              setMatches(sorted);
+          }, 500);
+      } catch (error: any) {
+          console.error("FATAL ERROR deleting match", error);
+          alert("Error crítico al borrar el partido: " + (error.message || JSON.stringify(error)));
+          // Rollback if failed
+          setMatches(originalMatches);
       }
   };
 
