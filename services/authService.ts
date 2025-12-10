@@ -1,172 +1,143 @@
-import { supabase } from '../lib/supabase';
+import { auth, db } from '../lib/firebase';
+import { 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signOut as firebaseSignOut,
+    updateProfile,
+    onAuthStateChanged,
+    sendPasswordResetEmail,
+    updatePassword,
+    User
+} from "firebase/auth";
+import { doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
-export interface AuthError {
-    message: string;
-}
-
-// URL de producción de la aplicación
-const PRODUCTION_URL = 'https://lol-pick-em-pro-606660166462.us-west1.run.app';
-
-const getRedirectUrl = () => {
-    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-        return window.location.origin;
-    }
-    return PRODUCTION_URL;
-};
+// Helper para notificar cambios de auth
+type AuthListener = (user: any | null) => void;
 
 export const authService = {
+    // Suscribirse a cambios de sesión (Login/Logout) usando el SDK de Firebase
+    onAuthStateChange(listener: AuthListener) {
+        return onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                // Obtener datos adicionales del perfil en Firestore
+                const userProfile = await this.getUserProfile(firebaseUser.uid);
+                
+                const user = {
+                    id: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    profile: {
+                        username: userProfile?.username || firebaseUser.displayName || 'Invocador',
+                        avatar_url: userProfile?.avatar_url || firebaseUser.photoURL
+                    }
+                };
+                listener(user);
+            } else {
+                listener(null);
+            }
+        });
+    },
+
     // Registro
     async signUp(email: string, password: string, username: string) {
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                emailRedirectTo: getRedirectUrl(),
-                data: {
-                    username: username,
-                    avatar_url: `https://ui-avatars.com/api/?name=${username}&background=random`
-                }
-            }
+        // 1. Crear usuario en Auth
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // 2. Actualizar perfil básico
+        await updateProfile(user, {
+            displayName: username,
+            photoURL: `https://ui-avatars.com/api/?name=${username}&background=random`
         });
 
-        if (error) throw error;
-        
-        // Crear perfil inicial
-        if (data.user) {
-            try {
-                const { error: profileError } = await supabase.from('profiles').insert([
-                    { 
-                        id: data.user.id,
-                        username: username,
-                        email: email, 
-                        avatar_url: data.user.user_metadata.avatar_url,
-                        total_score: 0
-                    }
-                ]);
-                
-                if (profileError) {
-                    console.warn("No se pudo crear el perfil automáticamente:", profileError);
-                }
-            } catch (e) {
-                console.warn("Error creando perfil:", e);
-            }
-        }
+        // 3. Guardar perfil extendido en Firestore (Base de datos)
+        await setDoc(doc(db, "users", user.uid), {
+            username: username,
+            email: email,
+            avatar_url: `https://ui-avatars.com/api/?name=${username}&background=random`,
+            created_at: new Date().toISOString(),
+            role: 'user' // 'admin' se puede cambiar manualmente en Firebase Console
+        });
 
-        return data;
+        return { user };
     },
 
+    // Login
     async signIn(identifier: string, password: string) {
-        let emailToLogin = identifier;
+        let email = identifier;
 
+        // Si el identificador no tiene @, asumimos que es username y buscamos su email
         if (!identifier.includes('@')) {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('email')
-                .ilike('username', identifier)
-                .single();
-
-            if (error || !data) {
-                throw new Error('Usuario no encontrado.');
-            }
-            emailToLogin = data.email;
+             try {
+                 const usersRef = collection(db, "users");
+                 const q = query(usersRef, where("username", "==", identifier));
+                 const querySnapshot = await getDocs(q);
+                 
+                 if (querySnapshot.empty) {
+                     throw new Error("Usuario no encontrado.");
+                 }
+                 
+                 // Obtenemos el email del primer documento encontrado
+                 const userData = querySnapshot.docs[0].data();
+                 if (userData.email) {
+                     email = userData.email;
+                 }
+             } catch (e: any) {
+                 throw new Error(e.message || "Error al buscar el usuario.");
+             }
         }
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: emailToLogin,
-            password
-        });
-        
-        if (error) throw error;
-        return data;
-    },
-
-    async resetPasswordForEmail(email: string) {
-        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: getRedirectUrl(),
-        });
-        if (error) throw error;
-        return data;
-    },
-
-    async updateUserPassword(newPassword: string) {
-        const { data, error } = await supabase.auth.updateUser({
-            password: newPassword
-        });
-        if (error) throw error;
-        return data;
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        return { user: userCredential.user };
     },
 
     async signOut() {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
+        await firebaseSignOut(auth);
     },
 
-    // Helper: Obtener Perfil Real por Email
-    // Crucial para corregir desajustes entre Auth.ID y Profile.ID
-    async getProfileByEmail(email: string) {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('email', email)
-            .single();
-        
-        if (error) return null;
-        return data;
-    },
-
-    // Obtener Usuario Actual (y asegurar perfil correcto)
+    // Obtener sesión actual (Promise-based, útil para carga inicial)
     async getCurrentUser() {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return null;
+        return new Promise((resolve) => {
+            const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+                unsubscribe();
+                if (firebaseUser) {
+                    const userProfile = await this.getUserProfile(firebaseUser.uid);
+                    resolve({
+                        id: firebaseUser.uid,
+                        email: firebaseUser.email,
+                        profile: {
+                            username: userProfile?.username || firebaseUser.displayName,
+                            avatar_url: userProfile?.avatar_url
+                        }
+                    });
+                } else {
+                    resolve(null);
+                }
+            });
+        });
+    },
 
-        // 1. Intentamos buscar por ID directo (Comportamiento estándar)
-        let { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-
-        // 2. Fallback: Si no se encuentra por ID, buscamos por Email (Fix para tu caso específico)
-        if (!profile && user.email) {
-            console.log("Perfil no encontrado por Auth ID, buscando por Email...");
-            const { data: profileByEmail } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('email', user.email)
-                .single();
-            
-            if (profileByEmail) {
-                profile = profileByEmail;
+    // Obtener datos de Firestore
+    async getUserProfile(uid: string) {
+        try {
+            const docRef = doc(db, "users", uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return docSnap.data();
             }
+            return null;
+        } catch (e) {
+            console.error("Error fetching profile", e);
+            return null;
         }
+    },
 
-        // 3. Fallback Final: Auto-crear perfil si falta
-        if (!profile) {
-            console.log("Perfil no encontrado, intentando reparar...");
-            const username = user.user_metadata?.username || user.email?.split('@')[0] || 'User';
-            const newProfile = {
-                id: user.id,
-                username: username, 
-                email: user.email, 
-                avatar_url: user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${username}&background=random`,
-                total_score: 0
-            };
+    async resetPasswordForEmail(email: string) {
+        await sendPasswordResetEmail(auth, email);
+    },
 
-            const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
-            
-            if (!insertError) {
-                profile = newProfile;
-            } else {
-                console.error("Error fatal reparando perfil:", insertError);
-            }
+    async updateUserPassword(newPassword: string) {
+        if (auth.currentUser) {
+            await updatePassword(auth.currentUser, newPassword);
         }
-
-        return {
-            ...user,
-            // Sobreescribimos el ID del usuario Auth con el ID del Perfil Real
-            // Esto asegura que el resto de la app use el UUID correcto (e025...)
-            id: profile?.id || user.id,
-            profile: profile || user.user_metadata
-        };
     }
 };

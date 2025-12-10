@@ -1,276 +1,259 @@
-import { supabase } from '../lib/supabase';
-import { Team, Region, Role, Player, Match, Stage } from '../types';
-import { TEAMS } from '../constants'; 
+import { Team, Player, Match, Role, Stage } from '../types';
+import { TEAMS, PLAYERS, MATCHES, getMatchesForDay } from '../constants';
+import { db } from '../lib/firebase';
+import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 
-// --- MAPPERS (DB -> App) ---
-
-const mapTeamFromDB = (dbTeam: any): Team => ({
-    id: dbTeam.id,
-    name: dbTeam.name,
-    shortName: dbTeam.short_name,
-    region: dbTeam.region as Region,
-    color: dbTeam.color_hex,
-    logo: dbTeam.logo_url
-});
-
-const mapPlayerFromDB = (dbPlayer: any): Player => ({
-    id: dbPlayer.id,
-    name: dbPlayer.name,
-    role: dbPlayer.role as Role,
-    teamId: dbPlayer.team_id,
-    photo: dbPlayer.photo_url,
-    cost: dbPlayer.fantasy_cost || 0,
-    averagePoints: dbPlayer.stats_avg_points || 0,
-    kda: dbPlayer.stats_kda || 0
-});
-
-const mapMatchFromDB = (dbMatch: any, teams: Record<string, Team>, computedDay: number): Match => ({
-    id: dbMatch.id,
-    teamA: teams[dbMatch.team_a_id] || { ...TEAMS.fnc, name: 'Unknown A', id: dbMatch.team_a_id },
-    teamB: teams[dbMatch.team_b_id] || { ...TEAMS.g2, name: 'Unknown B', id: dbMatch.team_b_id },
-    startTime: dbMatch.start_time,
-    stage: dbMatch.stage as Stage, 
-    isCompleted: dbMatch.status === 'finished',
-    winnerId: dbMatch.winner_id,
-    day: dbMatch.day || computedDay
-});
+// Helper para asegurar que no hay undefineds (Firestore lo odia)
+const sanitizeMatch = (match: Match): Match => {
+    return {
+        ...match,
+        winnerId: match.winnerId || null,
+        day: match.day || null,
+        // Asegurar que otros campos opcionales no sean undefined si se añaden en el futuro
+    };
+};
 
 export const dataService = {
-    // --- SPLITS ---
+    // --- CONFIGURATION (Active Days & Locks) ---
+    async getDaysConfig(): Promise<{ visibleDays: number[], closedDays: number[] }> {
+        try {
+            const docRef = doc(db, "admin_data", "config");
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                return {
+                    visibleDays: data.activeDays || [1],
+                    closedDays: data.closedDays || []
+                };
+            }
+            // Configuración por defecto si no existe
+            return { visibleDays: [1], closedDays: [] };
+        } catch (e) {
+            console.error("Error loading config", e);
+            return { visibleDays: [1], closedDays: [] };
+        }
+    },
+
+    async updateGlobalConfig(config: { visibleDays: number[], closedDays: number[] }) {
+        const docRef = doc(db, "admin_data", "config");
+        await setDoc(docRef, { 
+            activeDays: config.visibleDays,
+            closedDays: config.closedDays 
+        }, { merge: true });
+    },
+
     async getSplits() {
-        const { data, error } = await supabase
-            .from('splits')
-            .select('*')
-            .order('start_date', { ascending: true });
-        
-        if (error) {
-            console.error("Error fetching splits:", error);
-            return [];
-        }
-        return data;
+        // Podríamos mover esto a DB también, pero por ahora estático está bien para la estructura
+        return [
+            { id: 'winter_2026', name: 'Winter 2026', status: 'active' },
+            { id: 'spring_2026', name: 'Spring 2026', status: 'upcoming' },
+            { id: 'summer_2026', name: 'Summer 2026', status: 'upcoming' }
+        ];
     },
 
-    // --- TEAMS ---
+    // --- TEAMS (Database First + Auto-Seed) ---
     async getTeams(): Promise<Record<string, Team>> {
-        const { data, error } = await supabase
-            .from('teams')
-            .select('*');
+        try {
+            const docRef = doc(db, "admin_data", "teams");
+            const docSnap = await getDoc(docRef);
 
-        if (error || !data || data.length === 0) {
-            console.warn("Error o sin datos en DB para equipos.", error);
-            return TEAMS;
+            if (docSnap.exists()) {
+                // Si existen en DB, devolverlos
+                return docSnap.data().data as Record<string, Team>;
+            } else {
+                // Si NO existen, subirlos (Seed) y devolverlos
+                console.log("Seeding Teams to Database...");
+                await setDoc(docRef, { data: TEAMS });
+                return TEAMS;
+            }
+        } catch (e) {
+            console.error("Error getting teams:", e);
+            return TEAMS; // Fallback en caso de error crítico
         }
-
-        const teamsMap: Record<string, Team> = {};
-        data.forEach((t: any) => {
-            teamsMap[t.id] = mapTeamFromDB(t);
-        });
-        
-        return teamsMap;
     },
 
-    // --- PLAYERS ---
+    // --- PLAYERS (Database First + Auto-Seed) ---
     async getPlayers(): Promise<Player[]> {
-        const { data, error } = await supabase
-            .from('players')
-            .select('*');
-            
-        if (error || !data) {
-            console.error("Error fetching players:", error);
-            return [];
-        }
+        try {
+            const docRef = doc(db, "admin_data", "players");
+            const docSnap = await getDoc(docRef);
 
-        return data.map(mapPlayerFromDB);
+            if (docSnap.exists()) {
+                return docSnap.data().list as Player[];
+            } else {
+                console.log("Seeding Players to Database...");
+                await setDoc(docRef, { list: PLAYERS });
+                return PLAYERS;
+            }
+        } catch (e) {
+            console.error("Error getting players:", e);
+            return PLAYERS;
+        }
     },
 
-    // --- MATCHES ---
+    // --- MATCHES (Database First + Auto-Seed) ---
     async getMatches(day?: number): Promise<Match[]> {
-        const teamsMap = await dataService.getTeams();
-        
-        const { data, error } = await supabase
-            .from('matches')
-            .select('*')
-            .order('start_time', { ascending: true });
+        try {
+            const docRef = doc(db, "admin_data", "matches");
+            const docSnap = await getDoc(docRef);
+            
+            let allMatches: Match[] = [];
 
-        if (error) {
-            console.error("Error fetching matches:", error);
+            if (docSnap.exists()) {
+                // Obtener todos desde la DB
+                allMatches = docSnap.data().allMatches || [];
+            } else {
+                // Si está vacío, generar TODAS las jornadas y subirlas
+                console.log("Seeding Matches (Days 1-11) to Database...");
+                
+                // 1. Partidos iniciales sueltos (playoffs mock, etc)
+                // Sanitizar para evitar undefined
+                const seedMatches = [...MATCHES].map(sanitizeMatch);
+                
+                let generatedMatches: Match[] = [];
+                // 2. Generar jornadas 1 a 11
+                for (let i = 1; i <= 11; i++) {
+                    const dayMatches = getMatchesForDay(i).map(sanitizeMatch);
+                    generatedMatches = [...generatedMatches, ...dayMatches];
+                }
+
+                allMatches = [...seedMatches, ...generatedMatches];
+                
+                // Guardar sanitizados
+                await setDoc(docRef, { allMatches });
+            }
+
+            // Filtrar por día si se solicita
+            if (day) {
+                return allMatches.filter(m => m.day === day);
+            }
+            return allMatches;
+
+        } catch (e) {
+            console.error("Error getting matches:", e);
+            // Fallback mínimo para no romper la UI
+            return day ? getMatchesForDay(day) : MATCHES;
+        }
+    },
+
+    // --- ADMIN ACTIONS (Updating the Single Source of Truth) ---
+    async updateMatch(matchId: string, updates: any) {
+        const docRef = doc(db, "admin_data", "matches");
+        const docSnap = await getDoc(docRef);
+        
+        if (!docSnap.exists()) return; // Should exist by now via getMatches seed
+
+        let allMatches: Match[] = docSnap.data().allMatches || [];
+        const index = allMatches.findIndex(m => m.id === matchId);
+
+        if (index === -1) throw new Error("Match not found in DB");
+
+        // Merge updates
+        const currentMatch = allMatches[index];
+        
+        // Necesitamos los equipos para reconstruir el objeto si cambian los IDs
+        const teamsRef = await this.getTeams();
+
+        const updatedMatch: Match = {
+            ...currentMatch,
+            teamA: updates.team_a_id ? teamsRef[updates.team_a_id] : currentMatch.teamA,
+            teamB: updates.team_b_id ? teamsRef[updates.team_b_id] : currentMatch.teamB,
+            startTime: updates.start_time || currentMatch.startTime,
+            winnerId: updates.winner_id !== undefined ? updates.winner_id : (currentMatch.winnerId || null),
+            isCompleted: updates.status === 'finished',
+            day: updates.day || currentMatch.day || null
+        };
+
+        allMatches[index] = sanitizeMatch(updatedMatch);
+        await setDoc(docRef, { allMatches }, { merge: true });
+    },
+
+    async createMatch(matchData: any) {
+        const docRef = doc(db, "admin_data", "matches");
+        const docSnap = await getDoc(docRef);
+        let allMatches: Match[] = docSnap.exists() ? docSnap.data().allMatches : [];
+
+        const teamsRef = await this.getTeams();
+
+        const newMatch: Match = {
+            id: `custom-${Date.now()}`, // ID único
+            teamA: teamsRef[matchData.team_a_id],
+            teamB: teamsRef[matchData.team_b_id],
+            startTime: matchData.start_time,
+            stage: matchData.stage || Stage.GROUPS,
+            isCompleted: matchData.status === 'finished',
+            day: matchData.day || null,
+            winnerId: null
+        };
+
+        allMatches.push(sanitizeMatch(newMatch));
+        await setDoc(docRef, { allMatches }, { merge: true });
+    },
+
+    async deleteMatch(matchId: string) {
+        const docRef = doc(db, "admin_data", "matches");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            let allMatches: Match[] = docSnap.data().allMatches || [];
+            const newMatches = allMatches.filter(m => m.id !== matchId);
+            await setDoc(docRef, { allMatches: newMatches }); // Sobrescribir array
+        }
+    },
+
+    // --- PREDICTIONS ---
+    async getUserPredictions(userId: string) {
+        try {
+            const docRef = doc(db, "users", userId, "picks", "winter_2026");
+            const docSnap = await getDoc(docRef);
+            return docSnap.exists() ? docSnap.data().list || [] : [];
+        } catch (e) {
+            console.error("Error loading predictions", e);
             return [];
         }
+    },
 
-        if (!data || data.length === 0) return [];
+    async savePredictions(predictions: { user_id: string, match_id: string, predicted_winner_id: string }[]) {
+        if (!predictions || predictions.length === 0) return;
+        const userId = predictions[0].user_id;
+        
+        const docRef = doc(db, "users", userId, "picks", "winter_2026");
+        
+        // 1. Leer predicciones actuales
+        const docSnap = await getDoc(docRef);
+        let currentPreds = docSnap.exists() ? docSnap.data().list || [] : [];
 
-        const uniqueDates = Array.from(new Set(data.map((m: any) => 
-            new Date(m.start_time).toDateString()
-        )));
-
-        uniqueDates.sort((a: any, b: any) => new Date(a).getTime() - new Date(b).getTime());
-
-        const matchesWithDay = data.map((m: any) => {
-            const dateStr = new Date(m.start_time).toDateString();
-            const dayIndex = uniqueDates.indexOf(dateStr) + 1; 
-            return mapMatchFromDB(m, teamsMap, dayIndex);
+        // 2. Actualizar o Añadir (Upsert local al array)
+        predictions.forEach(newP => {
+            const index = currentPreds.findIndex((p: any) => p.matchId === newP.match_id);
+            if (index !== -1) {
+                currentPreds[index].predictedWinnerId = newP.predicted_winner_id;
+            } else {
+                currentPreds.push({ matchId: newP.match_id, predictedWinnerId: newP.predicted_winner_id });
+            }
         });
 
-        if (day) {
-            return matchesWithDay.filter(m => m.day === day);
-        }
-
-        return matchesWithDay;
+        // 3. Guardar array completo
+        await setDoc(docRef, { list: currentPreds }, { merge: true });
     },
 
-    // Crear un nuevo partido (Admin)
-    async createMatch(match: {
-        split_id: string,
-        team_a_id: string,
-        team_b_id: string,
-        start_time: string,
-        stage: string,
-        status: string,
-        day: number
-    }) {
-        const { error } = await supabase
-            .from('matches')
-            .insert([match]);
-        
-        if (error) throw error;
+    async clearAllUserPredictions(userId: string) {
+        const docRef = doc(db, "users", userId, "picks", "winter_2026");
+        await deleteDoc(docRef);
     },
 
-    // Actualizar un partido (Admin)
-    async updateMatch(matchId: string, updates: { 
-        winner_id?: string | null, 
-        status?: 'scheduled' | 'live' | 'finished', 
-        start_time?: string,
-        team_a_id?: string,
-        team_b_id?: string,
-        day?: number
-    }) {
-        const { error } = await supabase
-            .from('matches')
-            .update(updates)
-            .eq('id', matchId);
-        
-        if (error) throw error;
-    },
-
-    // --- PREDICCIONES (PICK'EM) ---
-    async getUserPredictions(userId: string) {
-        const { data, error } = await supabase
-            .from('predictions')
-            .select('match_id, predicted_winner_id')
-            .eq('user_id', userId);
-
-        if (error) {
-            console.error("Error cargando predicciones:", JSON.stringify(error, null, 2));
-            return [];
-        }
-        return data.map((p: any) => ({ matchId: p.match_id, predictedWinnerId: p.predicted_winner_id }));
-    },
-
-    async savePrediction(userId: string, matchId: string, teamId: string) {
-        if (matchId.startsWith('temp-')) return;
-
-        const { error } = await supabase
-            .from('predictions')
-            .upsert(
-                { 
-                    user_id: userId, 
-                    match_id: matchId, 
-                    predicted_winner_id: teamId,
-                    created_at: new Date().toISOString()
-                }, 
-                { onConflict: 'user_id, match_id' }
-            );
-        
-        if (error) {
-            console.error("Error guardando predicción:", JSON.stringify(error, null, 2));
-            throw new Error(error.message);
-        }
-    },
-
-    // Guardado masivo (Batch Save)
-    async savePredictions(predictions: { user_id: string, match_id: string, predicted_winner_id: string }[]) {
-         if (predictions.length === 0) return;
-         
-         const timestamp = new Date().toISOString();
-         
-         // Limpieza: IDs temporales fuera
-         const validPredictions = predictions.filter(p => !p.match_id.startsWith('temp-'));
-         if (validPredictions.length === 0) return;
-
-         const dataToSave = validPredictions.map(p => ({ 
-            user_id: p.user_id,
-            match_id: p.match_id,
-            predicted_winner_id: p.predicted_winner_id,
-            created_at: timestamp 
-         }));
-
-         const { error } = await supabase
-            .from('predictions')
-            .upsert(dataToSave, { onConflict: 'user_id, match_id' });
-         
-         if (error) {
-            console.error("Error guardando lote de predicciones:", JSON.stringify(error, null, 2));
-            throw new Error(error.message);
-         }
-    },
-
-    // --- FANTASY TEAM ---
+    // --- FANTASY ---
     async getFantasyTeam(userId: string) {
-        const { data, error } = await supabase
-            .from('fantasy_teams')
-            .select('*')
-            .eq('user_id', userId)
-            .order('updated_at', { ascending: false }) 
-            .limit(1)
-            .single();
-
-        if (error || !data) return null;
-
-        return {
-            [Role.TOP]: data.top_player_id,
-            [Role.JUNGLE]: data.jng_player_id,
-            [Role.MID]: data.mid_player_id,
-            [Role.ADC]: data.adc_player_id,
-            [Role.SUPPORT]: data.sup_player_id,
-        };
+        try {
+            const docRef = doc(db, "users", userId, "fantasy", "winter_2026");
+            const docSnap = await getDoc(docRef);
+            return docSnap.exists() ? docSnap.data().team : null;
+        } catch (e) {
+            return null;
+        }
     },
 
     async saveFantasyTeam(userId: string, team: Record<Role, string | null>) {
-        const payload = {
-            user_id: userId,
-            split_id: 'winter_2026', 
-            top_player_id: team[Role.TOP],
-            jng_player_id: team[Role.JUNGLE],
-            mid_player_id: team[Role.MID],
-            adc_player_id: team[Role.ADC],
-            sup_player_id: team[Role.SUPPORT],
-            updated_at: new Date().toISOString()
-        };
-
-        const { data: existing } = await supabase
-            .from('fantasy_teams')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('split_id', 'winter_2026')
-            .single();
-
-        let error;
-        if (existing) {
-             const result = await supabase
-                .from('fantasy_teams')
-                .update(payload)
-                .eq('id', existing.id);
-             error = result.error;
-        } else {
-             const result = await supabase
-                .from('fantasy_teams')
-                .insert([payload]);
-             error = result.error;
-        }
-
-        if (error) {
-            console.error("Error guardando fantasy team:", JSON.stringify(error, null, 2));
-            throw new Error(error.message);
-        }
+        const docRef = doc(db, "users", userId, "fantasy", "winter_2026");
+        await setDoc(docRef, { team }, { merge: true });
     }
 };

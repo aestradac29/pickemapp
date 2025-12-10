@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, User, Mail, Lock, AlertCircle, Eye, EyeOff, Loader2, CheckCircle2, ArrowLeft, KeyRound } from 'lucide-react';
 import { authService } from '../services/authService';
-import { isSupabaseConfigured } from '../lib/supabase';
 
 interface LoginProps {
   onLogin: (username: string) => void;
@@ -9,7 +8,7 @@ interface LoginProps {
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isRegistering, setIsRegistering] = useState(false);
-  const [isResetting, setIsResetting] = useState(false); // New state for Password Reset
+  const [isResetting, setIsResetting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
   // Login State
@@ -37,19 +36,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setSuccessMessage(null);
     setIsLoading(true);
 
-    if (!isSupabaseConfigured()) {
-        setError('⚠️ Falta configurar Supabase en lib/supabase.ts');
-        setIsLoading(false);
-        return;
-    }
-
     try {
         if (isResetting) {
-            // RECUPERACIÓN DE CONTRASEÑA
+            // RECUPERACIÓN (Simulada)
             if (!identifier) throw new Error('Por favor introduce tu correo electrónico.');
             
             await authService.resetPasswordForEmail(identifier);
-            setSuccessMessage(`Si existe una cuenta con ${identifier}, recibirás un correo con instrucciones.`);
+            setSuccessMessage(`Si existe una cuenta con ${identifier}, se ha enviado un código.`);
             setIsLoading(false);
             return;
         }
@@ -66,35 +59,38 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
              throw new Error('La contraseña debe tener al menos 6 caracteres.');
           }
           
-          // LLAMADA A SUPABASE
           const data = await authService.signUp(registerEmail, password, username);
           
-          if (data.user && !data.session) {
-             // MENSAJE ACTUALIZADO PARA SPAM
-             setSuccessMessage(`¡Cuenta creada con éxito! Hemos enviado un enlace de confirmación a ${registerEmail}. Es IMPORTANTE que confirmes tu cuenta antes de entrar. Por favor revisa tu bandeja de entrada y la carpeta de SPAM.`);
-             setIsRegistering(false); 
-             setIdentifier(registerEmail); 
-             setPassword('');
-          } else {
-             onLogin(username);
+          if (data.user) {
+             setSuccessMessage(`¡Cuenta creada con éxito! Entrando...`);
+             setTimeout(() => {
+                onLogin(username);
+             }, 1000);
           }
           
         } else {
-          // VALIDACIONES LOGIN
+          // LOGIN
           if (!identifier || !password) {
             throw new Error('Por favor introduce tu usuario/correo y contraseña.');
           }
           
-          // LLAMADA A SUPABASE
           const result = await authService.signIn(identifier, password);
-          const userProfile = result.user.user_metadata;
-          onLogin(userProfile.username || identifier.split('@')[0]);
+          
+          // Corrección: Usar displayName o fallback seguro en lugar de user_metadata
+          const safeUsername = result.user.displayName || (result.user.email ? result.user.email.split('@')[0] : 'Invocador');
+          onLogin(safeUsername);
         }
     } catch (err: any) {
         console.error(err);
-        setError(err.message || "Ocurrió un error inesperado.");
+        // Mejorar mensajes de error comunes de Firebase
+        let msg = err.message;
+        if (msg.includes('auth/invalid-credential') || msg.includes('auth/wrong-password')) msg = "Credenciales incorrectas.";
+        if (msg.includes('auth/user-not-found')) msg = "Usuario no encontrado.";
+        if (msg.includes('auth/email-already-in-use')) msg = "El correo ya está registrado.";
+        
+        setError(msg || "Ocurrió un error inesperado.");
     } finally {
-        if (!isResetting) setIsLoading(false);
+        if (!isResetting && !successMessage) setIsLoading(false);
     }
   };
 
@@ -117,7 +113,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       setIsRegistering(false);
       setError(null);
       setSuccessMessage(null);
-      // Keep identifier if entered
   };
 
   return (
@@ -141,11 +136,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             {isResetting ? 'Recupera el acceso a tu cuenta' : 
              isRegistering ? 'Crea tu cuenta de invocador' : 'Identifícate para comenzar'}
           </p>
-          {!isSupabaseConfigured() && (
-             <p className="text-red-400 text-xs mt-2 font-bold bg-red-900/30 px-2 py-1 rounded border border-red-500">
-                 Modo Demo: Configura Supabase para conectar
-             </p>
-          )}
+          <p className="text-green-400 text-[10px] mt-2 font-bold bg-green-900/30 px-2 py-1 rounded border border-green-500/50 flex items-center gap-1">
+             <CheckCircle2 className="w-3 h-3" /> CONECTADO A LA NUBE
+          </p>
         </div>
 
         {/* Success Message */}
@@ -180,9 +173,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     />
                     <Mail className="w-5 h-5 text-gray-500 absolute left-3 top-3.5 group-focus-within:text-[#c8aa6e] transition-colors" />
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                    Te enviaremos un enlace mágico para restablecer tu contraseña.
-                </p>
               </div>
           ) : isRegistering ? (
              // REGISTER FORM
@@ -296,7 +286,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             className="w-full bg-gradient-to-r from-[#c8aa6e] to-[#917640] hover:from-[#e6cf9b] hover:to-[#a88a4d] text-[#0a1428] font-bold py-3 px-4 rounded transform transition-all duration-200 hover:scale-[1.02] shadow-lg mt-6 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
           >
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 
-             (isResetting ? 'Enviar Enlace' : isRegistering ? 'Crear Cuenta' : 'Acceder')}
+             (isResetting ? 'Enviar' : isRegistering ? 'Crear Cuenta' : 'Acceder')}
           </button>
         </form>
 

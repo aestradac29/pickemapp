@@ -1,3 +1,4 @@
+
 export enum Stage {
   GROUPS = 'Fase Regular',
   PLAYOFFS = 'Playoffs',
@@ -59,8 +60,8 @@ export interface Match {
   startTime: string; // ISO String
   stage: Stage;
   isCompleted: boolean;
-  winnerId?: string; // If completed
-  day?: number; // Optional day number for filtering
+  winnerId?: string | null; // If completed
+  day?: number | null; // Optional day number for filtering
 }
 
 export interface UserPrediction {

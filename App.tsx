@@ -9,11 +9,11 @@ import { CrystalBall } from './components/CrystalBall';
 import { FantasyView } from './components/FantasyView';
 import { MatchdayView } from './components/MatchdayView';
 import { SplitSelection } from './components/SplitSelection';
+import { PasswordResetModal } from './components/PasswordResetModal';
 import { ViewState, UserPrediction } from './types';
-import { Menu, X, Share2, LogOut, ChevronLeft, KeyRound, Loader2, Save } from 'lucide-react';
+import { Menu, X, Share2, LogOut, ChevronLeft } from 'lucide-react';
 import { authService } from './services/authService';
 import { dataService } from './services/dataService';
-import { supabase } from './lib/supabase';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.LOGIN);
@@ -24,104 +24,74 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
-  // Inicializar selectedSplit desde localStorage si existe
   const [selectedSplit, setSelectedSplit] = useState<string | null>(() => {
     return localStorage.getItem('selectedSplit');
   });
 
   // Recovery State
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [isSavingPassword, setIsSavingPassword] = useState(false);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  // Admin Check
+  // Admin Check - STRICT: Only aestrada
   const isAdmin = currentUser === 'aestrada';
 
-  // --- SUPABASE SESSION HANDLER ---
+  // --- AUTH INITIALIZATION & LISTENER ---
   useEffect(() => {
+    // 1. Initial Check
     const checkUser = async () => {
-      try {
         const user = await authService.getCurrentUser();
         if (user) {
-           setCurrentUser(user.profile?.username || user.email?.split('@')[0] || 'Invocador');
-           // getCurrentUser ya devuelve el ID del perfil correcto gracias al fix en authService
-           setCurrentUserId(user.id);
-           
-           // Load User Data
-           loadUserData(user.id);
-
-           // Lógica de navegación inicial
-           if (view === ViewState.LOGIN) {
-              if (selectedSplit) {
-                  setView(ViewState.DASHBOARD);
-              } else {
-                  setView(ViewState.SPLIT_SELECTION);
-              }
-           }
+            handleUserAuthenticated(user);
+        } else {
+            setView(ViewState.LOGIN);
         }
-      } catch (error) {
-        console.error("No active session", error);
-      }
     };
     checkUser();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        // Detectar si el usuario llega por recuperación de contraseña
-        if (event === 'PASSWORD_RECOVERY') {
-            setShowPasswordResetModal(true);
-        }
-
-        if (event === 'SIGNED_IN' && session) {
-            const userEmail = session.user.email;
-            let realUserId = session.user.id;
-            let username = session.user.user_metadata?.username || session.user.email?.split('@')[0];
-
-            // FIX: Buscar el perfil real por email para asegurar que tenemos el ID correcto (e025...)
-            // y no el ID de Auth (1516...) si están desincronizados.
-            if (userEmail) {
-                try {
-                    const profile = await authService.getProfileByEmail(userEmail);
-                    if (profile) {
-                        realUserId = profile.id;
-                        username = profile.username;
-                    }
-                } catch (e) {
-                    console.error("Error syncing profile on auth change:", e);
-                }
-            }
-
-            setCurrentUser(username);
-            setCurrentUserId(realUserId);
-            loadUserData(realUserId);
-            
-            // Solo redirigir si el usuario estaba en Login. 
-            // Si ya estaba en Dashboard (por ejemplo al refrescar token), no hacemos nada.
-            setView((prevView) => {
-                if (prevView === ViewState.LOGIN && !showPasswordResetModal) {
-                     return localStorage.getItem('selectedSplit') ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION;
-                }
-                return prevView;
-            });
-
-        } else if (event === 'SIGNED_OUT') {
+    // 2. Subscribe to Auth Changes (Login/Logout)
+    const unsubscribe = authService.onAuthStateChange((user) => {
+        if (user) {
+            handleUserAuthenticated(user);
+        } else {
+            // Logout
             setCurrentUser(null);
             setCurrentUserId(null);
             setPredictions([]);
-            localStorage.removeItem('selectedSplit'); // Limpiar split al cerrar sesión
-            setSelectedSplit(null);
             setView(ViewState.LOGIN);
         }
     });
 
-    return () => {
-        authListener.subscription.unsubscribe();
-    };
-  }, [showPasswordResetModal]);
+    return () => unsubscribe();
+  }, []);
+
+  const handleUserAuthenticated = (user: any) => {
+      // Si ya tenemos un usuario seteado manualmente (por el registro), intentamos no sobrescribirlo con 'Invocador' si es posible
+      // Pero el listener es la fuente de verdad para el ID
+      setCurrentUser(prev => {
+        const newName = user.profile?.username || 'Invocador';
+        // Si el nuevo nombre es Invocador pero ya tenemos uno real, mantenemos el real
+        if (newName === 'Invocador' && prev && prev !== 'Invocador') return prev;
+        return newName;
+      });
+      setCurrentUserId(user.id);
+      loadUserData(user.id);
+
+      // Smart Redirect
+      if (view === ViewState.LOGIN) {
+          if (selectedSplit) {
+              setView(ViewState.DASHBOARD);
+          } else {
+              setView(ViewState.SPLIT_SELECTION);
+          }
+      }
+  };
 
   const loadUserData = async (userId: string) => {
-      const preds = await dataService.getUserPredictions(userId);
-      setPredictions(preds);
+      try {
+        const preds = await dataService.getUserPredictions(userId);
+        setPredictions(preds);
+      } catch (e) {
+          console.error("Error loading predictions", e);
+      }
   };
 
   const refreshPredictions = async () => {
@@ -132,57 +102,35 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (username: string) => {
+    // Actualizar nombre de usuario inmediatamente para evitar race conditions en registro
     setCurrentUser(username);
-    // Verificar si ya hay un split guardado para saltar selección
-    if (selectedSplit) {
-        setView(ViewState.DASHBOARD);
-    } else {
-        setView(ViewState.SPLIT_SELECTION);
+    
+    // Forzar navegación si seguimos en Login
+    if (view === ViewState.LOGIN) {
+        if (selectedSplit) {
+            setView(ViewState.DASHBOARD);
+        } else {
+            setView(ViewState.SPLIT_SELECTION);
+        }
     }
   };
 
   const handleSplitSelect = (splitName: string) => {
     setSelectedSplit(splitName);
-    localStorage.setItem('selectedSplit', splitName); // Guardar selección
+    localStorage.setItem('selectedSplit', splitName); 
     setView(ViewState.DASHBOARD);
   };
 
   const handleLogout = async () => {
     await authService.signOut();
-    setCurrentUser(null);
-    setCurrentUserId(null);
-    setSelectedSplit(null);
-    localStorage.removeItem('selectedSplit');
-    setView(ViewState.LOGIN);
     setIsMenuOpen(false);
   };
 
-  const handlePasswordUpdate = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setIsSavingPassword(true);
-      setPasswordError(null);
-
-      if (newPassword.length < 6) {
-          setPasswordError("La contraseña debe tener al menos 6 caracteres.");
-          setIsSavingPassword(false);
-          return;
-      }
-
-      try {
-          await authService.updateUserPassword(newPassword);
-          setShowPasswordResetModal(false);
-          setNewPassword('');
-          // Force view refresh just in case
-          setView(selectedSplit ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION);
-      } catch (error: any) {
-          setPasswordError(error.message || "Error al actualizar la contraseña.");
-      } finally {
-          setIsSavingPassword(false);
-      }
+  const handlePasswordSuccess = () => {
+      setShowPasswordResetModal(false);
   };
 
   const handleSelectWinner = async (matchId: string, teamId: string) => {
-    // Optimistic UI Update
     setPredictions(prev => {
       const existing = prev.find(p => p.matchId === matchId);
       if (existing) {
@@ -190,37 +138,22 @@ const App: React.FC = () => {
       }
       return [...prev, { matchId, predictedWinnerId: teamId }];
     });
-
-    // Save to DB
-    if (currentUserId) {
-        await dataService.savePrediction(currentUserId, matchId, teamId);
-    }
   };
 
-  // Render content based on current view
   const renderContent = () => {
     switch (view) {
       case ViewState.LOGIN:
         return <Login onLogin={handleLogin} />;
-      
       case ViewState.SPLIT_SELECTION:
         return <SplitSelection onSelect={handleSplitSelect} />;
-
       case ViewState.DASHBOARD:
         return <Dashboard onChangeView={setView} currentUser={currentUser} />;
-
-      // Removed explicit ADMIN view case, integrated into components
-
       case ViewState.RANKING:
         return <RankingView />;
-
       case ViewState.CRYSTAL_BALL:
         return <CrystalBall />;
-
       case ViewState.FANTASY:
-        // Pass currentUserId to FantasyView so it can save/load
         return <FantasyView currentUserId={currentUserId} />;
-
       case ViewState.MATCHDAY:
         return (
             <MatchdayView 
@@ -230,7 +163,6 @@ const App: React.FC = () => {
                 onPredictionsSaved={refreshPredictions}
             />
         );
-
       case ViewState.PLAYOFFS:
         return (
           <div className="animate-in fade-in slide-in-from-bottom-4">
@@ -255,7 +187,6 @@ const App: React.FC = () => {
             </div>
           </div>
         );
-
       case ViewState.RESULTS:
         return (
            <div className="animate-in fade-in slide-in-from-bottom-4">
@@ -263,7 +194,6 @@ const App: React.FC = () => {
              <Leaderboard users={USERS} />
            </div>
         );
-
       default:
         return <Dashboard onChangeView={setView} currentUser={currentUser} />;
     }
@@ -273,7 +203,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#0a1428] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1a2c4e] via-[#0a1428] to-[#0a1428] text-[#f0e6d2] font-sans">
       
       {/* Navbar */}
-      {currentUser && !showPasswordResetModal && (
+      {currentUser && !showPasswordResetModal && view !== ViewState.LOGIN && (
         <nav className="sticky top-0 z-50 bg-[#091428]/90 backdrop-blur-md border-b border-hextech-500/30">
           <div className="max-w-5xl mx-auto px-4">
             <div className="flex items-center justify-between h-16">
@@ -315,7 +245,14 @@ const App: React.FC = () => {
                 )}
 
                 <div className="h-6 w-px bg-gray-700 mx-2"></div>
-                <span className="text-sm text-gray-500 font-bold text-hextech-300">{currentUser}</span>
+                <div className="flex items-center gap-2">
+                    <img 
+                        src={`https://ui-avatars.com/api/?name=${currentUser}&background=random`} 
+                        alt="Avatar" 
+                        className="w-6 h-6 rounded-full border border-gray-600"
+                    />
+                    <span className="text-sm text-gray-500 font-bold text-hextech-300">{currentUser}</span>
+                </div>
                 <button 
                     onClick={handleLogout}
                     className="p-2 text-gray-400 hover:text-red-400 transition-colors"
@@ -338,6 +275,9 @@ const App: React.FC = () => {
           {isMenuOpen && (
              <div className="md:hidden bg-[#091428] border-b border-gray-800">
                 <div className="px-4 py-2 space-y-1">
+                    <div className="px-3 py-2 text-sm text-gray-500 font-bold border-b border-gray-800 mb-2">
+                        Sesión: <span className="text-hextech-300">{currentUser}</span>
+                    </div>
                     {selectedSplit && (
                         <>
                             <button onClick={() => { setView(ViewState.DASHBOARD); setIsMenuOpen(false); }} className="block w-full text-left py-2 px-3 text-gray-300 hover:bg-gray-800 rounded">Inicio</button>
@@ -356,48 +296,12 @@ const App: React.FC = () => {
         {renderContent()}
       </main>
 
-      {/* PASSWORD RESET MODAL */}
+      {/* Password Reset Modal */}
       {showPasswordResetModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-              <div className="w-full max-w-md bg-[#091428] border-2 border-[#c8aa6e] rounded-xl p-8 shadow-[0_0_50px_rgba(200,170,110,0.2)] animate-in zoom-in-95">
-                  <div className="text-center mb-6">
-                      <div className="w-16 h-16 bg-gradient-to-br from-[#c8aa6e] to-[#091428] rounded-full p-0.5 mb-4 border border-[#c8aa6e] flex items-center justify-center shadow-lg mx-auto">
-                          <KeyRound className="w-8 h-8 text-[#f0e6d2]" />
-                      </div>
-                      <h2 className="text-2xl font-bold text-white uppercase">Nueva Contraseña</h2>
-                      <p className="text-gray-400 text-sm mt-2">Introduce tu nueva contraseña para recuperar el acceso.</p>
-                  </div>
-
-                  {passwordError && (
-                      <div className="mb-4 p-3 bg-red-900/50 border border-red-500/50 rounded text-red-200 text-sm text-center">
-                          {passwordError}
-                      </div>
-                  )}
-
-                  <form onSubmit={handlePasswordUpdate}>
-                      <div className="space-y-4 mb-6">
-                          <div>
-                            <label className="text-xs font-bold text-[#c8aa6e] uppercase tracking-wider ml-1">Nueva Contraseña</label>
-                            <input 
-                                type="password" 
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                placeholder="••••••••"
-                                className="w-full bg-[#0a1428] border border-[#463714] text-[#f0e6d2] p-3 rounded focus:outline-none focus:border-[#c8aa6e] focus:shadow-[0_0_10px_rgba(200,170,110,0.2)] transition-all mt-1"
-                            />
-                          </div>
-                      </div>
-                      <button 
-                        type="submit"
-                        disabled={isSavingPassword}
-                        className="w-full bg-gradient-to-r from-[#c8aa6e] to-[#917640] hover:from-[#e6cf9b] hover:to-[#a88a4d] text-[#0a1428] font-bold py-3 px-4 rounded transform transition-all shadow-lg uppercase tracking-widest flex justify-center items-center gap-2"
-                      >
-                        {isSavingPassword ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        Guardar Contraseña
-                      </button>
-                  </form>
-              </div>
-          </div>
+          <PasswordResetModal 
+            onClose={() => setShowPasswordResetModal(false)}
+            onSuccess={handlePasswordSuccess}
+          />
       )}
     </div>
   );
