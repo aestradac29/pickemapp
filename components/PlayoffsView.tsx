@@ -2,23 +2,25 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
 import { DaySelector } from './DaySelector';
 import { UserPrediction, Match, Team, Stage } from '../types';
-import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff } from 'lucide-react';
+import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, Trash, CirclePlus } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { TEAMS } from '../constants';
 
-interface MatchdayViewProps {
+interface PlayoffsViewProps {
     currentUserId: string | null;
     initialPredictions?: UserPrediction[];
     isAdmin?: boolean;
     onPredictionsSaved?: () => Promise<void> | void; 
 }
 
-export const MatchdayView: React.FC<MatchdayViewProps> = ({ 
+export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ 
     currentUserId, 
     initialPredictions = [], 
     isAdmin = false,
     onPredictionsSaved 
 }) => {
+  // Playoffs usually have fewer "days" or rounds. Loaded from config.
+  const [totalRounds, setTotalRounds] = useState(5);
   const [currentDay, setCurrentDay] = useState(1);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
   const [closedDays, setClosedDays] = useState<number[]>([]); 
@@ -39,29 +41,34 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   const [isEditMode, setIsEditMode] = useState(false);
   const [newMatch, setNewMatch] = useState<Match | null>(null);
 
-  // Sync state with props (Cloud Data)
+  // Sync state with props
   useEffect(() => {
     setPredictions(initialPredictions);
   }, [initialPredictions]);
 
-  // Initial Data Load (All Matches)
+  // Initial Data Load
   useEffect(() => {
     const loadData = async () => {
         setIsLoadingMatches(true);
         setNewMatch(null); 
         try {
-            // Cargar TODOS los partidos de una vez para poder calcular cambios en cualquier jornada
             const [fetchedMatches, teamsMap, config] = await Promise.all([
                 dataService.getMatches(), 
                 dataService.getTeams(),
                 dataService.getDaysConfig()
             ]);
             
+            // Filter only Playoff matches for this view context
+            // Note: We still fetch all to handle IDs correctly, filtering happens in render/memo
             setAllMatches(fetchedMatches);
             setAllTeams(Object.values(teamsMap));
             
             setVisibleDays(config.visibleDays);
             setClosedDays(config.closedDays);
+            
+            if (config.playoffRounds) {
+                setTotalRounds(config.playoffRounds);
+            }
         } catch (error) {
             console.error("Error fetching data", error);
         } finally {
@@ -71,38 +78,31 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
     loadData();
   }, []);
 
-  // Derive matches for current day from allMatches state
-  // CRITICAL FIX: Filter by Stage.GROUPS to avoid showing Playoff matches (which also have days 1, 2...)
+  // Derive matches for current day AND stage = Playoffs/Finals
   const matches = useMemo(() => {
       return allMatches
-        .filter(m => m.day === currentDay && m.stage === Stage.GROUPS)
+        .filter(m => (m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS) && m.day === currentDay)
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }, [allMatches, currentDay]);
 
-  // Robust check for unsaved changes using actual match data logic instead of ID string parsing
   const checkUnsavedChanges = (day: number) => {
-    // 1. Obtener los IDs de los partidos que pertenecen a este día Y son de fase regular
     const dayMatchIds = allMatches
-        .filter(m => m.day === day && m.stage === Stage.GROUPS && !m.id.startsWith('temp-'))
+        .filter(m => (m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS) && m.day === day && !m.id.startsWith('temp-'))
         .map(m => m.id);
 
     if (dayMatchIds.length === 0) return false;
 
-    // 2. Filtrar las predicciones locales e iniciales relevantes para este día
     const currentDayPreds = predictions.filter(p => dayMatchIds.includes(p.matchId));
     const initialDayPreds = initialPredictions.filter(p => dayMatchIds.includes(p.matchId));
     
-    // 3. Comparar cantidades
     if (currentDayPreds.length !== initialDayPreds.length) return true;
 
-    // 4. Comparar contenido (si cambió el ganador)
     return currentDayPreds.some(curr => {
         const init = initialDayPreds.find(i => i.matchId === curr.matchId);
         return !init || init.predictedWinnerId !== curr.predictedWinnerId;
     });
   };
 
-  // --- LOGIC RULES ---
   const isDayVisible = visibleDays.includes(currentDay);
   const isManuallyClosed = closedDays.includes(currentDay);
   const now = new Date();
@@ -137,10 +137,10 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           teamA: TEAMS.fnc,
           teamB: TEAMS.g2,
           startTime: new Date().toISOString(),
-          stage: Stage.GROUPS, // Force Stage.GROUPS for Matchday View
+          stage: Stage.PLAYOFFS, // Default to Playoffs
           isCompleted: false,
           day: currentDay,
-          bestOf: 1 // Default BO1
+          bracketStage: 'winners' // Default bracket
       };
       setNewMatch(tempMatch);
   };
@@ -153,9 +153,10 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                 team_a_id: updates.teamA,
                 team_b_id: updates.teamB,
                 start_time: updates.startTime,
-                stage: Stage.GROUPS, // Explicitly set to GROUPS
+                stage: Stage.PLAYOFFS,
                 status: updates.status,
                 day: currentDay,
+                bracketStage: updates.bracketStage,
                 bestOf: updates.bestOf || 1
              });
              setNewMatch(null);
@@ -167,21 +168,20 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                 status: updates.winnerId ? 'finished' : updates.status,
                 winner_id: updates.winnerId || null,
                 day: updates.day,
+                bracketStage: updates.bracketStage,
                 bestOf: updates.bestOf
              };
              await dataService.updateMatch(matchId, dbUpdates);
           }
-          // Re-fetch ALL to keep state consistent
           const updatedMatches = await dataService.getMatches();
           setAllMatches(updatedMatches);
       } catch (error) {
           console.error("Failed to update/create match:", error);
-          alert("Error actualizando o creando el partido. Comprueba la consola.");
+          alert("Error actualizando o creando el partido.");
       }
   };
 
   const handleAdminDelete = async (matchId: string) => {
-      // Optimistic update
       const originalMatches = [...allMatches];
       setAllMatches(prev => prev.filter(m => m.id !== matchId));
 
@@ -191,13 +191,12 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
               return;
           }
           await dataService.deleteMatch(matchId);
-          // Confirm with server state
           const updatedMatches = await dataService.getMatches();
           setAllMatches(updatedMatches);
       } catch (error: any) {
-          console.error("FATAL ERROR deleting match", error);
-          alert("Error crítico al borrar el partido: " + (error.message || JSON.stringify(error)));
-          setAllMatches(originalMatches); // Rollback
+          console.error("Error deleting match", error);
+          alert("Error al borrar el partido.");
+          setAllMatches(originalMatches);
       }
   };
 
@@ -221,6 +220,23 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       await dataService.updateGlobalConfig({ visibleDays, closedDays: newClosedDays });
   };
 
+  const handleAddRound = async () => {
+      if (!isAdmin) return;
+      const newTotal = totalRounds + 1;
+      setTotalRounds(newTotal);
+      await dataService.updateGlobalConfig({ visibleDays, closedDays, playoffRounds: newTotal });
+  };
+
+  const handleDeleteRound = async () => {
+      if (!isAdmin) return;
+      if (totalRounds <= 1) return;
+      const newTotal = totalRounds - 1;
+      setTotalRounds(newTotal);
+      // Ensure we don't leave current view stranded
+      if (currentDay > newTotal) setCurrentDay(newTotal);
+      await dataService.updateGlobalConfig({ visibleDays, closedDays, playoffRounds: newTotal });
+  };
+
   const handleBatchSave = async () => {
       if (!currentUserId) {
           alert("Debes iniciar sesión para guardar.");
@@ -233,7 +249,6 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       setSaveStatus('idle');
       setErrorMessage(null);
 
-      // Use matches (filtered for current day) to determine what to save
       const currentDayMatchIds = matches.filter(m => !m.id.startsWith('temp-')).map(m => m.id);
       
       const dayPredictions = predictions
@@ -249,7 +264,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
               setIsSaving(false);
               isSavingRef.current = false;
               setSaveStatus('error');
-              setErrorMessage("La conexión es lenta, pero seguimos intentándolo...");
+              setErrorMessage("La conexión es lenta...");
           }
       }, 60000);
 
@@ -263,10 +278,9 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           setSaveStatus('success');
           setTimeout(() => setSaveStatus('idle'), 3000);
       } catch (error: any) {
-          console.error("Error saving matchday:", error);
+          console.error("Error saving playoffs:", error);
           setSaveStatus('error');
-          const msg = error instanceof Error ? error.message : (typeof error === 'string' ? error : "Error desconocido al guardar");
-          setErrorMessage(msg);
+          setErrorMessage(error.message || "Error al guardar");
       } finally {
           clearTimeout(fallbackTimer);
           setIsSaving(false);
@@ -274,7 +288,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       }
   };
 
-  const days = Array.from({ length: 11 }, (_, i) => i + 1);
+  // Rounds generated dynamically from state
+  const rounds = Array.from({ length: totalRounds }, (_, i) => i + 1);
   const validMatches = matches.filter(m => !m.id.startsWith('temp-'));
   const validMatchIds = validMatches.map(m => m.id);
   const currentDayPredictionsCount = predictions.filter(p => validMatchIds.includes(p.matchId)).length;
@@ -283,19 +298,19 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   return (
     <div className={`animate-in fade-in slide-in-from-bottom-4 pb-24 transition-all duration-300 ${isEditMode ? 'border-l-4 border-r-4 border-red-900/50 bg-red-950/10 min-h-screen' : ''}`}>
       
-      {/* Header with Day Selector */}
+      {/* Header with Round Selector */}
       <div className={`sticky top-0 z-30 pt-4 pb-4 -mx-4 px-4 border-b mb-6 backdrop-blur-md transition-colors ${isEditMode ? 'bg-red-950/90 border-red-800' : 'bg-[#0a1428]/95 border-gray-800'}`}>
         <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-full border ${isEditMode ? 'bg-red-900 border-red-500' : 'bg-blue-900/20 border-blue-500/30'}`}>
-                    <CalendarCheck className={`w-5 h-5 ${isEditMode ? 'text-white' : 'text-blue-400'}`} />
+                <div className={`p-2 rounded-full border ${isEditMode ? 'bg-red-900 border-red-500' : 'bg-hextech-900 border-hextech-500/30'}`}>
+                    <Trophy className={`w-5 h-5 ${isEditMode ? 'text-white' : 'text-hextech-500'}`} />
                 </div>
                 <div>
                     <h2 className={`text-xl font-bold uppercase tracking-wide ${isEditMode ? 'text-white' : 'text-[#c8aa6e]'}`}>
-                        {isEditMode ? 'MODO ADMINISTRADOR' : 'Fase Regular'}
+                        {isEditMode ? 'ADMIN PLAYOFFS' : 'Fase Final'}
                     </h2>
-                    <p className={`text-[10px] uppercase tracking-widest leading-none ${isEditMode ? 'text-red-300' : 'text-blue-300/60'}`}>
-                        {isEditMode ? 'Editando Datos en Vivo' : 'Winter 2026'}
+                    <p className={`text-[10px] uppercase tracking-widest leading-none ${isEditMode ? 'text-red-300' : 'text-hextech-500/60'}`}>
+                        {isEditMode ? 'Configurando Cuadro' : 'Winter 2026'}
                     </p>
                 </div>
             </div>
@@ -321,7 +336,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         </div>
 
         <DaySelector 
-            days={days} 
+            days={rounds} 
             currentDay={currentDay} 
             isEditMode={isEditMode}
             activeDays={visibleDays}
@@ -333,6 +348,25 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         {/* Admin Dual Control Toolbar */}
         {isEditMode && (
             <div className="mt-4 flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 justify-end">
+                {/* Round Management Controls */}
+                 <div className="flex items-center gap-2 border-r border-red-800 pr-2 mr-2">
+                    <button 
+                        onClick={handleDeleteRound}
+                        disabled={totalRounds <= 1}
+                        className="p-2 rounded-lg bg-red-950 border border-red-800 text-red-400 hover:bg-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Borrar última ronda"
+                    >
+                        <Trash className="w-4 h-4" />
+                    </button>
+                    <button 
+                        onClick={handleAddRound}
+                        className="p-2 rounded-lg bg-red-950 border border-red-800 text-red-400 hover:bg-red-900"
+                        title="Añadir ronda"
+                    >
+                        <CirclePlus className="w-4 h-4" />
+                    </button>
+                </div>
+
                 <button 
                     onClick={handleToggleVisibility}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase border transition-all ${
@@ -363,15 +397,14 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       {/* Matches List */}
       <div className="space-y-6 animate-in fade-in duration-500">
         
-        {/* State Banner: Closed/Hidden (For User) */}
         {!isEditMode && (
             <>
                 {!isDayVisible && (
                     <div className="flex flex-col items-center justify-center py-16 text-gray-500 border-2 border-dashed border-gray-800 rounded-2xl bg-black/20">
                         <CalendarOff className="w-12 h-12 mb-4 opacity-50" />
-                        <h3 className="text-lg font-bold text-gray-400 mb-1">Jornada {currentDay}</h3>
+                        <h3 className="text-lg font-bold text-gray-400 mb-1">Ronda {currentDay}</h3>
                         <p className="uppercase tracking-widest text-xs font-bold text-[#c8aa6e]">
-                            TBD / Partidos por determinar
+                            TBD / Por determinar
                         </p>
                     </div>
                 )}
@@ -379,7 +412,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                 {isDayVisible && isLockedForUser && (
                     <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center justify-center gap-2 text-red-300 mb-6 animate-in slide-in-from-top-2 font-bold uppercase tracking-widest text-sm">
                         <Lock className="w-4 h-4" />
-                        <span>Jornada Cerrada</span>
+                        <span>Predicciones Cerradas</span>
                     </div>
                 )}
             </>
@@ -387,34 +420,17 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
         {(isEditMode || isDayVisible) && (
             <>
-                {isEditMode && (
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                        {!isDayVisible && (
-                            <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-3 flex items-center gap-2 text-gray-400 text-xs font-bold uppercase">
-                                <EyeOff className="w-4 h-4" />
-                                <span>Vista Usuario: TBD</span>
-                            </div>
-                        )}
-                        {isManuallyClosed && (
-                            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center gap-2 text-red-400 text-xs font-bold uppercase">
-                                <Lock className="w-4 h-4" />
-                                <span>Votación: Bloqueada</span>
-                            </div>
-                        )}
-                    </div>
-                )}
-
                 {isLoadingMatches ? (
                     <div className="flex flex-col items-center justify-center py-12 text-[#c8aa6e]">
                         <Loader2 className="w-8 h-8 animate-spin mb-4" />
-                        <p>Cargando enfrentamientos...</p>
+                        <p>Cargando cuadro...</p>
                     </div>
                 ) : matches.length === 0 && !newMatch ? (
                     <div className="flex flex-col items-center justify-center py-16 text-gray-500 border-2 border-dashed border-gray-800 rounded-2xl">
-                        <CalendarOff className="w-12 h-12 mb-4 opacity-50" />
-                        <h3 className="text-lg font-bold text-gray-400 mb-1">Sin Datos</h3>
+                        <Trophy className="w-12 h-12 mb-4 opacity-50" />
+                        <h3 className="text-lg font-bold text-gray-400 mb-1">Sin Partidos</h3>
                         <p className="uppercase tracking-widest text-xs font-bold text-[#c8aa6e]">
-                            No hay partidos creados
+                            No hay encuentros programados en esta ronda
                         </p>
                     </div>
                 ) : (
@@ -456,7 +472,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                         <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center group-hover:bg-gray-700">
                             <Plus className="w-5 h-5" />
                         </div>
-                        <span className="font-bold uppercase tracking-wider text-sm">Añadir Partido a Jornada {currentDay}</span>
+                        <span className="font-bold uppercase tracking-wider text-sm">Añadir Partido a Ronda {currentDay}</span>
                     </button>
                 )}
             </>
@@ -497,7 +513,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                 
                 <div className="flex flex-col items-start leading-none">
                     <span className="text-sm">
-                        {saveStatus === 'success' ? 'GUARDADO EN LA NUBE' : saveStatus === 'error' ? 'REINTENTAR' : 'GUARDAR PREDICCIONES'}
+                        {saveStatus === 'success' ? 'GUARDADO' : saveStatus === 'error' ? 'REINTENTAR' : 'GUARDAR PREDICCIONES'}
                     </span>
                     {saveStatus !== 'success' && saveStatus !== 'error' && (
                         <span className="text-[10px] opacity-80 mt-1">

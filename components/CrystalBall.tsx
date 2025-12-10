@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { ROLE_ICONS, WHITE_LOGO_TEAMS } from '../constants';
-import { Sparkles, RefreshCw, Trophy, User, Sword, Shield, Hash, Loader2 } from 'lucide-react';
+import { Sparkles, RefreshCw, Trophy, User, Sword, Shield, Hash, Loader2, Save, CheckCircle2, AlertCircle, Settings } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { getChampions } from '../services/riotService';
 import { dataService } from '../services/dataService';
 import { Role, Player, Team } from '../types';
 
-export const CrystalBall: React.FC = () => {
+interface CrystalBallProps {
+    currentUserId?: string | null;
+    isAdmin?: boolean;
+}
+
+const REQUIRED_KEYS = [
+    'winter_champ', 'fastest_win_team', 'longest_win_team',
+    'mvp', 'rookie', 'highest_kda',
+    'best_top', 'best_jng', 'best_mid', 'best_adc', 'best_sup',
+    'most_picked', 'most_banned', 'highest_wr', 'lowest_wr', 'most_kills',
+    'total_pentakills'
+];
+
+export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin }) => {
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [championOptions, setChampionOptions] = useState<Option[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -15,7 +28,13 @@ export const CrystalBall: React.FC = () => {
   const [loadingChamps, setLoadingChamps] = useState(true);
   const [loadingData, setLoadingData] = useState(true);
   
-  const [pentakills, setPentakills] = useState<string>('');
+  // Saving State
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Admin Mode
+  const [mode, setMode] = useState<'prediction' | 'official_result'>('prediction');
 
   // Load App Data (Players & Teams)
   useEffect(() => {
@@ -37,6 +56,26 @@ export const CrystalBall: React.FC = () => {
     loadData();
   }, []);
 
+  // Load User/Admin Selections
+  useEffect(() => {
+    const loadSelections = async () => {
+        if (!currentUserId && !isAdmin) return;
+        
+        try {
+            let loadedSelections = {};
+            if (isAdmin && mode === 'official_result') {
+                 loadedSelections = await dataService.getAdminCrystalBallResults();
+            } else if (currentUserId) {
+                 loadedSelections = await dataService.getCrystalBall(currentUserId);
+            }
+            setSelections(loadedSelections || {});
+        } catch (e) {
+            console.error("Error loading selections", e);
+        }
+    };
+    loadSelections();
+  }, [currentUserId, mode, isAdmin]);
+
   // Load Riot Data (Champions)
   useEffect(() => {
     const fetchData = async () => {
@@ -56,7 +95,42 @@ export const CrystalBall: React.FC = () => {
 
   const handleSelectionChange = (key: string, value: string) => {
     setSelections(prev => ({ ...prev, [key]: value }));
+    setSaveStatus('idle'); // Reset save status on change
   };
+
+  const handleSave = async () => {
+      if (!currentUserId && !isAdmin) {
+          alert("Debes iniciar sesión.");
+          return;
+      }
+
+      setIsSaving(true);
+      setSaveStatus('idle');
+      setErrorMessage(null);
+
+      try {
+          if (isAdmin && mode === 'official_result') {
+              await dataService.saveAdminCrystalBallResults(selections);
+          } else if (currentUserId) {
+              await dataService.saveCrystalBall(currentUserId, selections);
+          }
+          setSaveStatus('success');
+          setTimeout(() => setSaveStatus('idle'), 3000);
+      } catch (e: any) {
+          console.error(e);
+          setSaveStatus('error');
+          setErrorMessage(e.message || "Error al guardar");
+      } finally {
+          setIsSaving(false);
+      }
+  };
+
+  const checkCompletion = () => {
+      const missing = REQUIRED_KEYS.filter(key => !selections[key]);
+      return missing.length === 0;
+  };
+
+  const isFormComplete = checkCompletion();
 
   const mapToOption = (p: Player): Option => {
     const team = teams.find(t => t.id === p.teamId);
@@ -108,20 +182,43 @@ export const CrystalBall: React.FC = () => {
   return (
       <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 mb-24">
         
+        {/* Admin Mode Toggle */}
+        {isAdmin && (
+            <div className="flex justify-end mb-4">
+                <div className="bg-[#0f1d36] border border-gray-700 p-1 rounded-lg flex items-center gap-1">
+                    <button 
+                        onClick={() => setMode('prediction')}
+                        className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-colors ${mode === 'prediction' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Mis Predicciones
+                    </button>
+                    <button 
+                        onClick={() => setMode('official_result')}
+                        className={`px-3 py-1.5 rounded text-xs font-bold uppercase flex items-center gap-2 transition-colors ${mode === 'official_result' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <Settings className="w-3 h-3" />
+                        Resultado Oficial
+                    </button>
+                </div>
+            </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-10">
           <div className="inline-block p-4 rounded-full bg-purple-900/20 mb-4 border border-purple-500/30 shadow-[0_0_30px_rgba(147,51,234,0.2)]">
               <Sparkles className="w-10 h-10 text-purple-400" />
           </div>
-          <h2 className="text-3xl font-bold text-white uppercase tracking-wider mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-purple-600">
-              Bola de Cristal
+          <h2 className={`text-3xl font-bold uppercase tracking-wider mb-2 text-transparent bg-clip-text ${mode === 'official_result' ? 'bg-gradient-to-r from-red-400 to-red-600' : 'bg-gradient-to-r from-purple-300 to-purple-600'}`}>
+              {mode === 'official_result' ? 'ADMIN: RESULTADOS' : 'Bola de Cristal'}
           </h2>
           <p className="text-purple-300/80 text-sm max-w-md mx-auto">
-              Predice el futuro del Split. Las selecciones se bloquearán al inicio de la primera jornada.
+              {mode === 'official_result' 
+                ? 'Introduce los resultados oficiales para calcular puntuaciones.' 
+                : 'Predice el futuro del Split. Las selecciones se bloquearán al inicio de la primera jornada.'}
           </p>
         </div>
 
-        <div className="space-y-12">
+        <div className={`space-y-12 transition-all ${mode === 'official_result' ? 'border-l-4 border-red-500 pl-4 bg-red-950/10 py-4 rounded-r-xl' : ''}`}>
           
           {/* SECTION 1: TEAMS */}
           <section>
@@ -303,21 +400,48 @@ export const CrystalBall: React.FC = () => {
                     label="Nº Total de Pentakills" 
                     options={pentakillOptions}
                     placeholder="Selecciona rango"
-                    value={pentakills}
-                    onChange={(v: string) => setPentakills(v)}
+                    value={selections['total_pentakills']}
+                    onChange={(v: string) => handleSelectionChange('total_pentakills', v)}
                 />
             </div>
           </section>
 
         </div>
         
-        <div className="mt-12 text-center pb-8">
-          <button className="bg-gradient-to-r from-purple-700 to-purple-900 hover:from-purple-600 hover:to-purple-800 text-white font-bold py-4 px-10 rounded-xl shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all transform hover:scale-105 border border-purple-500/50 flex items-center gap-3 mx-auto">
-              <Sparkles className="w-5 h-5" />
-              <span>Consultar al Destino (Guardar)</span>
+        <div className="mt-12 text-center pb-8 sticky bottom-8 z-30 pointer-events-none">
+          <button 
+             onClick={handleSave}
+             disabled={isSaving || !isFormComplete}
+             className={`
+                pointer-events-auto bg-gradient-to-r text-white font-bold py-4 px-10 rounded-xl shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all transform border flex items-center gap-3 mx-auto
+                ${!isFormComplete 
+                    ? 'from-gray-700 to-gray-800 border-gray-600 opacity-80 cursor-not-allowed grayscale' 
+                    : mode === 'official_result'
+                        ? 'from-red-700 to-red-900 border-red-500/50 hover:scale-105'
+                        : 'from-purple-700 to-purple-900 border-purple-500/50 hover:scale-105'
+                }
+             `}
+             title={!isFormComplete ? 'Rellena todos los campos para guardar' : ''}
+          >
+              {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+               saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> :
+               saveStatus === 'error' ? <AlertCircle className="w-5 h-5" /> :
+               <Save className="w-5 h-5" />
+              }
+              
+              <span>
+                  {saveStatus === 'success' 
+                    ? '¡Guardado!' 
+                    : saveStatus === 'error'
+                        ? 'Error al guardar'
+                        : !isFormComplete 
+                            ? 'Completa todos los campos'
+                            : (mode === 'official_result' ? 'PUBLICAR RESULTADOS OFICIALES' : 'GUARDAR PREDICCIONES')}
+              </span>
           </button>
+          
           <p className="mt-4 text-xs text-gray-500">
-              {Object.keys(selections).length + (pentakills !== '' ? 1 : 0)} predicciones realizadas
+              {Object.keys(selections).filter(k => selections[k]).length} de {REQUIRED_KEYS.length} selecciones completadas
           </p>
         </div>
       </div>

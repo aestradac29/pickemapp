@@ -78,7 +78,7 @@ export const DaySelector: React.FC<DaySelectorProps> = ({
                                 <Lock className={`w-5 h-5 ${currentDay === day ? 'text-[#0a1428]' : 'text-gray-600'}`} />
                             ) : (
                                 <>
-                                    <span className="text-[10px] uppercase font-bold tracking-tighter opacity-70">Day</span>
+                                    <span className="text-[8px] uppercase font-bold tracking-tighter opacity-70 leading-tight">Jornada</span>
                                     <span className="text-lg font-bold leading-none">{day}</span>
                                     
                                     {/* Hextech Style Indicator for Unsaved Changes */}

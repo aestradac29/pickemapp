@@ -62,6 +62,8 @@ export interface Match {
   isCompleted: boolean;
   winnerId?: string | null; // If completed
   day?: number | null; // Optional day number for filtering
+  bestOf?: number; // BO1, BO3, BO5
+  bracketStage?: 'winners' | 'losers'; // Nuevo campo para Playoffs
 }
 
 export interface UserPrediction {

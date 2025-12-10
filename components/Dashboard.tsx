@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ViewState } from '../types';
-import { Trophy, ListOrdered, Sparkles, CalendarCheck, Swords, UserPlus } from 'lucide-react';
+import { Trophy, ListOrdered, Sparkles, CalendarCheck, Swords, UserPlus, Lock, Unlock, ShieldAlert } from 'lucide-react';
+import { dataService } from '../services/dataService';
 
 interface DashboardProps {
   onChangeView: (view: ViewState) => void;
@@ -8,6 +9,33 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser }) => {
+  const [playoffsAccessible, setPlayoffsAccessible] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const isAdmin = currentUser === 'aestrada';
+
+  useEffect(() => {
+    const loadConfig = async () => {
+        setIsLoading(true);
+        try {
+            const config = await dataService.getDaysConfig();
+            setPlayoffsAccessible(config.playoffsAccessible || false);
+        } catch (e) {
+            console.error("Failed to load dashboard config", e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    loadConfig();
+  }, []);
+
+  const handleTogglePlayoffs = async () => {
+      if (!isAdmin) return;
+      const newValue = !playoffsAccessible;
+      setPlayoffsAccessible(newValue);
+      await dataService.updateGlobalConfig({ playoffsAccessible: newValue });
+  };
+
   const options = [
     {
       id: ViewState.MATCHDAY,
@@ -34,7 +62,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser 
       icon: Trophy,
       color: 'text-[#c8aa6e]',
       border: 'hover:border-[#c8aa6e]',
-      bg: 'hover:bg-[#c8aa6e]/10'
+      bg: 'hover:bg-[#c8aa6e]/10',
+      locked: !playoffsAccessible && !isAdmin // Bloqueado para usuarios normales si no está accesible
     },
     {
       id: ViewState.CRYSTAL_BALL,
@@ -66,35 +95,71 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser 
   ];
 
   return (
-    <div className="px-4 py-8 animate-in slide-in-from-bottom-8 duration-500 pb-20">
+    <div className="px-4 py-8 animate-in slide-in-from-bottom-8 duration-500 pb-20 relative">
       <h2 className="text-2xl font-bold text-center mb-8 text-[#f0e6d2] uppercase tracking-widest">
         Panel de Control
       </h2>
+
+      {/* Admin Quick Actions */}
+      {isAdmin && !isLoading && (
+          <div className="flex justify-center mb-8">
+              <button 
+                  onClick={handleTogglePlayoffs}
+                  className={`
+                      flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all shadow-lg
+                      ${playoffsAccessible 
+                          ? 'bg-red-900/30 border-red-500 text-red-300 hover:bg-red-900/50' 
+                          : 'bg-green-900/30 border-green-500 text-green-300 hover:bg-green-900/50'
+                      }
+                  `}
+              >
+                  {playoffsAccessible ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                  {playoffsAccessible ? 'Bloquear Acceso Playoffs' : 'Abrir Acceso Playoffs'}
+              </button>
+          </div>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-12">
         {options.map((option) => (
           <button
             key={option.id}
-            onClick={() => onChangeView(option.id)}
+            onClick={() => !option.locked && onChangeView(option.id)}
+            disabled={option.locked}
             className={`
               relative group flex flex-col items-center justify-center p-6 h-48
-              bg-[#091428]/80 backdrop-blur border border-gray-700 rounded-xl 
+              bg-[#091428]/80 backdrop-blur border rounded-xl 
               transition-all duration-300 shadow-xl
-              ${option.border} ${option.bg}
-              hover:shadow-[0_0_20px_rgba(0,0,0,0.5)]
-              hover:-translate-y-1
+              ${option.locked 
+                  ? 'border-gray-800 opacity-60 cursor-not-allowed grayscale' 
+                  : `border-gray-700 ${option.border} ${option.bg} hover:shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:-translate-y-1`
+              }
             `}
           >
-            <div className={`mb-4 p-3 rounded-full bg-[#0a1428] border border-gray-700 group-hover:scale-110 transition-transform ${option.color}`}>
-              <option.icon className="w-8 h-8" />
+            {/* Lock Overlay */}
+            {option.locked && (
+                <div className="absolute top-4 right-4 z-10">
+                    <Lock className="w-6 h-6 text-gray-500" />
+                </div>
+            )}
+
+            <div className={`mb-4 p-3 rounded-full bg-[#0a1428] border border-gray-700 group-hover:scale-110 transition-transform ${option.locked ? 'text-gray-600' : option.color}`}>
+              {option.locked ? <Lock className="w-8 h-8" /> : <option.icon className="w-8 h-8" />}
             </div>
-            <h3 className="text-lg font-bold text-[#f0e6d2] mb-1 uppercase tracking-wide">{option.title}</h3>
-            <p className="text-gray-500 text-xs group-hover:text-gray-300 transition-colors">{option.subtitle}</p>
             
-            {/* Corner Accents */}
-            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className={`w-2 h-2 rounded-full animate-pulse bg-current ${option.color}`}></div>
-            </div>
+            <h3 className={`text-lg font-bold mb-1 uppercase tracking-wide ${option.locked ? 'text-gray-500' : 'text-[#f0e6d2]'}`}>
+                {option.title}
+            </h3>
+            
+            <p className="text-gray-500 text-xs group-hover:text-gray-300 transition-colors">
+                {option.locked ? 'Fase Regular en curso' : option.subtitle}
+            </p>
+            
+            {/* Corner Accents (Only if not locked) */}
+            {!option.locked && (
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className={`w-2 h-2 rounded-full animate-pulse bg-current ${option.color}`}></div>
+                </div>
+            )}
           </button>
         ))}
       </div>

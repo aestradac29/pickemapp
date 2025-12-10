@@ -216,6 +216,7 @@ export const MATCHES: Match[] = [
     startTime: new Date(Date.now() + 86400000).toISOString(),
     stage: Stage.PLAYOFFS,
     isCompleted: false,
+    day: 1
   },
   {
     id: 'playoff-2',
@@ -224,6 +225,7 @@ export const MATCHES: Match[] = [
     startTime: new Date(Date.now() + 90000000).toISOString(),
     stage: Stage.PLAYOFFS,
     isCompleted: false,
+    day: 1
   },
   {
     id: 'playoff-3',
@@ -232,6 +234,7 @@ export const MATCHES: Match[] = [
     startTime: new Date(Date.now() + 95000000).toISOString(),
     stage: Stage.PLAYOFFS,
     isCompleted: false,
+    day: 1
   },
   {
     id: 'playoff-4',
@@ -240,6 +243,7 @@ export const MATCHES: Match[] = [
     startTime: new Date(Date.now() + 100000000).toISOString(),
     stage: Stage.PLAYOFFS,
     isCompleted: false,
+    day: 1
   },
 ];
 
@@ -285,7 +289,8 @@ export const getMatchesForDay = (day: number): Match[] => {
         teamB: teamsArray[teamBIndex],
         startTime: baseDate.toISOString(),
         stage: Stage.GROUPS,
-        isCompleted: false
+        isCompleted: false,
+        day: day // ADDED: Explicitly set the day
      });
   }
 

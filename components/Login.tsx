@@ -136,9 +136,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             {isResetting ? 'Recupera el acceso a tu cuenta' : 
              isRegistering ? 'Crea tu cuenta de invocador' : 'Identifícate para comenzar'}
           </p>
-          <p className="text-green-400 text-[10px] mt-2 font-bold bg-green-900/30 px-2 py-1 rounded border border-green-500/50 flex items-center gap-1">
-             <CheckCircle2 className="w-3 h-3" /> CONECTADO A LA NUBE
-          </p>
         </div>
 
         {/* Success Message */}

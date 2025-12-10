@@ -8,6 +8,7 @@ import { RankingView } from './components/RankingView';
 import { CrystalBall } from './components/CrystalBall';
 import { FantasyView } from './components/FantasyView';
 import { MatchdayView } from './components/MatchdayView';
+import { PlayoffsView } from './components/PlayoffsView';
 import { SplitSelection } from './components/SplitSelection';
 import { PasswordResetModal } from './components/PasswordResetModal';
 import { ViewState, UserPrediction } from './types';
@@ -149,9 +150,9 @@ const App: React.FC = () => {
       case ViewState.DASHBOARD:
         return <Dashboard onChangeView={setView} currentUser={currentUser} />;
       case ViewState.RANKING:
-        return <RankingView />;
+        return <RankingView currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.CRYSTAL_BALL:
-        return <CrystalBall />;
+        return <CrystalBall currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.FANTASY:
         return <FantasyView currentUserId={currentUserId} />;
       case ViewState.MATCHDAY:
@@ -165,27 +166,12 @@ const App: React.FC = () => {
         );
       case ViewState.PLAYOFFS:
         return (
-          <div className="animate-in fade-in slide-in-from-bottom-4">
-            <h2 className="text-2xl font-bold text-[#c8aa6e] mb-6 text-center uppercase">Playoffs {selectedSplit || 'Winter 2026'}</h2>
-            <div className="space-y-4">
-              {MATCHES.map(match => (
-                <MatchCard 
-                  key={match.id} 
-                  match={match}
-                  selectedWinnerId={predictions.find(p => p.matchId === match.id)?.predictedWinnerId}
-                  onSelectWinner={handleSelectWinner}
-                />
-              ))}
-            </div>
-             <div className="fixed bottom-8 left-0 right-0 px-4 flex justify-center pointer-events-none">
-              {predictions.length > 0 && (
-                <div className="pointer-events-auto bg-hextech-900 border border-hextech-500 text-hextech-500 px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-[0_0_20px_rgba(200,170,110,0.3)] animate-in slide-in-from-bottom-2">
-                  <Share2 className="w-4 h-4" />
-                  <span>Predicciones guardadas</span>
-                </div>
-              )}
-            </div>
-          </div>
+            <PlayoffsView 
+                currentUserId={currentUserId} 
+                initialPredictions={predictions} 
+                isAdmin={isAdmin}
+                onPredictionsSaved={refreshPredictions}
+            />
         );
       case ViewState.RESULTS:
         return (

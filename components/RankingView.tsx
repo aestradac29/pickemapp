@@ -1,30 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import { WHITE_LOGO_TEAMS } from '../constants';
 import { Team } from '../types';
-import { GripVertical, Save, Trophy, AlertOctagon, Loader2, RefreshCw } from 'lucide-react';
+import { GripVertical, Save, Trophy, AlertOctagon, Loader2, RefreshCw, CheckCircle2, AlertCircle, Settings } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
-export const RankingView: React.FC = () => {
+interface RankingViewProps {
+    currentUserId?: string | null;
+    isAdmin?: boolean;
+}
+
+export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin }) => {
   const [rankedTeams, setRankedTeams] = useState<Team[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  // Admin Mode Toggle: "prediction" (default for users) vs "official_result" (only for admin)
+  const [mode, setMode] = useState<'prediction' | 'official_result'>('prediction');
 
   useEffect(() => {
-    const loadTeams = async () => {
-        setIsLoading(true);
-        try {
-            const teamsMap = await dataService.getTeams();
-            const teamsList = Object.values(teamsMap);
-            // Default sort could be alphabetical or by region, here just taking DB order
-            setRankedTeams(teamsList);
-        } catch (error) {
-            console.error("Failed to load teams", error);
-        } finally {
-            setIsLoading(false);
+    loadTeamsAndRanking();
+  }, [mode, currentUserId]); // Reload when mode switches or user changes
+
+  const loadTeamsAndRanking = async () => {
+    setIsLoading(true);
+    setSaveStatus('idle');
+    try {
+        const teamsMap = await dataService.getTeams();
+        const teamsList = Object.values(teamsMap);
+        
+        let orderedIds: string[] = [];
+
+        if (isAdmin && mode === 'official_result') {
+            orderedIds = await dataService.getAdminRanking();
+        } else if (currentUserId) {
+            orderedIds = await dataService.getUserRanking(currentUserId);
         }
-    };
-    loadTeams();
-  }, []);
+
+        // Apply order if exists
+        if (orderedIds && orderedIds.length > 0) {
+            const orderedTeams = orderedIds
+                .map(id => teamsMap[id])
+                .filter(Boolean); // remove undefined if any ID mismatch
+            
+            // Add any missing teams (newly added to DB but not in saved order) at the end
+            const missingTeams = teamsList.filter(t => !orderedIds.includes(t.id));
+            setRankedTeams([...orderedTeams, ...missingTeams]);
+        } else {
+            // Default sort (e.g. alphabetical or by DB order)
+            setRankedTeams(teamsList);
+        }
+
+    } catch (error) {
+        console.error("Failed to load teams", error);
+    } finally {
+        setIsLoading(false);
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -42,29 +75,85 @@ export const RankingView: React.FC = () => {
 
     setRankedTeams(newOrder);
     setDraggedIndex(index);
+    setSaveStatus('idle'); // Reset status on change
   };
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
   };
 
+  const handleSave = async () => {
+      if (!currentUserId && !isAdmin) {
+          alert("Debes iniciar sesión.");
+          return;
+      }
+
+      setIsSaving(true);
+      setSaveStatus('idle');
+
+      const teamIds = rankedTeams.map(t => t.id);
+
+      try {
+          if (isAdmin && mode === 'official_result') {
+              await dataService.saveAdminRanking(teamIds);
+          } else if (currentUserId) {
+              await dataService.saveUserRanking(currentUserId, teamIds);
+          }
+          setSaveStatus('success');
+          setTimeout(() => setSaveStatus('idle'), 3000);
+      } catch (e) {
+          console.error(e);
+          setSaveStatus('error');
+      } finally {
+          setIsSaving(false);
+      }
+  };
+
   if (isLoading) {
       return (
           <div className="flex flex-col items-center justify-center min-h-[400px] text-[#c8aa6e]">
               <Loader2 className="w-10 h-10 animate-spin mb-4" />
-              <p>Cargando equipos...</p>
+              <p>Cargando clasificación...</p>
           </div>
       );
   }
 
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 mb-20">
+      
+      {/* Admin Mode Toggle */}
+      {isAdmin && (
+          <div className="flex justify-end mb-4">
+              <div className="bg-[#0f1d36] border border-gray-700 p-1 rounded-lg flex items-center gap-1">
+                  <button 
+                    onClick={() => setMode('prediction')}
+                    className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-colors ${mode === 'prediction' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                  >
+                      Mis Predicciones
+                  </button>
+                  <button 
+                    onClick={() => setMode('official_result')}
+                    className={`px-3 py-1.5 rounded text-xs font-bold uppercase flex items-center gap-2 transition-colors ${mode === 'official_result' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                  >
+                      <Settings className="w-3 h-3" />
+                      Resultado Oficial
+                  </button>
+              </div>
+          </div>
+      )}
+
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-[#c8aa6e] uppercase">Clasificación Winter 2026</h2>
-        <p className="text-gray-400 text-sm">Arrastra los equipos. Los 8 primeros clasifican a Playoffs.</p>
+        <h2 className={`text-2xl font-bold uppercase ${mode === 'official_result' ? 'text-red-500' : 'text-[#c8aa6e]'}`}>
+            {mode === 'official_result' ? 'ADMIN: RESULTADO REAL' : 'Tu Clasificación Winter 2026'}
+        </h2>
+        <p className="text-gray-400 text-sm">
+            {mode === 'official_result' 
+                ? 'Establece el orden REAL para calcular puntuaciones.' 
+                : 'Arrastra los equipos para predecir el orden final del Split.'}
+        </p>
       </div>
 
-      <div className="bg-[#091428]/80 backdrop-blur rounded-xl border border-gray-700 p-4 space-y-2 relative">
+      <div className={`bg-[#091428]/80 backdrop-blur rounded-xl border p-4 space-y-2 relative transition-colors ${mode === 'official_result' ? 'border-red-900/50 shadow-[0_0_20px_rgba(220,38,38,0.1)]' : 'border-gray-700'}`}>
         
         {/* Header Playoffs */}
         <div className="flex items-center gap-2 pb-2 mb-2 border-b border-[#c8aa6e]/20 text-[#c8aa6e]">
@@ -149,10 +238,26 @@ export const RankingView: React.FC = () => {
         })}
       </div>
 
-      <div className="mt-6 flex justify-center">
-        <button className="flex items-center gap-2 bg-[#c8aa6e] text-[#0a1428] px-6 py-3 rounded-full font-bold hover:bg-[#d6bb82] transition-colors shadow-lg transform hover:scale-105">
-          <Save className="w-5 h-5" />
-          Guardar Predicción
+      <div className="mt-6 flex justify-center sticky bottom-8 z-20 pointer-events-none">
+        <button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className={`
+                pointer-events-auto flex items-center gap-2 px-8 py-3 rounded-full font-bold transition-all shadow-xl transform hover:scale-105 border
+                ${mode === 'official_result' 
+                    ? 'bg-red-600 border-red-400 text-white hover:bg-red-700'
+                    : 'bg-[#c8aa6e] border-yellow-500 text-[#0a1428] hover:bg-[#d6bb82]'
+                }
+                ${saveStatus === 'success' ? 'ring-4 ring-green-500/50' : ''}
+                ${saveStatus === 'error' ? 'ring-4 ring-red-500/50' : ''}
+            `}
+        >
+          {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+           saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> : 
+           saveStatus === 'error' ? <AlertCircle className="w-5 h-5" /> :
+           <Save className="w-5 h-5" />}
+          
+          {saveStatus === 'success' ? '¡Guardado!' : saveStatus === 'error' ? 'Error al guardar' : (mode === 'official_result' ? 'PUBLICAR RESULTADO OFICIAL' : 'Guardar Predicción')}
         </button>
       </div>
     </div>

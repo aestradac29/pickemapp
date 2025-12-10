@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Match, Team } from '../types';
-import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2, AlertTriangle } from 'lucide-react';
+import { Match, Team, Stage } from '../types';
+import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2, AlertTriangle, Swords, ShieldAlert, Crown } from 'lucide-react';
 import { WHITE_LOGO_TEAMS } from '../constants';
 
 interface MatchCardProps {
@@ -34,19 +34,26 @@ const TeamButton = ({
 }) => {
     const shouldInvert = WHITE_LOGO_TEAMS.includes(team.id);
 
+    // Determinar si es el ganador oficial
+    const isWinner = match.winnerId === team.id;
+    // Determinar si es una predicción fallida (Estaba seleccionado, el partido acabó, y NO es el ganador)
+    const isWrongPick = match.isCompleted && isSelected && match.winnerId && !isWinner;
+
     return (
       <button
         onClick={() => !isEditing && !isLocked && onSelect(match.id, team.id)}
         disabled={isEditing || match.isCompleted || isLocked}
         className={`
           flex-1 flex flex-col items-center justify-center p-4 rounded-lg transition-all duration-200 border-2 relative
-          ${isSelected 
+          ${isSelected && !isWrongPick
             ? 'bg-hextech-500/10 border-hextech-500 shadow-[0_0_15px_rgba(200,170,110,0.3)]' 
+            : isWrongPick
+                ? 'bg-red-900/20 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
             : (match.isCompleted || isLocked)
                 ? 'bg-gray-800/30 border-gray-800 opacity-70 grayscale-[0.5] cursor-not-allowed' 
                 : 'bg-hextech-800 border-gray-700 hover:border-gray-500 hover:bg-gray-800'
           }
-          ${match.winnerId === team.id ? 'ring-2 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.3)] !opacity-100 !grayscale-0' : ''}
+          ${isWinner ? 'ring-2 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.3)] !opacity-100 !grayscale-0' : ''}
         `}
       >
         <div className="mb-2 relative w-16 h-16 flex items-center justify-center">
@@ -71,7 +78,7 @@ const TeamButton = ({
             </div>
         </div>
         
-        <span className={`font-bold text-lg ${isSelected ? 'text-hextech-500' : 'text-gray-300'}`}>
+        <span className={`font-bold text-lg ${isSelected ? (isWrongPick ? 'text-red-500' : 'text-hextech-500') : 'text-gray-300'}`}>
           {team.shortName}
         </span>
         
@@ -79,9 +86,18 @@ const TeamButton = ({
         {isSelected && !match.isCompleted && (
           <CheckCircle2 className="w-5 h-5 text-hextech-500 mt-2 animate-bounce" />
         )}
-        {match.winnerId === team.id && (
+        
+        {/* Etiqueta de Ganador */}
+        {isWinner && (
            <div className="mt-2 bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-[10px] uppercase font-bold border border-green-500/50 flex items-center gap-1">
-               <Trophy className="w-3 h-3" /> Winner
+               <Trophy className="w-3 h-3" /> Ganador
+           </div>
+        )}
+
+        {/* Etiqueta de Fallo */}
+        {isWrongPick && (
+           <div className="mt-2 bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-[10px] uppercase font-bold border border-red-500/50 flex items-center gap-1">
+               <X className="w-3 h-3" /> Fallado
            </div>
         )}
       </button>
@@ -107,7 +123,9 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       startTime: match.startTime,
       winnerId: match.winnerId || '',
       status: match.isCompleted ? 'finished' : 'scheduled',
-      day: match.day || 1
+      day: match.day || 1,
+      bestOf: match.bestOf || 1, // Default to BO1
+      bracketStage: match.bracketStage || 'winners'
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -128,7 +146,9 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       startTime: match.startTime,
       winnerId: match.winnerId || '',
       status: match.isCompleted ? 'finished' : 'scheduled',
-      day: match.day || 1
+      day: match.day || 1,
+      bestOf: match.bestOf || 1,
+      bracketStage: match.bracketStage || 'winners'
     });
   }, [match]);
 
@@ -151,7 +171,8 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 
           await onUpdate({
               ...editState,
-              startTime: validDate
+              startTime: validDate,
+              bestOf: Number(editState.bestOf)
           });
       } catch (error: any) {
           console.error("Error saving match:", error);
@@ -189,6 +210,9 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       const date = new Date(editState.startTime);
       const safeDate = isNaN(date.getTime()) ? new Date() : date;
       const isoDate = new Date(safeDate.getTime() - (safeDate.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+
+      // Check if match is Playoff/Final to show bracket selector
+      const isPlayoffMatch = match.stage === Stage.PLAYOFFS || match.stage === Stage.FINALS;
 
       return (
           <div className="w-full bg-red-950/20 backdrop-blur-sm rounded-xl border border-red-500/30 overflow-hidden mb-4 shadow-xl p-4 animate-in fade-in relative">
@@ -264,7 +288,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                       />
                   </div>
                   <div>
-                      <label className="text-[10px] text-gray-500 uppercase font-bold">Jornada (Bloqueado)</label>
+                      <label className="text-[10px] text-gray-500 uppercase font-bold">Jornada</label>
                       <input 
                         type="number" 
                         disabled
@@ -298,7 +322,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                     </select>
                   </div>
 
-                  {/* Winner & Status */}
+                  {/* Winner & Status & BestOf */}
                   <div>
                     <label className="text-[10px] text-gray-500 uppercase font-bold">Ganador</label>
                     <select 
@@ -311,18 +335,48 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                         <option value={editState.teamB}>{teams.find(t => t.id === editState.teamB)?.shortName || 'Rojo'}</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Estado</label>
-                    <select 
-                        value={editState.status}
-                        onChange={(e) => setEditState({...editState, status: e.target.value})}
-                        className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-white focus:border-red-500 outline-none uppercase"
-                    >
-                        <option value="scheduled">Programado</option>
-                        <option value="live">En Vivo</option>
-                        <option value="finished">Finalizado</option>
-                    </select>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold">Estado</label>
+                        <select 
+                            value={editState.status}
+                            onChange={(e) => setEditState({...editState, status: e.target.value})}
+                            className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-white focus:border-red-500 outline-none uppercase"
+                        >
+                            <option value="scheduled">Programado</option>
+                            <option value="live">En Vivo</option>
+                            <option value="finished">Finalizado</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 uppercase font-bold">Formato</label>
+                        <select 
+                            value={editState.bestOf}
+                            onChange={(e) => setEditState({...editState, bestOf: Number(e.target.value)})}
+                            className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-white focus:border-red-500 outline-none uppercase"
+                        >
+                            <option value={1}>BO1</option>
+                            <option value={3}>BO3</option>
+                            <option value={5}>BO5</option>
+                        </select>
+                      </div>
                   </div>
+
+                  {/* Bracket Selector - Only show if stage is Playoffs or Finals */}
+                  {isPlayoffMatch && (
+                       <div className="col-span-2">
+                            <label className="text-[10px] text-gray-500 uppercase font-bold">Bracket (Playoffs)</label>
+                            <select 
+                                value={editState.bracketStage}
+                                onChange={(e) => setEditState({...editState, bracketStage: e.target.value as 'winners'|'losers' })}
+                                className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-white focus:border-red-500 outline-none uppercase"
+                            >
+                                <option value="winners">Winners Bracket</option>
+                                <option value="losers">Losers Bracket</option>
+                            </select>
+                       </div>
+                  )}
               </div>
               
               {/* Extra delete button for visibility */}
@@ -347,9 +401,27 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       {/* Header */}
       <div className="bg-black/30 px-4 py-2 flex justify-between items-center text-xs text-gray-400">
         <div className="flex items-center gap-2">
-           <span className="uppercase tracking-wider font-semibold">{match.stage}</span>
+           {(match.stage === Stage.PLAYOFFS || match.stage === Stage.FINALS) ? (
+              match.bracketStage === 'losers' ? (
+                  <span className="text-gray-500 font-bold uppercase flex items-center gap-1 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">
+                     <ShieldAlert className="w-3 h-3" /> Losers
+                  </span>
+               ) : (
+                   <span className="text-yellow-500 font-bold uppercase flex items-center gap-1 bg-yellow-900/20 px-1.5 py-0.5 rounded border border-yellow-700/50">
+                      <Crown className="w-3 h-3" /> Winners
+                   </span>
+               )
+           ) : (
+             <span className="uppercase tracking-wider font-semibold">{match.stage}</span>
+           )}
+           
            <span className="text-gray-600">|</span>
-           <span className="text-[#c8aa6e] font-bold">DAY {match.day}</span>
+           <span className="text-[#c8aa6e] font-bold">JORNADA {match.day}</span>
+           <span className="text-gray-600">|</span>
+           <div className="flex items-center gap-1 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700 text-gray-300 font-bold">
+               <Swords className="w-3 h-3" />
+               <span>BO{match.bestOf || 1}</span>
+           </div>
         </div>
         <div className="flex items-center gap-2">
             {match.isCompleted && <span className="text-green-400 font-bold uppercase flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Finalizado</span>}

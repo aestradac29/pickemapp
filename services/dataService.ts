@@ -11,7 +11,7 @@ const cleanPayload = (data: any): any => {
 
 export const dataService = {
     // --- CONFIGURATION (Active Days & Locks) ---
-    async getDaysConfig(): Promise<{ visibleDays: number[], closedDays: number[] }> {
+    async getDaysConfig(): Promise<{ visibleDays: number[], closedDays: number[], playoffRounds?: number, playoffsAccessible?: boolean }> {
         try {
             const docRef = doc(db, "admin_data", "config");
             const docSnap = await getDoc(docRef);
@@ -19,22 +19,29 @@ export const dataService = {
                 const data = docSnap.data();
                 return {
                     visibleDays: data.activeDays || [1],
-                    closedDays: data.closedDays || []
+                    closedDays: data.closedDays || [],
+                    playoffRounds: data.playoffRounds || 5, // Default 5 rounds
+                    playoffsAccessible: data.playoffsAccessible || false // Default locked
                 };
             }
-            return { visibleDays: [1], closedDays: [] };
+            return { visibleDays: [1], closedDays: [], playoffRounds: 5, playoffsAccessible: false };
         } catch (e) {
             console.error("Error loading config", e);
-            return { visibleDays: [1], closedDays: [] };
+            return { visibleDays: [1], closedDays: [], playoffRounds: 5, playoffsAccessible: false };
         }
     },
 
-    async updateGlobalConfig(config: { visibleDays: number[], closedDays: number[] }) {
+    async updateGlobalConfig(config: { visibleDays?: number[], closedDays?: number[], playoffRounds?: number, playoffsAccessible?: boolean }) {
         const docRef = doc(db, "admin_data", "config");
-        await setDoc(docRef, { 
-            activeDays: config.visibleDays,
-            closedDays: config.closedDays 
-        }, { merge: true });
+        // Preparamos payload solo con lo definido para no borrar datos si no se pasan
+        const payload: any = {};
+        
+        if (config.visibleDays) payload.activeDays = config.visibleDays;
+        if (config.closedDays) payload.closedDays = config.closedDays;
+        if (config.playoffRounds !== undefined) payload.playoffRounds = config.playoffRounds;
+        if (config.playoffsAccessible !== undefined) payload.playoffsAccessible = config.playoffsAccessible;
+
+        await setDoc(docRef, payload, { merge: true });
     },
 
     async getSplits() {
@@ -105,11 +112,24 @@ export const dataService = {
                 
                 // HIDRATACIÓN: Reemplazamos los objetos de equipo dentro del partido 
                 // con los datos frescos de la colección 'teams'.
-                allMatches = rawMatches.map((m: Match) => ({
-                    ...m,
-                    teamA: teamsMap[m.teamA.id] || m.teamA, 
-                    teamB: teamsMap[m.teamB.id] || m.teamB
-                }));
+                allMatches = rawMatches.map((m: Match) => {
+                    // RECOVERY: If day is missing, try to infer from ID (for standard seeded matches)
+                    let finalDay = m.day;
+                    if (!finalDay && m.id.startsWith('d') && m.id.includes('-m')) {
+                        try {
+                            // id format: d1-m0
+                            const dayPart = m.id.split('-')[0].replace('d', '');
+                            finalDay = parseInt(dayPart);
+                        } catch(e) {}
+                    }
+
+                    return {
+                        ...m,
+                        day: finalDay,
+                        teamA: teamsMap[m.teamA.id] || m.teamA, 
+                        teamB: teamsMap[m.teamB.id] || m.teamB
+                    };
+                });
 
             } else {
                 // Seed inicial si está vacío
@@ -157,7 +177,9 @@ export const dataService = {
             startTime: updates.start_time || currentMatch.startTime,
             winnerId: updates.winner_id !== undefined ? updates.winner_id : (currentMatch.winnerId || null),
             isCompleted: updates.status === 'finished',
-            day: updates.day || currentMatch.day || null
+            day: updates.day || currentMatch.day || null,
+            bestOf: updates.bestOf ?? currentMatch.bestOf ?? 1,
+            bracketStage: updates.bracketStage || currentMatch.bracketStage // Update bracketStage
         };
 
         allMatches[index] = updatedMatch;
@@ -181,7 +203,9 @@ export const dataService = {
             stage: matchData.stage || Stage.GROUPS,
             isCompleted: matchData.status === 'finished',
             day: matchData.day || null,
-            winnerId: null
+            winnerId: null,
+            bestOf: matchData.bestOf || 1,
+            bracketStage: matchData.bracketStage
         };
 
         allMatches.push(newMatch);
@@ -248,6 +272,73 @@ export const dataService = {
         const docRef = doc(db, "users", userId, "picks", "winter_2026");
         await deleteDoc(docRef);
     },
+
+    // --- RANKING (User Prediction vs Admin Result) ---
+    async getUserRanking(userId: string): Promise<string[]> {
+        try {
+            const docRef = doc(db, "users", userId, "picks", "winter_2026_ranking");
+            const docSnap = await getDoc(docRef);
+            return docSnap.exists() ? docSnap.data().order || [] : [];
+        } catch (e) {
+            console.error("Error loading user ranking", e);
+            return [];
+        }
+    },
+
+    async saveUserRanking(userId: string, teamIds: string[]) {
+        const docRef = doc(db, "users", userId, "picks", "winter_2026_ranking");
+        await setDoc(docRef, { order: cleanPayload(teamIds) }, { merge: true });
+    },
+
+    async getAdminRanking(): Promise<string[]> {
+        try {
+            const docRef = doc(db, "admin_data", "results");
+            const docSnap = await getDoc(docRef);
+            return docSnap.exists() ? docSnap.data().winter_2026_ranking || [] : [];
+        } catch (e) {
+            console.error("Error loading admin ranking", e);
+            return [];
+        }
+    },
+
+    async saveAdminRanking(teamIds: string[]) {
+        const docRef = doc(db, "admin_data", "results");
+        await setDoc(docRef, { winter_2026_ranking: cleanPayload(teamIds) }, { merge: true });
+    },
+
+    // --- CRYSTAL BALL (Bola de Cristal) ---
+    async getCrystalBall(userId: string) {
+        try {
+            const docRef = doc(db, "users", userId, "picks", "winter_2026_crystal");
+            const docSnap = await getDoc(docRef);
+            return docSnap.exists() ? docSnap.data().selections : {};
+        } catch (e) {
+            console.error("Error loading crystal ball", e);
+            return {};
+        }
+    },
+
+    async saveCrystalBall(userId: string, selections: Record<string, string>) {
+        const docRef = doc(db, "users", userId, "picks", "winter_2026_crystal");
+        await setDoc(docRef, { selections: cleanPayload(selections) }, { merge: true });
+    },
+
+    async getAdminCrystalBallResults() {
+        try {
+            const docRef = doc(db, "admin_data", "results");
+            const docSnap = await getDoc(docRef);
+            return docSnap.exists() ? docSnap.data().winter_2026_crystal || {} : {};
+        } catch (e) {
+            console.error("Error loading admin crystal ball results", e);
+            return {};
+        }
+    },
+
+    async saveAdminCrystalBallResults(selections: Record<string, string>) {
+        const docRef = doc(db, "admin_data", "results");
+        await setDoc(docRef, { winter_2026_crystal: cleanPayload(selections) }, { merge: true });
+    },
+
 
     // --- FANTASY ---
     async getFantasyTeam(userId: string) {
