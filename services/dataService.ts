@@ -9,7 +9,6 @@ const sanitizeMatch = (match: Match): Match => {
         ...match,
         winnerId: match.winnerId || null,
         day: match.day || null,
-        // Asegurar que otros campos opcionales no sean undefined si se añaden en el futuro
     };
 };
 
@@ -26,7 +25,6 @@ export const dataService = {
                     closedDays: data.closedDays || []
                 };
             }
-            // Configuración por defecto si no existe
             return { visibleDays: [1], closedDays: [] };
         } catch (e) {
             console.error("Error loading config", e);
@@ -43,7 +41,6 @@ export const dataService = {
     },
 
     async getSplits() {
-        // Podríamos mover esto a DB también, pero por ahora estático está bien para la estructura
         return [
             { id: 'winter_2026', name: 'Winter 2026', status: 'active' },
             { id: 'spring_2026', name: 'Spring 2026', status: 'upcoming' },
@@ -58,17 +55,15 @@ export const dataService = {
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
-                // Si existen en DB, devolverlos
                 return docSnap.data().data as Record<string, Team>;
             } else {
-                // Si NO existen, subirlos (Seed) y devolverlos
                 console.log("Seeding Teams to Database...");
                 await setDoc(docRef, { data: TEAMS });
                 return TEAMS;
             }
         } catch (e) {
             console.error("Error getting teams:", e);
-            return TEAMS; // Fallback en caso de error crítico
+            return TEAMS;
         }
     },
 
@@ -91,39 +86,48 @@ export const dataService = {
         }
     },
 
-    // --- MATCHES (Database First + Auto-Seed) ---
+    // --- MATCHES (Database First + Auto-Seed + Team Hydration) ---
     async getMatches(day?: number): Promise<Match[]> {
         try {
-            const docRef = doc(db, "admin_data", "matches");
-            const docSnap = await getDoc(docRef);
+            // OPTIMIZACIÓN: Cargamos Matches y Teams en paralelo.
+            // Esto es crucial: Usamos la colección 'teams' como la fuente de verdad para los logos.
+            const [matchesSnap, teamsSnap] = await Promise.all([
+                getDoc(doc(db, "admin_data", "matches")),
+                getDoc(doc(db, "admin_data", "teams"))
+            ]);
             
+            // Preparar mapa de equipos para hidratar
+            let teamsMap: Record<string, Team> = TEAMS; 
+            if (teamsSnap.exists()) {
+                teamsMap = teamsSnap.data().data as Record<string, Team>;
+            }
+
             let allMatches: Match[] = [];
 
-            if (docSnap.exists()) {
-                // Obtener todos desde la DB
-                allMatches = docSnap.data().allMatches || [];
+            if (matchesSnap.exists()) {
+                const rawMatches = matchesSnap.data().allMatches || [];
+                
+                // HIDRATACIÓN: Reemplazamos los objetos de equipo dentro del partido 
+                // con los datos frescos de la colección 'teams'.
+                allMatches = rawMatches.map((m: Match) => ({
+                    ...m,
+                    teamA: teamsMap[m.teamA.id] || m.teamA, // Si existe en DB usa ese, si no, usa el guardado en el match
+                    teamB: teamsMap[m.teamB.id] || m.teamB
+                }));
+
             } else {
-                // Si está vacío, generar TODAS las jornadas y subirlas
+                // Seed inicial si está vacío
                 console.log("Seeding Matches (Days 1-11) to Database...");
-                
-                // 1. Partidos iniciales sueltos (playoffs mock, etc)
-                // Sanitizar para evitar undefined
                 const seedMatches = [...MATCHES].map(sanitizeMatch);
-                
                 let generatedMatches: Match[] = [];
-                // 2. Generar jornadas 1 a 11
                 for (let i = 1; i <= 11; i++) {
                     const dayMatches = getMatchesForDay(i).map(sanitizeMatch);
                     generatedMatches = [...generatedMatches, ...dayMatches];
                 }
-
                 allMatches = [...seedMatches, ...generatedMatches];
-                
-                // Guardar sanitizados
-                await setDoc(docRef, { allMatches });
+                await setDoc(doc(db, "admin_data", "matches"), { allMatches });
             }
 
-            // Filtrar por día si se solicita
             if (day) {
                 return allMatches.filter(m => m.day === day);
             }
@@ -131,27 +135,23 @@ export const dataService = {
 
         } catch (e) {
             console.error("Error getting matches:", e);
-            // Fallback mínimo para no romper la UI
             return day ? getMatchesForDay(day) : MATCHES;
         }
     },
 
-    // --- ADMIN ACTIONS (Updating the Single Source of Truth) ---
+    // --- ADMIN ACTIONS ---
     async updateMatch(matchId: string, updates: any) {
         const docRef = doc(db, "admin_data", "matches");
         const docSnap = await getDoc(docRef);
         
-        if (!docSnap.exists()) return; // Should exist by now via getMatches seed
+        if (!docSnap.exists()) return;
 
         let allMatches: Match[] = docSnap.data().allMatches || [];
         const index = allMatches.findIndex(m => m.id === matchId);
 
         if (index === -1) throw new Error("Match not found in DB");
 
-        // Merge updates
         const currentMatch = allMatches[index];
-        
-        // Necesitamos los equipos para reconstruir el objeto si cambian los IDs
         const teamsRef = await this.getTeams();
 
         const updatedMatch: Match = {
@@ -176,7 +176,7 @@ export const dataService = {
         const teamsRef = await this.getTeams();
 
         const newMatch: Match = {
-            id: `custom-${Date.now()}`, // ID único
+            id: `custom-${Date.now()}`,
             teamA: teamsRef[matchData.team_a_id],
             teamB: teamsRef[matchData.team_b_id],
             startTime: matchData.start_time,
@@ -196,7 +196,7 @@ export const dataService = {
         if (docSnap.exists()) {
             let allMatches: Match[] = docSnap.data().allMatches || [];
             const newMatches = allMatches.filter(m => m.id !== matchId);
-            await setDoc(docRef, { allMatches: newMatches }); // Sobrescribir array
+            await setDoc(docRef, { allMatches: newMatches });
         }
     },
 
@@ -215,14 +215,11 @@ export const dataService = {
     async savePredictions(predictions: { user_id: string, match_id: string, predicted_winner_id: string }[]) {
         if (!predictions || predictions.length === 0) return;
         const userId = predictions[0].user_id;
-        
         const docRef = doc(db, "users", userId, "picks", "winter_2026");
         
-        // 1. Leer predicciones actuales
         const docSnap = await getDoc(docRef);
         let currentPreds = docSnap.exists() ? docSnap.data().list || [] : [];
 
-        // 2. Actualizar o Añadir (Upsert local al array)
         predictions.forEach(newP => {
             const index = currentPreds.findIndex((p: any) => p.matchId === newP.match_id);
             if (index !== -1) {
@@ -232,7 +229,6 @@ export const dataService = {
             }
         });
 
-        // 3. Guardar array completo
         await setDoc(docRef, { list: currentPreds }, { merge: true });
     },
 
