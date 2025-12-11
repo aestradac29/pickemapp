@@ -9,11 +9,13 @@ export const ROLE_ICONS: Record<Role, string> = {
   [Role.SUPPORT]: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/svg/position-utility.svg"
 };
 
+// Helper: URLs directas a la Wiki. Gracias al meta tag "no-referrer" en index.html, esto funcionará sin bloqueos CORS.
+const getLogo = (filename: string) => `https://lol.fandom.com/wiki/Special:FilePath/${filename}`;
+
 // Teams that need their logo inverted to white for visibility on dark backgrounds
 export const WHITE_LOGO_TEAMS = ['rat', 'sk', 'gx'];
 
 // Mock Teams - LEC Winter 2026 Context (12 Teams including guests)
-// Using 'Special:FilePath' ensures we get the latest correct image from the wiki directly
 export const TEAMS: Record<string, Team> = {
   fnc: { 
     id: 'fnc', 
@@ -21,7 +23,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'FNC', 
     region: Region.LEC, 
     color: '#ff5900',
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/Fnaticlogo_square.png'
+    logo: getLogo('Fnaticlogo_square.png')
   },
   g2: { 
     id: 'g2', 
@@ -29,7 +31,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'G2', 
     region: Region.LEC, 
     color: '#000000',
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/G2_Esportslogo_square.png'
+    logo: getLogo('G2_Esportslogo_square.png')
   },
   gx: { 
     id: 'gx', 
@@ -37,7 +39,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'GX', 
     region: Region.LEC, 
     color: '#e4002b',
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/GIANTXlogo_square.png'
+    logo: getLogo('GIANTXlogo_square.png')
   },
   kc: { 
     id: 'kc', 
@@ -45,7 +47,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'KC', 
     region: Region.LEC, 
     color: '#10274e',
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/Karmine_Corplogo_square.png'
+    logo: getLogo('Karmine_Corplogo_square.png')
   },
   kcb: { 
     id: 'kcb', 
@@ -53,9 +55,8 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'KCB', 
     region: Region.LEC, 
     color: '#3498db',
-    // KC Blue usually uses the main KC logo or the Academy specific one if available.
-    // Falling back to main KC logo for safety, but checking for specific file.
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/Karmine_Corplogo_square.png' 
+    // Usamos el mismo logo base si no hay uno específico, o el específico si existe en la wiki
+    logo: getLogo('Karmine_Corplogo_square.png') 
   },
   rat: { 
     id: 'rat', 
@@ -63,8 +64,8 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'RAT', 
     region: Region.LEC, 
     color: '#5d5d5d',
-    // Specific logo for Los Ratones from the Versus Season wiki context
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/Los_Ratoneslogo_square.png'
+    // Logo del equipo de Caedrel
+    logo: getLogo('Los_Ratoneslogo_square.png')
   },
   mkoi: { 
     id: 'mkoi', 
@@ -72,7 +73,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'KOI', 
     region: Region.LEC, 
     color: '#7606e4',
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/Movistar_KOIlogo_square.png'
+    logo: getLogo('Movistar_KOIlogo_square.png')
   },
   nvi: { 
     id: 'nvi', 
@@ -80,8 +81,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'NAVI', 
     region: Region.LEC, 
     color: '#fff200',
-    // NaVi logo
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/Natus_Vincerelogo_square.png'
+    logo: getLogo('Natus_Vincerelogo_square.png')
   },
   sk: { 
     id: 'sk', 
@@ -89,7 +89,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'SK', 
     region: Region.LEC, 
     color: '#000000',
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/SK_Gaminglogo_square.png'
+    logo: getLogo('SK_Gaminglogo_square.png')
   },
   bds: { 
     id: 'bds', 
@@ -97,7 +97,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'BDS', 
     region: Region.LEC, 
     color: '#ff0055',
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/Team_BDSlogo_square.png'
+    logo: getLogo('Team_BDSlogo_square.png')
   },
   th: { 
     id: 'th', 
@@ -105,7 +105,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'TH', 
     region: Region.LEC, 
     color: '#c4a673',
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/Team_Hereticslogo_square.png'
+    logo: getLogo('Team_Hereticslogo_square.png')
   },
   vit: { 
     id: 'vit', 
@@ -113,7 +113,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'VIT', 
     region: Region.LEC, 
     color: '#f0e500',
-    logo: 'https://lol.fandom.com/wiki/Special:FilePath/Team_Vitalitylogo_square.png'
+    logo: getLogo('Team_Vitalitylogo_square.png')
   },
 };
 
