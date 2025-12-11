@@ -303,7 +303,7 @@ export const USERS: User[] = [
     id: 'u1', 
     name: 'FakerFan23', 
     avatar: 'https://picsum.photos/40/40?random=1', 
-    score: 345, // Total Score
+    score: 225, // Updated: Matchday (45) + Ranking (80) + Playoffs (100) = 225
     scoreBreakdown: {
         matchday: 45,
         ranking: 80,
@@ -314,9 +314,14 @@ export const USERS: User[] = [
     rank: 1,
     pointsHistory: [
         { day: 'Day 1', points: 40 },
-        { day: 'Day 2', points: 120 },
-        { day: 'Day 3', points: 210 },
-        { day: 'Day 4', points: 345 },
+        { day: 'Day 2', points: 90 },
+        { day: 'Day 3', points: 150 },
+        { day: 'Day 4', points: 225 }, // Match score
+    ],
+    fantasyHistory: [
+        { day: 'J1', points: 50 },
+        { day: 'J2', points: 60 },
+        { day: 'J3', points: 70 },
     ],
     // Mock Fantasy Team (High Value)
     fantasyTeam: {
@@ -331,7 +336,7 @@ export const USERS: User[] = [
     id: 'u2', 
     name: 'JungleDiff', 
     avatar: 'https://picsum.photos/40/40?random=2', 
-    score: 310, // Total Score
+    score: 195, // Updated: Matchday (55) + Ranking (60) + Playoffs (80) = 195
     scoreBreakdown: {
         matchday: 55,
         ranking: 60,
@@ -342,9 +347,14 @@ export const USERS: User[] = [
     rank: 2,
     pointsHistory: [
         { day: 'Day 1', points: 50 },
-        { day: 'Day 2', points: 100 },
-        { day: 'Day 3', points: 180 },
-        { day: 'Day 4', points: 310 },
+        { day: 'Day 2', points: 90 },
+        { day: 'Day 3', points: 140 },
+        { day: 'Day 4', points: 195 }, // Match score
+    ],
+    fantasyHistory: [
+        { day: 'J1', points: 60 },
+        { day: 'J2', points: 75 },
+        { day: 'J3', points: 85 },
     ],
     // Mock Fantasy Team (Budget / Meta)
     fantasyTeam: {

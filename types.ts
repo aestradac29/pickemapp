@@ -75,7 +75,7 @@ export interface User {
   id: string;
   name: string;
   avatar: string;
-  score: number; // Global Score
+  score: number; // Global Score (Matchday + Ranking + Playoffs)
   scoreBreakdown: {
     matchday: number;
     ranking: number;
@@ -84,7 +84,8 @@ export interface User {
     fantasy: number;
   };
   rank: number;
-  pointsHistory: { day: string; points: number }[];
+  pointsHistory: { day: string; points: number }[]; // Global History
+  fantasyHistory: { day: string; points: number }[]; // Fantasy History (12 rounds)
   fantasyTeam?: Record<Role, string | null>; // The user's saved lineup
 }
 

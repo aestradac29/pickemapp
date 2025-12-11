@@ -14,7 +14,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
 
   // Helper to get score based on active category
   const getScore = (user: User) => {
-    if (activeCategory === 'global') return user.score;
+    if (activeCategory === 'global') return user.score; // Already calculated in service (Matchday + Ranking + Playoffs)
     return user.scoreBreakdown[activeCategory];
   };
 
@@ -31,8 +31,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
     { id: 'fantasy', label: 'Fantasy', icon: UserPlus },
   ];
 
-  // Prepare data for the chart (Only relevant for Global view currently)
-  const chartData = users[0].pointsHistory.map((h, index) => {
+  // Prepare data for GLOBAL chart
+  const globalChartData = users[0].pointsHistory.map((h, index) => {
     const point: any = { name: h.day };
     users.forEach(user => {
         point[user.name] = user.pointsHistory[index].points;
@@ -40,7 +40,18 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
     return point;
   });
 
-  const colors = ['#c8aa6e', '#0ac8b9', '#f0e6d2', '#e4002b'];
+  // Prepare data for FANTASY chart (12 rounds)
+  const fantasyChartData = users[0].fantasyHistory ? users[0].fantasyHistory.map((h, index) => {
+      const point: any = { name: h.day };
+      users.forEach(user => {
+          if (user.fantasyHistory && user.fantasyHistory[index]) {
+              point[user.name] = user.fantasyHistory[index].points;
+          }
+      });
+      return point;
+  }) : [];
+
+  const colors = ['#c8aa6e', '#0ac8b9', '#f0e6d2', '#e4002b', '#a855f7', '#3b82f6'];
 
   return (
     <div className="space-y-6 pb-20">
@@ -67,6 +78,18 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
             );
         })}
       </div>
+
+      {/* Info Banner for Separation */}
+      {activeCategory === 'global' && (
+          <div className="text-center text-xs text-gray-400 bg-blue-900/10 border border-blue-900/30 p-2 rounded-lg">
+              Puntuación Global = Jornadas + Ranking + Playoffs
+          </div>
+      )}
+      {(activeCategory === 'fantasy' || activeCategory === 'crystalBall') && (
+          <div className="text-center text-xs text-[#c8aa6e] bg-[#c8aa6e]/10 border border-[#c8aa6e]/30 p-2 rounded-lg">
+              Competición Independiente (No suma al Global)
+          </div>
+      )}
 
       {/* Leaderboard List */}
       <div className="bg-[#091428]/80 backdrop-blur-sm rounded-xl border border-gray-800 p-6 shadow-xl animate-in fade-in duration-300">
@@ -109,7 +132,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                     {user.name}
                   </p>
                   <p className="text-xs text-gray-500 font-medium">
-                      {activeCategory === 'global' ? 'Maestro de la Grieta' : 'Aspirante'}
+                      {activeCategory === 'global' ? 'Maestro de la Grieta' : activeCategory === 'fantasy' ? 'Manager' : 'Aspirante'}
                   </p>
                 </div>
               </div>
@@ -124,7 +147,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
         </div>
       </div>
 
-      {/* Stats Chart - Only Visible on Global Tab */}
+      {/* Stats Chart - Global Tab */}
       {activeCategory === 'global' && (
         <div className="bg-[#091428]/80 backdrop-blur-sm rounded-xl border border-gray-800 p-6 shadow-xl animate-in slide-in-from-bottom-4">
             <h3 className="text-lg font-bold text-gray-300 mb-4 flex items-center gap-2 uppercase tracking-wide">
@@ -133,7 +156,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
             </h3>
             <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
+                    <LineChart data={globalChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                         <XAxis 
                             dataKey="name" 
@@ -164,6 +187,49 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
             </div>
         </div>
       )}
+
+      {/* Stats Chart - Fantasy Tab (12 Rounds) */}
+      {activeCategory === 'fantasy' && (
+        <div className="bg-[#091428]/80 backdrop-blur-sm rounded-xl border border-gray-800 p-6 shadow-xl animate-in slide-in-from-bottom-4">
+            <h3 className="text-lg font-bold text-[#0ac8b9] mb-4 flex items-center gap-2 uppercase tracking-wide">
+                <TrendingUp className="w-5 h-5" />
+                Liga Fantasy
+            </h3>
+            <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={fantasyChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                        <XAxis 
+                            dataKey="name" 
+                            stroke="#64748b" 
+                            fontSize={10} 
+                            tickLine={false} 
+                            axisLine={false}
+                            tickMargin={10}
+                            interval={0} // Show all ticks
+                        />
+                        <Tooltip 
+                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f3f4f6', borderRadius: '0.5rem' }}
+                            itemStyle={{ color: '#f3f4f6' }}
+                            cursor={{ stroke: '#334155', strokeWidth: 1 }}
+                        />
+                        {users.map((user, i) => (
+                            <Line 
+                                key={user.id}
+                                type="monotone" 
+                                dataKey={user.name} 
+                                stroke={colors[i % colors.length]} 
+                                strokeWidth={2}
+                                dot={{ r: 3, fill: '#0a1428', strokeWidth: 2 }}
+                                activeDot={{ r: 5, fill: colors[i % colors.length] }}
+                            />
+                        ))}
+                    </LineChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };

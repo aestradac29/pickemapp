@@ -266,14 +266,41 @@ export const dataService = {
             
             return snapshot.docs.map(doc => {
                 const data = doc.data();
+                
+                // MOCK SCORE BREAKDOWN (Si no existe en DB)
+                const breakdown = data.scoreBreakdown || { matchday: 0, ranking: 0, playoffs: 0, crystalBall: 0, fantasy: 0 };
+                
+                // CRÍTICO: Global Score = Jornada + Ranking + Playoffs
+                // Fantasy y Bola de Cristal van por separado
+                const globalScore = (breakdown.matchday || 0) + (breakdown.ranking || 0) + (breakdown.playoffs || 0);
+
+                // MOCK GLOBAL HISTORY
+                const mockHistory = [
+                    { day: 'Inicio', points: 0 },
+                    { day: 'J1-3', points: Math.floor(globalScore * 0.3) },
+                    { day: 'J4-6', points: Math.floor(globalScore * 0.6) },
+                    { day: 'J7-9', points: Math.floor(globalScore * 0.8) },
+                    { day: 'Actual', points: globalScore },
+                ];
+
+                // MOCK FANTASY HISTORY (12 JORNADAS: 11 Regular + 1 Playoff)
+                const fantasyTotal = breakdown.fantasy || 0;
+                const fantasyHistory = Array.from({ length: 12 }, (_, i) => {
+                    const label = i === 11 ? 'Playoffs' : `J${i + 1}`;
+                    // Distribución lineal simulada
+                    const points = Math.floor((fantasyTotal / 12) * (i + 1));
+                    return { day: label, points: points }; 
+                });
+
                 return {
                     id: doc.id,
                     name: data.username || 'Invocador',
                     avatar: data.avatar_url || `https://ui-avatars.com/api/?name=${data.username || 'User'}&background=random`,
-                    score: 0, // Simplified for search
-                    scoreBreakdown: { matchday: 0, ranking: 0, playoffs: 0, crystalBall: 0, fantasy: 0 },
+                    score: globalScore,
+                    scoreBreakdown: breakdown,
                     rank: 0,
-                    pointsHistory: []
+                    pointsHistory: data.pointsHistory || mockHistory,
+                    fantasyHistory: fantasyHistory
                 };
             });
         } catch (e) {
