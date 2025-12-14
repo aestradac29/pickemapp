@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ViewState } from '../types';
-import { Trophy, ListOrdered, Sparkles, CalendarCheck, Swords, UserPlus, Lock, Unlock, ShieldAlert } from 'lucide-react';
+import { Trophy, ListOrdered, Sparkles, CalendarCheck, Swords, UserPlus, Lock, Unlock, Database } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
 interface DashboardProps {
@@ -102,20 +102,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser 
 
       {/* Admin Quick Actions */}
       {isAdmin && !isLoading && (
-          <div className="flex justify-center mb-8">
-              <button 
-                  onClick={handleTogglePlayoffs}
-                  className={`
-                      flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all shadow-lg
-                      ${playoffsAccessible 
-                          ? 'bg-red-900/30 border-red-500 text-red-300 hover:bg-red-900/50' 
-                          : 'bg-green-900/30 border-green-500 text-green-300 hover:bg-green-900/50'
-                      }
-                  `}
-              >
-                  {playoffsAccessible ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                  {playoffsAccessible ? 'Bloquear Acceso Playoffs' : 'Abrir Acceso Playoffs'}
-              </button>
+          <div className="flex flex-col items-center gap-4 mb-8">
+              <div className="flex gap-4">
+                  <button 
+                      onClick={handleTogglePlayoffs}
+                      className={`
+                          flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all shadow-lg
+                          ${playoffsAccessible 
+                              ? 'bg-red-900/30 border-red-500 text-red-300 hover:bg-red-900/50' 
+                              : 'bg-green-900/30 border-green-500 text-green-300 hover:bg-green-900/50'
+                          }
+                      `}
+                  >
+                      {playoffsAccessible ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                      {playoffsAccessible ? 'Bloquear Acceso Playoffs' : 'Abrir Acceso Playoffs'}
+                  </button>
+
+                  <button 
+                      onClick={() => onChangeView(ViewState.DB_MANAGER)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest border border-[#c8aa6e] bg-[#c8aa6e]/10 text-[#c8aa6e] hover:bg-[#c8aa6e]/20 transition-all shadow-lg"
+                  >
+                      <Database className="w-4 h-4" />
+                      Gestión Base de Datos
+                  </button>
+              </div>
           </div>
       )}
       

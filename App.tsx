@@ -11,6 +11,7 @@ import { MatchdayView } from './components/MatchdayView';
 import { PlayoffsView } from './components/PlayoffsView';
 import { SplitSelection } from './components/SplitSelection';
 import { PasswordResetModal } from './components/PasswordResetModal';
+import { DatabaseManager } from './components/DatabaseManager'; // Import nuevo
 import { ViewState, UserPrediction } from './types';
 import { Menu, X, Share2, LogOut, ChevronLeft } from 'lucide-react';
 import { authService } from './services/authService';
@@ -155,6 +156,10 @@ const App: React.FC = () => {
         return <CrystalBall currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.FANTASY:
         return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} />;
+      case ViewState.DB_MANAGER:
+         // Protect route
+         if (!isAdmin) return <Dashboard onChangeView={setView} currentUser={currentUser} />;
+         return <DatabaseManager />;
       case ViewState.MATCHDAY:
         return (
             <MatchdayView 

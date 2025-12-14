@@ -71,6 +71,24 @@ export const dataService = {
         }
     },
 
+    async updateTeam(teamId: string, updates: Partial<Team>) {
+        const docRef = doc(db, "admin_data", "teams");
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) return;
+
+        let currentData = docSnap.data().data as Record<string, Team>;
+        
+        if (!currentData[teamId]) throw new Error("Team not found");
+
+        currentData[teamId] = {
+            ...currentData[teamId],
+            ...updates
+        };
+
+        await setDoc(docRef, { data: cleanPayload(currentData) }, { merge: true });
+    },
+
     // --- PLAYERS (Database First + Auto-Seed) ---
     async getPlayers(): Promise<Player[]> {
         try {

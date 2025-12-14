@@ -17,6 +17,7 @@ export enum ViewState {
   SPLIT_SELECTION = 'SPLIT_SELECTION', // New View
   DASHBOARD = 'DASHBOARD',
   ADMIN = 'ADMIN', // New Admin View
+  DB_MANAGER = 'DB_MANAGER', // New Database Editor View
   RANKING = 'RANKING', // Clasificación Winter 2026
   PLAYOFFS = 'PLAYOFFS', // Playoffs
   MATCHDAY = 'MATCHDAY', // Jornada (Regular Season)
