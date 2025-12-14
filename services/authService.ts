@@ -25,6 +25,7 @@ export const authService = {
                 const user = {
                     id: firebaseUser.uid,
                     email: firebaseUser.email,
+                    role: userProfile?.role || 'user', // Recuperamos el rol de la BBDD
                     profile: {
                         username: userProfile?.username || firebaseUser.displayName || 'Invocador',
                         avatar_url: userProfile?.avatar_url || firebaseUser.photoURL
@@ -55,7 +56,7 @@ export const authService = {
             email: email,
             avatar_url: `https://ui-avatars.com/api/?name=${username}&background=random`,
             created_at: new Date().toISOString(),
-            role: 'user' // 'admin' se puede cambiar manualmente en Firebase Console
+            role: 'user' // Por defecto usuario normal
         });
 
         return { user };
@@ -104,6 +105,7 @@ export const authService = {
                     resolve({
                         id: firebaseUser.uid,
                         email: firebaseUser.email,
+                        role: userProfile?.role || 'user', // Recuperamos el rol de la BBDD
                         profile: {
                             username: userProfile?.username || firebaseUser.displayName,
                             avatar_url: userProfile?.avatar_url

@@ -12,8 +12,8 @@ import { PlayoffsView } from './components/PlayoffsView';
 import { SplitSelection } from './components/SplitSelection';
 import { PasswordResetModal } from './components/PasswordResetModal';
 import { DatabaseManager } from './components/DatabaseManager'; // Import nuevo
-import { ViewState, UserPrediction } from './types';
-import { Menu, X, Share2, LogOut, ChevronLeft } from 'lucide-react';
+import { ViewState, UserPrediction, User } from './types';
+import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert } from 'lucide-react';
 import { authService } from './services/authService';
 import { dataService } from './services/dataService';
 
@@ -25,6 +25,7 @@ const App: React.FC = () => {
   // Auth State
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>('user'); // Nuevo estado para el rol
   
   const [selectedSplit, setSelectedSplit] = useState<string | null>(() => {
     return localStorage.getItem('selectedSplit');
@@ -33,8 +34,12 @@ const App: React.FC = () => {
   // Recovery State
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
 
-  // Admin Check - STRICT: Only aestrada
-  const isAdmin = currentUser === 'aestrada';
+  // Leaderboard Data
+  const [leaderboardUsers, setLeaderboardUsers] = useState<User[]>([]);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
+
+  // Admin Check - Dynamic based on Database Role
+  const isAdmin = userRole === 'admin';
 
   // --- AUTH INITIALIZATION & LISTENER ---
   useEffect(() => {
@@ -57,6 +62,7 @@ const App: React.FC = () => {
             // Logout
             setCurrentUser(null);
             setCurrentUserId(null);
+            setUserRole('user');
             setPredictions([]);
             setView(ViewState.LOGIN);
         }
@@ -64,6 +70,24 @@ const App: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // --- LEADERBOARD DATA LOADER ---
+  useEffect(() => {
+    if (view === ViewState.RESULTS) {
+        const fetchLeaderboard = async () => {
+            setIsLoadingLeaderboard(true);
+            try {
+                const users = await dataService.getAllUsers();
+                setLeaderboardUsers(users);
+            } catch (e) {
+                console.error("Error loading leaderboard", e);
+            } finally {
+                setIsLoadingLeaderboard(false);
+            }
+        }
+        fetchLeaderboard();
+    }
+  }, [view]);
 
   const handleUserAuthenticated = (user: any) => {
       // Si ya tenemos un usuario seteado manualmente (por el registro), intentamos no sobrescribirlo con 'Invocador' si es posible
@@ -75,6 +99,7 @@ const App: React.FC = () => {
         return newName;
       });
       setCurrentUserId(user.id);
+      setUserRole(user.role || 'user'); // Set Role from DB
       loadUserData(user.id);
 
       // Smart Redirect
@@ -149,7 +174,7 @@ const App: React.FC = () => {
       case ViewState.SPLIT_SELECTION:
         return <SplitSelection onSelect={handleSplitSelect} />;
       case ViewState.DASHBOARD:
-        return <Dashboard onChangeView={setView} currentUser={currentUser} />;
+        return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
       case ViewState.RANKING:
         return <RankingView currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.CRYSTAL_BALL:
@@ -158,7 +183,7 @@ const App: React.FC = () => {
         return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.DB_MANAGER:
          // Protect route
-         if (!isAdmin) return <Dashboard onChangeView={setView} currentUser={currentUser} />;
+         if (!isAdmin) return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
          return <DatabaseManager />;
       case ViewState.MATCHDAY:
         return (
@@ -182,11 +207,17 @@ const App: React.FC = () => {
         return (
            <div className="animate-in fade-in slide-in-from-bottom-4">
              <h2 className="text-2xl font-bold text-[#c8aa6e] mb-6 text-center uppercase">Resultados y Ranking</h2>
-             <Leaderboard users={USERS} />
+             {isLoadingLeaderboard ? (
+                 <div className="flex justify-center py-20">
+                     <Loader2 className="w-10 h-10 text-[#c8aa6e] animate-spin" />
+                 </div>
+             ) : (
+                 <Leaderboard users={leaderboardUsers} />
+             )}
            </div>
         );
       default:
-        return <Dashboard onChangeView={setView} currentUser={currentUser} />;
+        return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
     }
   };
 
@@ -236,17 +267,25 @@ const App: React.FC = () => {
                 )}
 
                 <div className="h-6 w-px bg-gray-700 mx-2"></div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <img 
                         src={`https://ui-avatars.com/api/?name=${currentUser}&background=random`} 
                         alt="Avatar" 
-                        className="w-6 h-6 rounded-full border border-gray-600"
+                        className={`w-9 h-9 rounded-full border-2 ${isAdmin ? 'border-red-500' : 'border-gray-600'}`}
                     />
-                    <span className="text-sm text-gray-500 font-bold text-hextech-300">{currentUser}</span>
+                    <div className="flex flex-col items-start justify-center">
+                        <span className="text-sm font-bold text-hextech-300 leading-none">{currentUser}</span>
+                        {isAdmin && (
+                            <div className="flex items-center gap-1 mt-0.5 bg-red-900/30 px-1.5 py-0.5 rounded border border-red-500/30">
+                                <ShieldAlert className="w-3 h-3 text-red-400" />
+                                <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest leading-none">Admin</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <button 
                     onClick={handleLogout}
-                    className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                    className="p-2 text-gray-400 hover:text-red-400 transition-colors ml-2"
                     title="Cerrar Sesión"
                 >
                     <LogOut className="w-5 h-5" />
@@ -266,8 +305,10 @@ const App: React.FC = () => {
           {isMenuOpen && (
              <div className="md:hidden bg-[#091428] border-b border-gray-800">
                 <div className="px-4 py-2 space-y-1">
-                    <div className="px-3 py-2 text-sm text-gray-500 font-bold border-b border-gray-800 mb-2">
-                        Sesión: <span className="text-hextech-300">{currentUser}</span>
+                    <div className="px-3 py-2 text-sm font-bold border-b border-gray-800 mb-2 flex items-center gap-2">
+                        <span className="text-gray-500">Sesión:</span> 
+                        <span className="text-hextech-300">{currentUser}</span>
+                        {isAdmin && <span className="text-[10px] bg-red-900/50 text-red-300 px-1.5 rounded border border-red-500/50">ADMIN</span>}
                     </div>
                     {selectedSplit && (
                         <>

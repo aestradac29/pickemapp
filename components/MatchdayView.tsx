@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
 import { DaySelector } from './DaySelector';
 import { UserPrediction, Match, Team, Stage } from '../types';
-import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff } from 'lucide-react';
+import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { TEAMS } from '../constants';
 
@@ -380,6 +380,16 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center justify-center gap-2 text-red-300 mb-6 animate-in slide-in-from-top-2 font-bold uppercase tracking-widest text-sm">
                         <Lock className="w-4 h-4" />
                         <span>Jornada Cerrada</span>
+                    </div>
+                )}
+
+                {/* SCORING LEGEND */}
+                {isDayVisible && matches.length > 0 && (
+                    <div className="flex justify-center -mt-2 mb-2 animate-in fade-in">
+                        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-widest shadow-sm">
+                            <Trophy className="w-3 h-3" />
+                            <span>Acierto: +1 Punto</span>
+                        </div>
                     </div>
                 )}
             </>

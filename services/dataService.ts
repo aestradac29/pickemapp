@@ -277,50 +277,118 @@ export const dataService = {
     // --- USERS & LEADERBOARD ---
     async getAllUsers(): Promise<User[]> {
         try {
-            const usersRef = collection(db, "users");
-            // Limit to 100 for safety in this version, or paginate if needed
-            const q = query(usersRef, orderBy("username"), limit(100));
-            const snapshot = await getDocs(q);
+            // 1. Obtener TODOS los partidos para tener mapa de ID -> Dia/Ganador/Etapa
+            // y el Ranking Oficial del Admin para calcular puntos
+            const [matches, adminRanking] = await Promise.all([
+                this.getMatches(),
+                this.getAdminRanking()
+            ]);
             
-            return snapshot.docs.map(doc => {
-                const data = doc.data();
-                
-                // MOCK SCORE BREAKDOWN (Si no existe en DB)
-                const breakdown = data.scoreBreakdown || { matchday: 0, ranking: 0, playoffs: 0, crystalBall: 0, fantasy: 0 };
-                
-                // CRÍTICO: Global Score = Jornada + Ranking + Playoffs
-                // Fantasy y Bola de Cristal van por separado
-                const globalScore = (breakdown.matchday || 0) + (breakdown.ranking || 0) + (breakdown.playoffs || 0);
+            // Mapa para búsqueda rápida: matchId -> { winnerId, day, stage }
+            const matchMap = new Map<string, { winnerId: string | null, day: number, stage: Stage }>();
+            matches.forEach(m => {
+                matchMap.set(m.id, { 
+                    winnerId: m.winnerId || null, 
+                    day: m.day || 0, // Fallback 0
+                    stage: m.stage 
+                });
+            });
 
-                // MOCK GLOBAL HISTORY
-                const mockHistory = [
-                    { day: 'Inicio', points: 0 },
-                    { day: 'J1-3', points: Math.floor(globalScore * 0.3) },
-                    { day: 'J4-6', points: Math.floor(globalScore * 0.6) },
-                    { day: 'J7-9', points: Math.floor(globalScore * 0.8) },
-                    { day: 'Actual', points: globalScore },
-                ];
+            // 2. Obtener Usuarios
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, orderBy("username"), limit(50));
+            const snapshot = await getDocs(q);
 
-                // MOCK FANTASY HISTORY (12 JORNADAS: 11 Regular + 1 Playoff)
+            // 3. Procesar cada usuario y sus predicciones
+            const userPromises = snapshot.docs.map(async (userDoc) => {
+                const data = userDoc.data();
+                const userId = userDoc.id;
+
+                // A. PREDICCIONES DE PARTIDOS (MATCHDAY & PLAYOFFS)
+                const picksRef = doc(db, "users", userId, "picks", "winter_2026");
+                const picksSnap = await getDoc(picksRef);
+                const userPicks = picksSnap.exists() ? (picksSnap.data().list || []) : [];
+
+                const regularSeasonPointsPerDay = new Array(12).fill(0); // Index 1 to 11
+                let playoffsScore = 0;
+
+                userPicks.forEach((pick: any) => {
+                    const info = matchMap.get(pick.matchId);
+                    if (info && info.winnerId && pick.predictedWinnerId === info.winnerId) {
+                        if (info.stage === Stage.GROUPS) {
+                            if (info.day >= 1 && info.day <= 11) {
+                                regularSeasonPointsPerDay[info.day]++;
+                            }
+                        } else {
+                            playoffsScore++;
+                        }
+                    }
+                });
+
+                // B. PUNTUACIÓN DE RANKING (Calculada al vuelo)
+                let rankingScore = 0;
+                // Obtenemos el ranking del usuario
+                const rankingRef = doc(db, "users", userId, "picks", "winter_2026_ranking");
+                const rankingSnap = await getDoc(rankingRef);
+                const userRankingIds = rankingSnap.exists() ? rankingSnap.data().order || [] : [];
+
+                if (adminRanking.length > 0 && userRankingIds.length > 0) {
+                    userRankingIds.forEach((teamId: string, userIndex: number) => {
+                         const adminIndex = adminRanking.indexOf(teamId);
+                         if (adminIndex !== -1) {
+                             const diff = Math.abs(userIndex - adminIndex);
+                             if (diff === 0) {
+                                 rankingScore += 6; // Acierto exacto
+                             } else if (diff === 1) {
+                                 rankingScore += 3; // Fallo por 1 posición
+                             }
+                         }
+                    });
+                }
+
+                // C. CONSTRUCCIÓN DE RESULTADOS
+                
+                // Historial acumulativo J1...J11
+                const pointsHistory = [];
+                let cumulative = 0;
+                for (let i = 1; i <= 11; i++) {
+                    cumulative += regularSeasonPointsPerDay[i];
+                    pointsHistory.push({ day: `J${i}`, points: cumulative });
+                }
+                pointsHistory.push({ day: 'Playoffs', points: cumulative + playoffsScore });
+
+                // Breakdown de puntuaciones
+                const breakdown = data.scoreBreakdown || { crystalBall: 0, fantasy: 0 };
+                breakdown.matchday = cumulative;
+                breakdown.playoffs = playoffsScore;
+                breakdown.ranking = rankingScore; // Usar el calculado, no el de DB
+
+                // Score Global
+                const globalScore = cumulative + playoffsScore + rankingScore;
+
+                // Mock Fantasy History
                 const fantasyTotal = breakdown.fantasy || 0;
                 const fantasyHistory = Array.from({ length: 12 }, (_, i) => {
                     const label = i === 11 ? 'Playoffs' : `J${i + 1}`;
-                    // Distribución lineal simulada
                     const points = Math.floor((fantasyTotal / 12) * (i + 1));
                     return { day: label, points: points }; 
                 });
 
                 return {
-                    id: doc.id,
+                    id: userId,
                     name: data.username || 'Invocador',
                     avatar: data.avatar_url || `https://ui-avatars.com/api/?name=${data.username || 'User'}&background=random`,
                     score: globalScore,
                     scoreBreakdown: breakdown,
-                    rank: 0,
-                    pointsHistory: data.pointsHistory || mockHistory,
+                    rank: 0, 
+                    pointsHistory: pointsHistory, 
                     fantasyHistory: fantasyHistory
                 };
             });
+
+            const users = await Promise.all(userPromises);
+            return users.sort((a, b) => b.score - a.score);
+
         } catch (e) {
             console.error("Error fetching all users:", e);
             return [];

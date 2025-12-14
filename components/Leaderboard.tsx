@@ -12,6 +12,15 @@ type LeaderboardCategory = 'global' | 'matchday' | 'ranking' | 'playoffs' | 'cry
 export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
   const [activeCategory, setActiveCategory] = useState<LeaderboardCategory>('global');
 
+  if (!users || users.length === 0) {
+    return (
+        <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-[#091428]/50 rounded-xl border border-gray-800">
+            <Globe className="w-12 h-12 mb-4 opacity-20" />
+            <p>No hay datos de clasificación disponibles.</p>
+        </div>
+    );
+  }
+
   // Helper to get score based on active category
   const getScore = (user: User) => {
     if (activeCategory === 'global') return user.score; // Already calculated in service (Matchday + Ranking + Playoffs)
@@ -31,11 +40,13 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
     { id: 'fantasy', label: 'Fantasy', icon: UserPlus },
   ];
 
-  // Prepare data for GLOBAL chart
+  // Prepare data for MATCHDAY/GLOBAL chart
   const globalChartData = users[0].pointsHistory.map((h, index) => {
     const point: any = { name: h.day };
     users.forEach(user => {
-        point[user.name] = user.pointsHistory[index].points;
+        if (user.pointsHistory && user.pointsHistory[index]) {
+            point[user.name] = user.pointsHistory[index].points;
+        }
     });
     return point;
   });
@@ -147,8 +158,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
         </div>
       </div>
 
-      {/* Stats Chart - Global Tab */}
-      {activeCategory === 'global' && (
+      {/* Stats Chart - Moved to Matchday Tab */}
+      {activeCategory === 'matchday' && users[0]?.pointsHistory && (
         <div className="bg-[#091428]/80 backdrop-blur-sm rounded-xl border border-gray-800 p-6 shadow-xl animate-in slide-in-from-bottom-4">
             <h3 className="text-lg font-bold text-gray-300 mb-4 flex items-center gap-2 uppercase tracking-wide">
                 <TrendingUp className="w-5 h-5 text-[#0ac8b9]" />
@@ -161,10 +172,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                         <XAxis 
                             dataKey="name" 
                             stroke="#64748b" 
-                            fontSize={12} 
+                            fontSize={10} 
                             tickLine={false} 
                             axisLine={false}
                             tickMargin={10}
+                            interval={0} // Force show all ticks to match fantasy style
                         />
                         <Tooltip 
                             contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f3f4f6', borderRadius: '0.5rem' }}
@@ -189,7 +201,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
       )}
 
       {/* Stats Chart - Fantasy Tab (12 Rounds) */}
-      {activeCategory === 'fantasy' && (
+      {activeCategory === 'fantasy' && users[0]?.fantasyHistory && (
         <div className="bg-[#091428]/80 backdrop-blur-sm rounded-xl border border-gray-800 p-6 shadow-xl animate-in slide-in-from-bottom-4">
             <h3 className="text-lg font-bold text-[#0ac8b9] mb-4 flex items-center gap-2 uppercase tracking-wide">
                 <TrendingUp className="w-5 h-5" />

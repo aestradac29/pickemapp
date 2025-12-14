@@ -6,13 +6,12 @@ import { dataService } from '../services/dataService';
 interface DashboardProps {
   onChangeView: (view: ViewState) => void;
   currentUser?: string | null;
+  isAdmin?: boolean;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser, isAdmin = false }) => {
   const [playoffsAccessible, setPlayoffsAccessible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  
-  const isAdmin = currentUser === 'aestrada';
 
   useEffect(() => {
     const loadConfig = async () => {
