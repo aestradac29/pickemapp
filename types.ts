@@ -23,7 +23,8 @@ export enum ViewState {
   MATCHDAY = 'MATCHDAY', // Jornada (Regular Season)
   CRYSTAL_BALL = 'CRYSTAL_BALL', // Bola de cristal
   FANTASY = 'FANTASY', // Fantasy Team
-  RESULTS = 'RESULTS' // Resultados jornada
+  RESULTS = 'RESULTS', // Resultados jornada
+  PROFILE = 'PROFILE' // New Profile View
 }
 
 export enum Role {
@@ -76,6 +77,7 @@ export interface User {
   id: string;
   name: string;
   avatar: string;
+  title?: string; // New: Custom user title
   score: number; // Global Score (Matchday + Ranking + Playoffs)
   scoreBreakdown: {
     matchday: number;

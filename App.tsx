@@ -12,6 +12,7 @@ import { PlayoffsView } from './components/PlayoffsView';
 import { SplitSelection } from './components/SplitSelection';
 import { PasswordResetModal } from './components/PasswordResetModal';
 import { DatabaseManager } from './components/DatabaseManager'; // Import nuevo
+import { ProfileView } from './components/ProfileView'; // Import nuevo
 import { ViewState, UserPrediction, User } from './types';
 import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert } from 'lucide-react';
 import { authService } from './services/authService';
@@ -25,6 +26,7 @@ const App: React.FC = () => {
   // Auth State
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null); // New state for live avatar update
   const [userRole, setUserRole] = useState<string>('user'); // Nuevo estado para el rol
   
   const [selectedSplit, setSelectedSplit] = useState<string | null>(() => {
@@ -62,6 +64,7 @@ const App: React.FC = () => {
             // Logout
             setCurrentUser(null);
             setCurrentUserId(null);
+            setCurrentUserAvatar(null);
             setUserRole('user');
             setPredictions([]);
             setView(ViewState.LOGIN);
@@ -99,6 +102,7 @@ const App: React.FC = () => {
         return newName;
       });
       setCurrentUserId(user.id);
+      setCurrentUserAvatar(user.profile?.avatar_url);
       setUserRole(user.role || 'user'); // Set Role from DB
       loadUserData(user.id);
 
@@ -181,6 +185,8 @@ const App: React.FC = () => {
         return <CrystalBall currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.FANTASY:
         return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} />;
+      case ViewState.PROFILE:
+        return <ProfileView currentUserId={currentUserId} />;
       case ViewState.DB_MANAGER:
          // Protect route
          if (!isAdmin) return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
@@ -267,14 +273,19 @@ const App: React.FC = () => {
                 )}
 
                 <div className="h-6 w-px bg-gray-700 mx-2"></div>
-                <div className="flex items-center gap-3">
+                
+                {/* Profile Clickable Area */}
+                <button 
+                    onClick={() => setView(ViewState.PROFILE)}
+                    className="flex items-center gap-3 hover:bg-gray-800/50 p-1 pr-3 rounded-full transition-colors group"
+                >
                     <img 
-                        src={`https://ui-avatars.com/api/?name=${currentUser}&background=random`} 
+                        src={currentUserAvatar || `https://ui-avatars.com/api/?name=${currentUser}&background=random`} 
                         alt="Avatar" 
-                        className={`w-9 h-9 rounded-full border-2 ${isAdmin ? 'border-red-500' : 'border-gray-600'}`}
+                        className={`w-9 h-9 rounded-full border-2 group-hover:border-[#c8aa6e] transition-colors ${isAdmin ? 'border-red-500' : 'border-gray-600'}`}
                     />
                     <div className="flex flex-col items-start justify-center">
-                        <span className="text-sm font-bold text-hextech-300 leading-none">{currentUser}</span>
+                        <span className="text-sm font-bold text-hextech-300 leading-none group-hover:text-[#c8aa6e] transition-colors">{currentUser}</span>
                         {isAdmin && (
                             <div className="flex items-center gap-1 mt-0.5 bg-red-900/30 px-1.5 py-0.5 rounded border border-red-500/30">
                                 <ShieldAlert className="w-3 h-3 text-red-400" />
@@ -282,7 +293,8 @@ const App: React.FC = () => {
                             </div>
                         )}
                     </div>
-                </div>
+                </button>
+
                 <button 
                     onClick={handleLogout}
                     className="p-2 text-gray-400 hover:text-red-400 transition-colors ml-2"
@@ -305,11 +317,14 @@ const App: React.FC = () => {
           {isMenuOpen && (
              <div className="md:hidden bg-[#091428] border-b border-gray-800">
                 <div className="px-4 py-2 space-y-1">
-                    <div className="px-3 py-2 text-sm font-bold border-b border-gray-800 mb-2 flex items-center gap-2">
+                    <button 
+                        onClick={() => { setView(ViewState.PROFILE); setIsMenuOpen(false); }}
+                        className="w-full px-3 py-2 text-sm font-bold border-b border-gray-800 mb-2 flex items-center gap-2 hover:bg-gray-800 rounded"
+                    >
                         <span className="text-gray-500">Sesión:</span> 
                         <span className="text-hextech-300">{currentUser}</span>
                         {isAdmin && <span className="text-[10px] bg-red-900/50 text-red-300 px-1.5 rounded border border-red-500/50">ADMIN</span>}
-                    </div>
+                    </button>
                     {selectedSplit && (
                         <>
                             <button onClick={() => { setView(ViewState.DASHBOARD); setIsMenuOpen(false); }} className="block w-full text-left py-2 px-3 text-gray-300 hover:bg-gray-800 rounded">Inicio</button>

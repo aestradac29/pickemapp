@@ -142,8 +142,12 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                   <p className={`font-bold text-lg ${idx === 0 ? 'text-[#c8aa6e]' : 'text-gray-200'}`}>
                     {user.name}
                   </p>
-                  <p className="text-xs text-gray-500 font-medium">
-                      {activeCategory === 'global' ? 'Maestro de la Grieta' : activeCategory === 'fantasy' ? 'Manager' : 'Aspirante'}
+                  <p className="text-xs text-gray-500 font-medium truncate max-w-[150px] sm:max-w-xs">
+                      {user.title ? (
+                          <span className="text-[#c8aa6e] italic">{user.title}</span>
+                      ) : (
+                          <span>{activeCategory === 'fantasy' ? 'Manager' : 'Aspirante'}</span>
+                      )}
                   </p>
                 </div>
               </div>

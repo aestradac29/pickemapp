@@ -446,6 +446,7 @@ export const dataService = {
                     id: userId,
                     name: data.username || 'Invocador',
                     avatar: data.avatar_url || `https://ui-avatars.com/api/?name=${data.username || 'User'}&background=random`,
+                    title: data.title || '',
                     score: globalScore,
                     scoreBreakdown: breakdown,
                     rank: 0, 
@@ -455,7 +456,12 @@ export const dataService = {
             });
 
             const users = await Promise.all(userPromises);
-            return users.sort((a, b) => b.score - a.score);
+            const sortedUsers = users.sort((a, b) => b.score - a.score);
+            
+            // Assign Ranks
+            sortedUsers.forEach((u, i) => u.rank = i + 1);
+            
+            return sortedUsers;
 
         } catch (e) {
             console.error("Error fetching all users:", e);
@@ -464,6 +470,11 @@ export const dataService = {
     },
 
     // --- OTHER METHODS ---
+    async updateUserProfile(userId: string, updates: { avatar_url?: string, title?: string }) {
+        const docRef = doc(db, "users", userId);
+        await setDoc(docRef, cleanPayload(updates), { merge: true });
+    },
+
     async getUserPredictions(userId: string) {
         try {
             const docRef = doc(db, "users", userId, "picks", "winter_2026");
