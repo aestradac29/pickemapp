@@ -38,6 +38,7 @@ interface SearchableSelectProps {
   value?: string;
   onChange: (value: string) => void;
   className?: string;
+  disabled?: boolean;
 }
 
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({ 
@@ -46,7 +47,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   placeholder = "Seleccionar...", 
   value, 
   onChange,
-  className
+  className,
+  disabled = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -87,48 +89,53 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       
       {/* Trigger Button */}
       <button 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
         className={`
-          w-full bg-[#0a1428] min-h-[56px] px-4 py-2 rounded-lg border text-left flex items-center justify-between transition-all duration-300
+          w-full bg-[#0a1428] min-h-[56px] px-4 py-2 rounded-lg border text-left flex items-center gap-3 transition-all duration-300
           ${isOpen ? 'border-[#ac88d6] ring-1 ring-[#ac88d6]' : 'border-gray-700 hover:border-gray-500'}
+          ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-900 grayscale' : ''}
         `}
       >
         {selectedOption ? (
-          <div className="flex items-center gap-3">
+          <>
+            {/* Image Section */}
             {selectedOption.image ? (
-               <div className="w-10 h-10 rounded bg-[#1a2c4e] flex items-center justify-center overflow-hidden border border-gray-600 shadow-inner">
+               <div className="w-10 h-10 rounded bg-[#1a2c4e] flex items-center justify-center overflow-hidden border border-gray-600 shadow-inner flex-shrink-0">
                   <SafeImage 
                       src={selectedOption.image} 
                       alt="" 
-                      // object-contain ensures the whole headshot or icon is visible without cropping
                       className={`w-full h-full object-contain ${selectedOption.imageClassName || ''}`} 
                       fallbackColor={selectedOption.color}
                       fallbackLabel={selectedOption.label}
                   />
                </div>
             ) : selectedOption.color ? (
-                <div className="w-8 h-8 rounded flex items-center justify-center font-bold text-xs" style={{ backgroundColor: selectedOption.color }}>
+                <div className="w-8 h-8 rounded flex items-center justify-center font-bold text-xs flex-shrink-0" style={{ backgroundColor: selectedOption.color }}>
                     {selectedOption.label[0]}
                 </div>
             ) : (
-                <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center font-bold text-xs text-gray-400">
+                <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center font-bold text-xs text-gray-400 flex-shrink-0">
                     {selectedOption.label[0]}
                 </div>
             )}
             
-            <div className="flex flex-col">
-                <span className="font-bold text-gray-200 leading-tight">{selectedOption.label}</span>
-                {selectedOption.subLabel && <span className="text-[10px] text-gray-500 uppercase">{selectedOption.subLabel}</span>}
+            {/* Text Section - Replaced w-full with flex-1 min-w-0 for proper flex behavior */}
+            <div className="flex flex-col text-left flex-1 min-w-0 overflow-hidden">
+                <div className="font-bold text-gray-200 leading-tight truncate">{selectedOption.label}</div>
+                {selectedOption.subLabel && <div className="text-[10px] text-gray-500 uppercase truncate">{selectedOption.subLabel}</div>}
             </div>
-          </div>
+          </>
         ) : (
-          <span className="text-gray-500 italic text-sm">{placeholder}</span>
+          <span className="text-gray-500 italic text-sm flex-1">{placeholder}</span>
         )}
-        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180 text-[#ac88d6]' : ''}`} />
+        
+        {/* Chevron - Always flex-shrink-0 */}
+        {!disabled && <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180 text-[#ac88d6]' : ''}`} />}
       </button>
 
       {/* Dropdown Menu */}
-      {isOpen && (
+      {isOpen && !disabled && (
         <div className="absolute z-50 mt-2 min-w-[300px] w-full max-w-[90vw] -left-2 sm:left-0 bg-[#091428] border border-gray-600 rounded-lg shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95 origin-top">
           {/* Search Input */}
           <div className="p-3 border-b border-gray-700 bg-[#0f1d36]">
@@ -153,39 +160,38 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   key={option.id}
                   onClick={() => handleSelect(option.id)}
                   className={`
-                    w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-800 transition-colors border-l-4 border-transparent
+                    w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-800 transition-colors border-l-4 border-transparent text-left
                     ${value === option.id ? 'bg-[#ac88d6]/10 border-l-[#ac88d6]' : ''}
                   `}
                 >
                   {option.image ? (
-                     <div className="w-12 h-12 rounded-lg bg-[#0f1923] flex items-center justify-center overflow-hidden shadow-md border border-gray-700">
+                     <div className="w-12 h-12 rounded-lg bg-[#0f1923] flex items-center justify-center overflow-hidden shadow-md border border-gray-700 flex-shrink-0">
                         <SafeImage 
                             src={option.image} 
                             alt="" 
-                            // object-contain preserves aspect ratio for icons and headshots
                             className={`w-full h-full object-contain ${option.imageClassName || ''}`} 
                             fallbackColor={option.color}
                             fallbackLabel={option.label}
                         />
                      </div>
                   ) : option.color ? (
-                     <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg text-white shadow-md border border-white/10" style={{ backgroundColor: option.color }}>
+                     <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg text-white shadow-md border border-white/10 flex-shrink-0" style={{ backgroundColor: option.color }}>
                         {option.label[0]}
                      </div>
                   ) : (
-                    <div className="w-12 h-12 rounded-lg bg-gray-700 flex items-center justify-center font-bold text-lg text-gray-400 border border-gray-600">
+                    <div className="w-12 h-12 rounded-lg bg-gray-700 flex items-center justify-center font-bold text-lg text-gray-400 border border-gray-600 flex-shrink-0">
                         {option.label[0]}
                     </div>
                   )}
                   
-                  <div className="flex flex-col items-start gap-0.5">
-                    <span className={`text-base font-bold leading-none ${value === option.id ? 'text-[#ac88d6]' : 'text-gray-200'}`}>
+                  <div className="flex flex-col items-start gap-0.5 overflow-hidden flex-1">
+                    <div className={`text-base font-bold leading-none truncate w-full ${value === option.id ? 'text-[#ac88d6]' : 'text-gray-200'}`}>
                         {option.label}
-                    </span>
-                    {option.subLabel && <span className="text-xs text-gray-500 uppercase tracking-wide font-medium bg-black/20 px-1.5 py-0.5 rounded">{option.subLabel}</span>}
+                    </div>
+                    {option.subLabel && <div className="text-xs text-gray-500 uppercase tracking-wide font-medium bg-black/20 px-1.5 py-0.5 rounded truncate max-w-full">{option.subLabel}</div>}
                   </div>
 
-                  {value === option.id && <Check className="w-5 h-5 text-[#ac88d6] ml-auto" />}
+                  {value === option.id && <Check className="w-5 h-5 text-[#ac88d6] ml-auto flex-shrink-0" />}
                 </button>
               ))
             ) : (

@@ -78,8 +78,9 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
             setAllMatches(fetchedMatches);
             setAllTeams(Object.values(teamsMap));
             
-            setVisibleDays(config.visibleDays);
-            setClosedDays(config.closedDays);
+            // Use specific Playoff keys
+            setVisibleDays(config.playoffVisibleDays);
+            setClosedDays(config.playoffClosedDays);
             
             if (config.playoffRounds) {
                 setTotalRounds(config.playoffRounds);
@@ -270,7 +271,8 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           : [...visibleDays, currentDay];
       
       setVisibleDays(newVisibleDays);
-      await dataService.updateGlobalConfig({ visibleDays: newVisibleDays, closedDays });
+      // Use specific key for Playoffs
+      await dataService.updateGlobalConfig({ playoffVisibleDays: newVisibleDays });
   };
 
   const handleToggleLock = async () => {
@@ -280,14 +282,16 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           : [...closedDays, currentDay];
       
       setClosedDays(newClosedDays);
-      await dataService.updateGlobalConfig({ visibleDays, closedDays: newClosedDays });
+      // Use specific key for Playoffs
+      await dataService.updateGlobalConfig({ playoffClosedDays: newClosedDays });
   };
 
   const handleAddRound = async () => {
       if (!isAdmin) return;
       const newTotal = totalRounds + 1;
       setTotalRounds(newTotal);
-      await dataService.updateGlobalConfig({ visibleDays, closedDays, playoffRounds: newTotal });
+      // Update rounds only
+      await dataService.updateGlobalConfig({ playoffRounds: newTotal });
   };
 
   const handleDeleteRound = async () => {
@@ -296,7 +300,8 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       const newTotal = totalRounds - 1;
       setTotalRounds(newTotal);
       if (currentDay > newTotal) setCurrentDay(newTotal);
-      await dataService.updateGlobalConfig({ visibleDays, closedDays, playoffRounds: newTotal });
+      // Update rounds only
+      await dataService.updateGlobalConfig({ playoffRounds: newTotal });
   };
 
   const handleBatchSave = async () => {

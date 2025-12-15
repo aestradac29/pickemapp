@@ -4,14 +4,20 @@ import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 
 // Helper CRÍTICO: Elimina recursivamente cualquier campo 'undefined' del objeto.
-// Firestore lanza una excepción si encuentra un 'undefined', lo que rompía el borrado.
 const cleanPayload = (data: any): any => {
     return JSON.parse(JSON.stringify(data));
 };
 
 export const dataService = {
     // --- CONFIGURATION (Active Days & Locks) ---
-    async getDaysConfig(): Promise<{ visibleDays: number[], closedDays: number[], playoffRounds?: number, playoffsAccessible?: boolean }> {
+    async getDaysConfig(): Promise<{ 
+        visibleDays: number[], 
+        closedDays: number[], 
+        playoffVisibleDays: number[], 
+        playoffClosedDays: number[],
+        playoffRounds?: number, 
+        playoffsAccessible?: boolean 
+    }> {
         try {
             const docRef = doc(db, "admin_data", "config");
             const docSnap = await getDoc(docRef);
@@ -20,24 +26,45 @@ export const dataService = {
                 return {
                     visibleDays: data.activeDays || [1],
                     closedDays: data.closedDays || [],
+                    // Separated config for Playoffs
+                    playoffVisibleDays: data.playoffVisibleDays || [1],
+                    playoffClosedDays: data.playoffClosedDays || [],
                     playoffRounds: data.playoffRounds || 5, // Default 5 rounds
                     playoffsAccessible: data.playoffsAccessible || false // Default locked
                 };
             }
-            return { visibleDays: [1], closedDays: [], playoffRounds: 5, playoffsAccessible: false };
+            return { 
+                visibleDays: [1], closedDays: [], 
+                playoffVisibleDays: [1], playoffClosedDays: [],
+                playoffRounds: 5, playoffsAccessible: false 
+            };
         } catch (e) {
             console.error("Error loading config", e);
-            return { visibleDays: [1], closedDays: [], playoffRounds: 5, playoffsAccessible: false };
+            return { 
+                visibleDays: [1], closedDays: [], 
+                playoffVisibleDays: [1], playoffClosedDays: [],
+                playoffRounds: 5, playoffsAccessible: false 
+            };
         }
     },
 
-    async updateGlobalConfig(config: { visibleDays?: number[], closedDays?: number[], playoffRounds?: number, playoffsAccessible?: boolean }) {
+    async updateGlobalConfig(config: { 
+        visibleDays?: number[], 
+        closedDays?: number[], 
+        playoffVisibleDays?: number[], 
+        playoffClosedDays?: number[],
+        playoffRounds?: number, 
+        playoffsAccessible?: boolean 
+    }) {
         const docRef = doc(db, "admin_data", "config");
-        // Preparamos payload solo con lo definido para no borrar datos si no se pasan
         const payload: any = {};
         
         if (config.visibleDays) payload.activeDays = config.visibleDays;
         if (config.closedDays) payload.closedDays = config.closedDays;
+        
+        if (config.playoffVisibleDays) payload.playoffVisibleDays = config.playoffVisibleDays;
+        if (config.playoffClosedDays) payload.playoffClosedDays = config.playoffClosedDays;
+
         if (config.playoffRounds !== undefined) payload.playoffRounds = config.playoffRounds;
         if (config.playoffsAccessible !== undefined) payload.playoffsAccessible = config.playoffsAccessible;
 
@@ -52,7 +79,7 @@ export const dataService = {
         ];
     },
 
-    // --- TEAMS (Database First + Auto-Seed) ---
+    // --- TEAMS ---
     async getTeams(): Promise<Record<string, Team>> {
         try {
             const docRef = doc(db, "admin_data", "teams");
@@ -78,18 +105,13 @@ export const dataService = {
         if (!docSnap.exists()) return;
 
         let currentData = docSnap.data().data as Record<string, Team>;
-        
         if (!currentData[teamId]) throw new Error("Team not found");
 
-        currentData[teamId] = {
-            ...currentData[teamId],
-            ...updates
-        };
-
+        currentData[teamId] = { ...currentData[teamId], ...updates };
         await setDoc(docRef, { data: cleanPayload(currentData) }, { merge: true });
     },
 
-    // --- PLAYERS (Database First + Auto-Seed) ---
+    // --- PLAYERS ---
     async getPlayers(): Promise<Player[]> {
         try {
             const docRef = doc(db, "admin_data", "players");
@@ -119,25 +141,18 @@ export const dataService = {
 
         if (index === -1) throw new Error("Player not found");
 
-        // Update specific fields
-        currentList[index] = {
-            ...currentList[index],
-            ...updates
-        };
-
+        currentList[index] = { ...currentList[index], ...updates };
         await setDoc(docRef, { list: cleanPayload(currentList) }, { merge: true });
     },
 
-    // --- MATCHES (Database First + Auto-Seed + Team Hydration) ---
+    // --- MATCHES ---
     async getMatches(day?: number): Promise<Match[]> {
         try {
-            // OPTIMIZACIÓN: Cargamos Matches y Teams en paralelo.
             const [matchesSnap, teamsSnap] = await Promise.all([
                 getDoc(doc(db, "admin_data", "matches")),
                 getDoc(doc(db, "admin_data", "teams"))
             ]);
             
-            // Preparar mapa de equipos para hidratar
             let teamsMap: Record<string, Team> = TEAMS; 
             if (teamsSnap.exists()) {
                 teamsMap = teamsSnap.data().data as Record<string, Team>;
@@ -147,15 +162,10 @@ export const dataService = {
 
             if (matchesSnap.exists()) {
                 const rawMatches = matchesSnap.data().allMatches || [];
-                
-                // HIDRATACIÓN: Reemplazamos los objetos de equipo dentro del partido 
-                // con los datos frescos de la colección 'teams'.
                 allMatches = rawMatches.map((m: Match) => {
-                    // RECOVERY: If day is missing, try to infer from ID (for standard seeded matches)
                     let finalDay = m.day;
                     if (!finalDay && m.id.startsWith('d') && m.id.includes('-m')) {
                         try {
-                            // id format: d1-m0
                             const dayPart = m.id.split('-')[0].replace('d', '');
                             finalDay = parseInt(dayPart);
                         } catch(e) {}
@@ -164,13 +174,12 @@ export const dataService = {
                     return {
                         ...m,
                         day: finalDay,
-                        teamA: teamsMap[m.teamA.id] || m.teamA, 
-                        teamB: teamsMap[m.teamB.id] || m.teamB
+                        teamA: (m.teamA && teamsMap[m.teamA.id]) || m.teamA, 
+                        teamB: (m.teamB && teamsMap[m.teamB.id]) || m.teamB
                     };
                 });
 
             } else {
-                // Seed inicial si está vacío
                 console.log("Seeding Matches (Days 1-11) to Database...");
                 const seedMatches = [...MATCHES];
                 let generatedMatches: Match[] = [];
@@ -193,7 +202,6 @@ export const dataService = {
         }
     },
 
-    // --- ADMIN ACTIONS ---
     async updateMatch(matchId: string, updates: any) {
         const docRef = doc(db, "admin_data", "matches");
         const docSnap = await getDoc(docRef);
@@ -208,35 +216,38 @@ export const dataService = {
         const currentMatch = allMatches[index];
         const teamsRef = await this.getTeams();
 
+        const newTeamA = updates.team_a_id ? teamsRef[updates.team_a_id] : currentMatch.teamA;
+        const newTeamB = updates.team_b_id ? teamsRef[updates.team_b_id] : currentMatch.teamB;
+
         const updatedMatch: Match = {
             ...currentMatch,
-            teamA: updates.team_a_id ? teamsRef[updates.team_a_id] : currentMatch.teamA,
-            teamB: updates.team_b_id ? teamsRef[updates.team_b_id] : currentMatch.teamB,
+            teamA: newTeamA || currentMatch.teamA,
+            teamB: newTeamB || currentMatch.teamB,
             startTime: updates.start_time || currentMatch.startTime,
             winnerId: updates.winner_id !== undefined ? updates.winner_id : (currentMatch.winnerId || null),
             isCompleted: updates.status === 'finished',
             day: updates.day || currentMatch.day || null,
             bestOf: updates.bestOf ?? currentMatch.bestOf ?? 1,
-            bracketStage: updates.bracketStage || currentMatch.bracketStage // Update bracketStage
+            bracketStage: updates.bracketStage || currentMatch.bracketStage
         };
 
         allMatches[index] = updatedMatch;
-        
-        // CLEAN antes de guardar
         await setDoc(docRef, { allMatches: cleanPayload(allMatches) }, { merge: true });
     },
 
     async createMatch(matchData: any) {
         const docRef = doc(db, "admin_data", "matches");
         const docSnap = await getDoc(docRef);
-        let allMatches: Match[] = docSnap.exists() ? docSnap.data().allMatches : [];
+        let allMatches: Match[] = (docSnap.exists() ? docSnap.data().allMatches : []) || [];
 
         const teamsRef = await this.getTeams();
+        const teamA = teamsRef[matchData.team_a_id];
+        const teamB = teamsRef[matchData.team_b_id];
 
         const newMatch: Match = {
             id: `custom-${Date.now()}`,
-            teamA: teamsRef[matchData.team_a_id],
-            teamB: teamsRef[matchData.team_b_id],
+            teamA: teamA,
+            teamB: teamB,
             startTime: matchData.start_time,
             stage: matchData.stage || Stage.GROUPS,
             isCompleted: matchData.status === 'finished',
@@ -247,90 +258,65 @@ export const dataService = {
         };
 
         allMatches.push(newMatch);
-        // CLEAN antes de guardar
         await setDoc(docRef, { allMatches: cleanPayload(allMatches) }, { merge: true });
     },
 
     async deleteMatch(matchId: string) {
-        console.log("Intentando borrar partido:", matchId);
         const docRef = doc(db, "admin_data", "matches");
         const docSnap = await getDoc(docRef);
-        
         if (docSnap.exists()) {
             let allMatches: Match[] = docSnap.data().allMatches || [];
-            
-            const initialCount = allMatches.length;
             const newMatches = allMatches.filter(m => m.id !== matchId);
-            
-            if (newMatches.length === initialCount) {
-                console.warn("No se encontró el partido para borrar en la DB");
-                return;
-            }
-
-            console.log("Guardando lista de partidos actualizada...");
-            // CRÍTICO: Usamos cleanPayload para sanear TODO el array antes de reescribirlo.
             await setDoc(docRef, { allMatches: cleanPayload(newMatches) });
-            console.log("Partido borrado correctamente en DB.");
         }
     },
 
     // --- USERS & LEADERBOARD ---
     async getAllUsers(): Promise<User[]> {
         try {
-            // 1. Obtener datos maestros y config
-            const [matches, adminRanking, config] = await Promise.all([
+            // 1. Obtener datos maestros
+            const [matches, adminRanking, config, adminCrystalBall] = await Promise.all([
                 this.getMatches(),
                 this.getAdminRanking(),
-                this.getDaysConfig()
+                this.getDaysConfig(),
+                this.getAdminCrystalBallResults()
             ]);
             
             const maxPlayoffRounds = config.playoffRounds || 5;
             
-            // PRE-CALCULATION OF PLAYOFF MATCH POINTS
+            // PRE-CALCULATION PLAYOFFS
             const playoffMatches = matches.filter(m => m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS)
                                           .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
             
-            // Logic copied from PlayoffBracket.tsx to identify rounds
             let grandFinal = playoffMatches.find(m => m.stage === Stage.FINALS);
             let winnersMatches = playoffMatches.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
-            
             if (!grandFinal && winnersMatches.length > 7) {
                 grandFinal = winnersMatches[winnersMatches.length - 1];
                 winnersMatches = winnersMatches.slice(0, winnersMatches.length - 1);
             }
-            
             const losersMatches = playoffMatches.filter(m => m.bracketStage === 'losers' && m.stage !== Stage.FINALS);
 
-            // Create a Map of MatchID -> Points Value
             const matchPointsMap = new Map<string, number>();
-
-            // Grand Final (10 pts)
             if (grandFinal) matchPointsMap.set(grandFinal.id, 10);
-
-            // Winners Bracket
             winnersMatches.forEach((m, idx) => {
-                if (idx < 4) matchPointsMap.set(m.id, 3);      // R1 (Upper Round 1)
-                else if (idx < 6) matchPointsMap.set(m.id, 4); // R2 (Upper Round 2)
-                else matchPointsMap.set(m.id, 8);              // Final Winners
+                if (idx < 4) matchPointsMap.set(m.id, 3);
+                else if (idx < 6) matchPointsMap.set(m.id, 4);
+                else matchPointsMap.set(m.id, 8);
             });
-
-            // Losers Bracket
             losersMatches.forEach((m, idx) => {
-                if (idx < 2) matchPointsMap.set(m.id, 3);      // L-R1
-                else if (idx < 4) matchPointsMap.set(m.id, 4); // L-R2
-                else if (idx === 4) matchPointsMap.set(m.id, 6); // L-Semi
-                else matchPointsMap.set(m.id, 8);              // L-Final
+                if (idx < 2) matchPointsMap.set(m.id, 3);
+                else if (idx < 4) matchPointsMap.set(m.id, 4);
+                else if (idx === 4) matchPointsMap.set(m.id, 6);
+                else matchPointsMap.set(m.id, 8);
             });
 
-
-            // Mapa para búsqueda rápida
             const matchMap = new Map<string, { winnerId: string | null, day: number, stage: Stage, pointsValue: number }>();
             matches.forEach(m => {
                 matchMap.set(m.id, { 
                     winnerId: m.winnerId || null, 
-                    day: m.day || 0, // Fallback 0
+                    day: m.day || 0,
                     stage: m.stage,
-                    pointsValue: matchPointsMap.get(m.id) || 1 // Default to 1 for Groups, or bracket points
+                    pointsValue: matchPointsMap.get(m.id) || 1
                 });
             });
 
@@ -339,17 +325,17 @@ export const dataService = {
             const q = query(usersRef, orderBy("username"), limit(50));
             const snapshot = await getDocs(q);
 
-            // 3. Procesar cada usuario y sus predicciones
+            // 3. Procesar usuarios
             const userPromises = snapshot.docs.map(async (userDoc) => {
                 const data = userDoc.data();
                 const userId = userDoc.id;
 
-                // A. PREDICCIONES
+                // A. PREDICCIONES MATCHDAY & PLAYOFFS
                 const picksRef = doc(db, "users", userId, "picks", "winter_2026");
                 const picksSnap = await getDoc(picksRef);
                 const userPicks = picksSnap.exists() ? (picksSnap.data().list || []) : [];
 
-                const regularSeasonPointsPerDay = new Array(12).fill(0); // Index 1 to 11
+                const regularSeasonPointsPerDay = new Array(12).fill(0);
                 const playoffPointsPerRound = new Array(maxPlayoffRounds + 1).fill(0);
                 let playoffsScoreTotal = 0;
 
@@ -361,7 +347,6 @@ export const dataService = {
                                 regularSeasonPointsPerDay[info.day] += 1;
                             }
                         } else {
-                            // Playoffs
                             playoffsScoreTotal += info.pointsValue;
                             if (info.day >= 1 && info.day <= maxPlayoffRounds) {
                                 playoffPointsPerRound[info.day] += info.pointsValue;
@@ -387,40 +372,69 @@ export const dataService = {
                     });
                 }
 
-                // C. CONSTRUCCIÓN DE RESULTADOS (Secuencial: Regular -> Rank -> Playoffs)
+                // C. PUNTUACIÓN DE BOLA DE CRISTAL
+                let crystalBallScore = 0;
+                const crystalBallRef = doc(db, "users", userId, "picks", "winter_2026_crystal");
+                const crystalBallSnap = await getDoc(crystalBallRef);
+                const userCrystalBall = crystalBallSnap.exists() ? crystalBallSnap.data().selections : {};
+
+                if (Object.keys(adminCrystalBall).length > 0 && Object.keys(userCrystalBall).length > 0) {
+                    const MAJOR_TITLES = ['winter_champ', 'mvp', 'rookie']; // 10 pts
+                    const STANDARD_CATEGORIES = ['best_top', 'best_jng', 'best_mid', 'best_adc', 'best_sup', 'total_pentakills']; // 5 pts
+                    const RANKED_CATEGORIES = [
+                        'fastest_win_team', 'longest_win_team',
+                        'highest_kda',
+                        'most_picked', 'most_banned', 'highest_wr', 'lowest_wr', 'most_kills'
+                    ];
+
+                    MAJOR_TITLES.forEach(key => {
+                        if (userCrystalBall[key] && userCrystalBall[key] === adminCrystalBall[key]) crystalBallScore += 10;
+                    });
+                    STANDARD_CATEGORIES.forEach(key => {
+                        if (userCrystalBall[key] && userCrystalBall[key] === adminCrystalBall[key]) crystalBallScore += 5;
+                    });
+                    RANKED_CATEGORIES.forEach(key => {
+                        const userVal = userCrystalBall[key];
+                        if (userVal) {
+                            if (userVal === adminCrystalBall[`${key}_1`]) crystalBallScore += 5;
+                            else if (userVal === adminCrystalBall[`${key}_2`]) crystalBallScore += 3;
+                            else if (userVal === adminCrystalBall[`${key}_3`]) crystalBallScore += 1;
+                        }
+                    });
+                }
+
+                // D. CONSTRUCCIÓN DE RESULTADOS
                 const pointsHistory = [];
                 let cumulative = 0;
-                
-                // 1. Fase Regular (J1-J11)
                 for (let i = 1; i <= 11; i++) {
                     cumulative += regularSeasonPointsPerDay[i];
                     pointsHistory.push({ day: `J${i}`, points: cumulative });
                 }
+                
+                // Sumar Ranking + Crystal Ball al histórico "post-regular" si están disponibles
+                let midSeasonBoost = rankingScore + crystalBallScore;
+                if (midSeasonBoost > 0) {
+                    cumulative += midSeasonBoost;
+                    pointsHistory.push({ day: 'Bonus', points: cumulative });
+                }
 
-                // 2. Ranking (Se suma después de la fase regular)
-                cumulative += rankingScore;
-                pointsHistory.push({ day: 'Rank', points: cumulative });
-
-                // 3. Playoffs (Se suman después del ranking)
                 for (let i = 1; i <= maxPlayoffRounds; i++) {
                     cumulative += playoffPointsPerRound[i];
                     pointsHistory.push({ day: `PO${i}`, points: cumulative });
                 }
 
-                // Breakdown de puntuaciones
-                const breakdown = data.scoreBreakdown || { crystalBall: 0, fantasy: 0 };
-                // Calculate matchday total
                 let matchdayTotal = 0;
                 for(let i=1; i<=11; i++) matchdayTotal += regularSeasonPointsPerDay[i];
 
+                const breakdown = data.scoreBreakdown || { crystalBall: 0, fantasy: 0 };
                 breakdown.matchday = matchdayTotal;
                 breakdown.playoffs = playoffsScoreTotal;
                 breakdown.ranking = rankingScore;
+                breakdown.crystalBall = crystalBallScore; // Actualizar con valor calculado
 
-                // Score Global
-                const globalScore = matchdayTotal + playoffsScoreTotal + rankingScore;
+                const globalScore = matchdayTotal + playoffsScoreTotal + rankingScore + crystalBallScore;
 
-                // Mock Fantasy History
+                // Mock Fantasy
                 const fantasyTotal = breakdown.fantasy || 0;
                 const fantasyHistory = Array.from({ length: 12 }, (_, i) => {
                     const label = i === 11 ? 'Playoffs' : `J${i + 1}`;
@@ -449,123 +463,73 @@ export const dataService = {
         }
     },
 
-    // --- PREDICTIONS ---
+    // --- OTHER METHODS ---
     async getUserPredictions(userId: string) {
         try {
             const docRef = doc(db, "users", userId, "picks", "winter_2026");
             const docSnap = await getDoc(docRef);
             return docSnap.exists() ? docSnap.data().list || [] : [];
-        } catch (e) {
-            console.error("Error loading predictions", e);
-            return [];
-        }
+        } catch (e) { return []; }
     },
-
-    async savePredictions(predictions: { user_id: string, match_id: string, predicted_winner_id: string }[]) {
-        if (!predictions || predictions.length === 0) return;
+    async savePredictions(predictions: any[]) {
+        if (!predictions.length) return;
         const userId = predictions[0].user_id;
         const docRef = doc(db, "users", userId, "picks", "winter_2026");
-        
         const docSnap = await getDoc(docRef);
         let currentPreds = docSnap.exists() ? docSnap.data().list || [] : [];
-
         predictions.forEach(newP => {
             const index = currentPreds.findIndex((p: any) => p.matchId === newP.match_id);
-            if (index !== -1) {
-                currentPreds[index].predictedWinnerId = newP.predicted_winner_id;
-            } else {
-                currentPreds.push({ matchId: newP.match_id, predictedWinnerId: newP.predicted_winner_id });
-            }
+            if (index !== -1) currentPreds[index].predictedWinnerId = newP.predicted_winner_id;
+            else currentPreds.push({ matchId: newP.match_id, predictedWinnerId: newP.predicted_winner_id });
         });
-
         await setDoc(docRef, { list: cleanPayload(currentPreds) }, { merge: true });
     },
-
     async clearAllUserPredictions(userId: string) {
-        const docRef = doc(db, "users", userId, "picks", "winter_2026");
-        await deleteDoc(docRef);
+        await deleteDoc(doc(db, "users", userId, "picks", "winter_2026"));
     },
-
-    // --- RANKING (User Prediction vs Admin Result) ---
-    async getUserRanking(userId: string): Promise<string[]> {
+    async getUserRanking(userId: string) {
         try {
-            const docRef = doc(db, "users", userId, "picks", "winter_2026_ranking");
-            const docSnap = await getDoc(docRef);
-            return docSnap.exists() ? docSnap.data().order || [] : [];
-        } catch (e) {
-            console.error("Error loading user ranking", e);
-            return [];
-        }
+            const snap = await getDoc(doc(db, "users", userId, "picks", "winter_2026_ranking"));
+            return snap.exists() ? snap.data().order || [] : [];
+        } catch (e) { return []; }
     },
-
     async saveUserRanking(userId: string, teamIds: string[]) {
-        const docRef = doc(db, "users", userId, "picks", "winter_2026_ranking");
-        await setDoc(docRef, { order: cleanPayload(teamIds) }, { merge: true });
+        await setDoc(doc(db, "users", userId, "picks", "winter_2026_ranking"), { order: cleanPayload(teamIds) }, { merge: true });
     },
-
-    async getAdminRanking(): Promise<string[]> {
+    async getAdminRanking() {
         try {
-            const docRef = doc(db, "admin_data", "results");
-            const docSnap = await getDoc(docRef);
-            return docSnap.exists() ? docSnap.data().winter_2026_ranking || [] : [];
-        } catch (e) {
-            console.error("Error loading admin ranking", e);
-            return [];
-        }
+            const snap = await getDoc(doc(db, "admin_data", "results"));
+            return snap.exists() ? snap.data().winter_2026_ranking || [] : [];
+        } catch (e) { return []; }
     },
-
     async saveAdminRanking(teamIds: string[]) {
-        const docRef = doc(db, "admin_data", "results");
-        await setDoc(docRef, { winter_2026_ranking: cleanPayload(teamIds) }, { merge: true });
+        await setDoc(doc(db, "admin_data", "results"), { winter_2026_ranking: cleanPayload(teamIds) }, { merge: true });
     },
-
-    // --- CRYSTAL BALL (Bola de Cristal) ---
     async getCrystalBall(userId: string) {
         try {
-            const docRef = doc(db, "users", userId, "picks", "winter_2026_crystal");
-            const docSnap = await getDoc(docRef);
-            return docSnap.exists() ? docSnap.data().selections : {};
-        } catch (e) {
-            console.error("Error loading crystal ball", e);
-            return {};
-        }
+            const snap = await getDoc(doc(db, "users", userId, "picks", "winter_2026_crystal"));
+            return snap.exists() ? snap.data().selections : {};
+        } catch (e) { return {}; }
     },
-
-    async saveCrystalBall(userId: string, selections: Record<string, string>) {
-        const docRef = doc(db, "users", userId, "picks", "winter_2026_crystal");
-        await setDoc(docRef, { selections: cleanPayload(selections) }, { merge: true });
+    async saveCrystalBall(userId: string, selections: any) {
+        await setDoc(doc(db, "users", userId, "picks", "winter_2026_crystal"), { selections: cleanPayload(selections) }, { merge: true });
     },
-
     async getAdminCrystalBallResults() {
         try {
-            const docRef = doc(db, "admin_data", "results");
-            const docSnap = await getDoc(docRef);
-            return docSnap.exists() ? docSnap.data().winter_2026_crystal || {} : {};
-        } catch (e) {
-            console.error("Error loading admin crystal ball results", e);
-            return {};
-        }
+            const snap = await getDoc(doc(db, "admin_data", "results"));
+            return snap.exists() ? snap.data().winter_2026_crystal || {} : {};
+        } catch (e) { return {}; }
     },
-
-    async saveAdminCrystalBallResults(selections: Record<string, string>) {
-        const docRef = doc(db, "admin_data", "results");
-        await setDoc(docRef, { winter_2026_crystal: cleanPayload(selections) }, { merge: true });
+    async saveAdminCrystalBallResults(selections: any) {
+        await setDoc(doc(db, "admin_data", "results"), { winter_2026_crystal: cleanPayload(selections) }, { merge: true });
     },
-
-
-    // --- FANTASY ---
     async getFantasyTeam(userId: string) {
         try {
-            const docRef = doc(db, "users", userId, "fantasy", "winter_2026");
-            const docSnap = await getDoc(docRef);
-            return docSnap.exists() ? docSnap.data().team : null;
-        } catch (e) {
-            return null;
-        }
+            const snap = await getDoc(doc(db, "users", userId, "fantasy", "winter_2026"));
+            return snap.exists() ? snap.data().team : null;
+        } catch (e) { return null; }
     },
-
-    async saveFantasyTeam(userId: string, team: Record<Role, string | null>) {
-        const docRef = doc(db, "users", userId, "fantasy", "winter_2026");
-        await setDoc(docRef, { team: cleanPayload(team) }, { merge: true });
+    async saveFantasyTeam(userId: string, team: any) {
+        await setDoc(doc(db, "users", userId, "fantasy", "winter_2026"), { team: cleanPayload(team) }, { merge: true });
     }
 };

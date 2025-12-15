@@ -234,9 +234,9 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
       </div>
       
       {isLocked && mode === 'prediction' && (
-        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center justify-center gap-2 text-red-300 mb-6 animate-in slide-in-from-top-2 font-bold uppercase tracking-widest text-sm">
+        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center justify-center gap-2 text-red-300 mb-6 animate-in slide-in-from-top-2 font-bold uppercase tracking-widest text-sm max-w-lg mx-auto">
             <Lock className="w-4 h-4" />
-            <span>Predicciones Cerradas (Jornada 1 Iniciada)</span>
+            <span>Predicciones Cerradas (El Split ha comenzado)</span>
         </div>
       )}
 
