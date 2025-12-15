@@ -199,6 +199,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
     // Determine current champion ID based on avatar URL match (for the selector value)
     const currentAvatarChampId = championOptions.find(c => c.image === editForm.avatar)?.id;
 
+    // --- LEVEL & PROGRESS CALCULATIONS ---
+    const level = Math.floor(user.score / 50) + 1;
+    const scoreInCurrentLevel = user.score % 50;
+    const progressPercent = (scoreInCurrentLevel / 50) * 100;
+    
+    // SVG Dimensions for the ring
+    const size = 144; // Total SVG size (px)
+    const strokeWidth = 3;
+    const radius = (size / 2) - (strokeWidth * 2);
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
+
     return (
         <div className="max-w-2xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4">
             
@@ -210,26 +222,69 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                 </div>
                 
                 {/* Content Layer (Visible) */}
-                <div className="relative z-10 p-6 flex flex-col sm:flex-row items-start gap-6">
-                    {/* Avatar Group */}
-                    <div className="relative group flex-shrink-0 mx-auto sm:mx-0">
-                        <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-br from-[#c8aa6e] to-[#785a28] shadow-lg">
+                <div className="relative z-10 p-6 flex flex-col sm:flex-row items-start gap-8">
+                    {/* Avatar Group with Progress Ring */}
+                    <div className="relative group flex-shrink-0 mx-auto sm:mx-0 w-36 h-36 flex items-center justify-center">
+                        
+                        {/* Avatar Image */}
+                        <div className="w-28 h-28 rounded-full bg-[#0a1428] border-4 border-[#0a1428] shadow-lg relative z-10 overflow-hidden">
                             <img 
                                 src={editForm.avatar || user.avatar} 
                                 alt={user.name} 
-                                className="w-full h-full rounded-full object-cover bg-[#0a1428]"
+                                className="w-full h-full object-cover"
                                 onError={(e) => (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${user.name}&background=random`}
                             />
                         </div>
+
+                        {/* Progress Ring (SVG) - Hidden when editing to reduce clutter */}
                         {!isEditing && (
-                            <div className="absolute -bottom-2 -right-2 bg-[#0a1428] border border-gray-600 p-1.5 rounded-full text-gray-400">
-                                <span className="text-[10px] font-bold px-1">Lvl {Math.floor(user.score / 50) + 1}</span>
-                            </div>
+                            <>
+                                <svg 
+                                    className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none z-20"
+                                    width={size} 
+                                    height={size} 
+                                    viewBox={`0 0 ${size} ${size}`}
+                                >
+                                    {/* Track */}
+                                    <circle
+                                        cx={size/2} cy={size/2} r={radius}
+                                        fill="none"
+                                        stroke="#1e293b" // gray-800
+                                        strokeWidth={strokeWidth}
+                                    />
+                                    {/* Progress */}
+                                    <circle
+                                        cx={size/2} cy={size/2} r={radius}
+                                        fill="none"
+                                        stroke="#c8aa6e" // Hextech Gold
+                                        strokeWidth={strokeWidth}
+                                        strokeDasharray={circumference}
+                                        strokeDashoffset={strokeDashoffset}
+                                        strokeLinecap="round"
+                                        className="transition-all duration-1000 ease-out"
+                                    />
+                                </svg>
+
+                                {/* Level Badge */}
+                                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center min-w-[80px]">
+                                    <div className="bg-[#0a1428] border-2 border-[#c8aa6e] text-[#c8aa6e] text-[10px] font-bold px-3 py-0.5 rounded-full shadow-[0_0_10px_rgba(200,170,110,0.3)] tracking-wider">
+                                        LVL {level}
+                                    </div>
+                                    <span className="text-[9px] text-gray-500 font-mono mt-0.5 bg-black/60 px-1.5 rounded backdrop-blur-sm border border-gray-800">
+                                        {scoreInCurrentLevel} / 50 XP
+                                    </span>
+                                </div>
+                            </>
+                        )}
+                        
+                        {/* Edit Mode Ring Placeholder */}
+                        {isEditing && (
+                            <div className="absolute inset-0 rounded-full border-2 border-dashed border-gray-600 animate-spin-slow opacity-50 pointer-events-none"></div>
                         )}
                     </div>
 
                     {/* Info Group */}
-                    <div className="flex-1 w-full min-w-0">
+                    <div className="flex-1 w-full min-w-0 pt-2">
                         {isEditing ? (
                             <div className="space-y-4 pt-2">
                                 <div className="relative z-50">
@@ -252,19 +307,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center sm:text-left mt-2">
-                                <h1 className="text-3xl font-bold text-white mb-1">{user.name}</h1>
+                            <div className="text-center sm:text-left">
+                                <h1 className="text-3xl font-bold text-white mb-1 drop-shadow-lg">{user.name}</h1>
                                 {user.title ? (
-                                    <span className="inline-block bg-[#c8aa6e]/10 text-[#c8aa6e] border border-[#c8aa6e]/30 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
+                                    <span className="inline-block bg-gradient-to-r from-[#c8aa6e]/20 to-transparent text-[#c8aa6e] border-l-2 border-[#c8aa6e] pl-3 pr-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-2">
                                         {user.title}
                                     </span>
                                 ) : (
                                     <span className="text-gray-500 text-xs italic mb-2 block">Sin título asignado</span>
                                 )}
-                                <div className="flex items-center justify-center sm:justify-start gap-4 mt-4">
-                                    <div className="text-gray-400 text-sm flex items-center gap-1.5 bg-black/30 px-3 py-1.5 rounded-lg border border-gray-700">
-                                        <Medal className="w-4 h-4 text-yellow-500" />
-                                        Ranking Global: <span className="text-white font-bold">#{user.rank}</span>
+                                <div className="flex items-center justify-center sm:justify-start gap-4 mt-6">
+                                    <div className="text-gray-400 text-sm flex items-center gap-2 bg-black/30 px-4 py-2 rounded-lg border border-gray-700/50">
+                                        <div className="p-1 bg-[#0a1428] rounded border border-gray-700">
+                                            <Medal className="w-4 h-4 text-yellow-500" />
+                                        </div>
+                                        <div>
+                                            <span className="text-[10px] uppercase font-bold block leading-none text-gray-500">Ranking</span>
+                                            <span className="text-white font-bold leading-none">#{user.rank}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
