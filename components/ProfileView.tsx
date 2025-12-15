@@ -122,15 +122,64 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
         );
     }
 
-    const StatCard = ({ icon: Icon, label, value, color }: any) => (
-        <div className={`bg-[#0f1923] p-4 rounded-xl border border-gray-700 flex flex-col items-center justify-center relative overflow-hidden group hover:border-${color.split('-')[1]}`}>
-            <div className={`absolute top-2 right-2 text-${color} opacity-20 group-hover:opacity-50 transition-opacity`}>
-                <Icon className="w-8 h-8" />
+    // Improved StatCard with explicit theming
+    const StatCard = ({ icon: Icon, label, value, type }: { icon: any, label: string, value: number, type: 'gold' | 'blue' | 'purple' | 'cyan' }) => {
+        const theme = {
+            gold: {
+                bg: 'bg-yellow-900/10',
+                border: 'border-yellow-500/30',
+                text: 'text-yellow-400',
+                icon: 'text-yellow-500',
+                glow: 'shadow-[0_0_15px_rgba(234,179,8,0.1)]'
+            },
+            blue: {
+                bg: 'bg-blue-900/10',
+                border: 'border-blue-500/30',
+                text: 'text-blue-400',
+                icon: 'text-blue-500',
+                glow: 'shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+            },
+            purple: {
+                bg: 'bg-purple-900/10',
+                border: 'border-purple-500/30',
+                text: 'text-purple-400',
+                icon: 'text-purple-500',
+                glow: 'shadow-[0_0_15px_rgba(168,85,247,0.1)]'
+            },
+            cyan: {
+                bg: 'bg-[#0ac8b9]/10',
+                border: 'border-[#0ac8b9]/30',
+                text: 'text-[#0ac8b9]',
+                icon: 'text-[#0ac8b9]',
+                glow: 'shadow-[0_0_15px_rgba(10,200,185,0.1)]'
+            }
+        }[type];
+
+        return (
+            <div className={`
+                relative p-4 rounded-xl border flex flex-col items-center justify-center overflow-hidden 
+                transition-all duration-300 hover:scale-[1.02] hover:bg-opacity-80
+                ${theme.bg} ${theme.border} ${theme.glow}
+            `}>
+                {/* Large Background Icon Faded */}
+                <div className={`absolute -right-6 -bottom-6 opacity-10 ${theme.text}`}>
+                    <Icon className="w-24 h-24 -rotate-12" />
+                </div>
+                
+                {/* Top Right Icon */}
+                <div className={`absolute top-2 right-2 opacity-60 ${theme.icon}`}>
+                    <Icon className="w-5 h-5" />
+                </div>
+
+                <span className="text-3xl font-bold text-white mb-1 relative z-10 drop-shadow-sm">
+                    {value}
+                </span>
+                <span className={`text-[10px] uppercase font-bold tracking-widest relative z-10 ${theme.text} opacity-90`}>
+                    {label}
+                </span>
             </div>
-            <span className="text-3xl font-bold text-white mb-1 relative z-10">{value}</span>
-            <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest relative z-10">{label}</span>
-        </div>
-    );
+        );
+    };
 
     const BreakdownBar = ({ label, value, max, color }: any) => (
         <div className="mb-4">
@@ -258,10 +307,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
 
             {/* Stats Grid - Relative z-0 ensures it's below header z-20 */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 relative z-0">
-                <StatCard icon={Trophy} label="Puntos Totales" value={user.score} color="text-yellow-400" />
-                <StatCard icon={Swords} label="Fase Regular" value={user.scoreBreakdown.matchday} color="text-blue-400" />
-                <StatCard icon={Sparkles} label="Bola Cristal" value={user.scoreBreakdown.crystalBall} color="text-purple-400" />
-                <StatCard icon={UserIcon} label="Fantasy" value={user.scoreBreakdown.fantasy} color="text-[#0ac8b9]" />
+                <StatCard icon={Trophy} label="Puntos Totales" value={user.score} type="gold" />
+                <StatCard icon={Swords} label="Fase Regular" value={user.scoreBreakdown.matchday} type="blue" />
+                <StatCard icon={Sparkles} label="Bola Cristal" value={user.scoreBreakdown.crystalBall} type="purple" />
+                <StatCard icon={UserIcon} label="Fantasy" value={user.scoreBreakdown.fantasy} type="cyan" />
             </div>
 
             {/* Score Breakdown */}
