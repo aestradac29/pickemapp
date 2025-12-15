@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
+import { PlayoffBracket } from './PlayoffBracket';
 import { DaySelector } from './DaySelector';
 import { UserPrediction, Match, Team, Stage } from '../types';
-import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, Trash, CirclePlus } from 'lucide-react';
+import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, Trash, CirclePlus, GitMerge, List } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { TEAMS } from '../constants';
 
@@ -13,23 +14,38 @@ interface PlayoffsViewProps {
     onPredictionsSaved?: () => Promise<void> | void; 
 }
 
+const PointBadge = ({ points, label }: { points: number, label: string }) => {
+    let colorClass = "bg-blue-900/30 text-blue-300 border-blue-500/30";
+    if (points >= 10) colorClass = "bg-purple-900/30 text-purple-300 border-purple-500/30";
+    else if (points >= 8) colorClass = "bg-[#c8aa6e]/20 text-[#c8aa6e] border-[#c8aa6e]/30";
+    else if (points >= 6) colorClass = "bg-green-900/30 text-green-300 border-green-500/30";
+
+    return (
+        <div className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[9px] font-bold uppercase tracking-wider ${colorClass}`}>
+            <span>{label}</span>
+            <span className="bg-black/40 px-1 rounded text-white">{points} Pts</span>
+        </div>
+    );
+};
+
 export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ 
     currentUserId, 
     initialPredictions = [], 
     isAdmin = false,
     onPredictionsSaved 
 }) => {
-  // Playoffs usually have fewer "days" or rounds. Loaded from config.
+  // Config
   const [totalRounds, setTotalRounds] = useState(5);
   const [currentDay, setCurrentDay] = useState(1);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
   const [closedDays, setClosedDays] = useState<number[]>([]); 
   
-  // State for ALL matches loaded from DB
+  // Data
   const [allMatches, setAllMatches] = useState<Match[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
 
+  // Predictions
   const [predictions, setPredictions] = useState<UserPrediction[]>(initialPredictions);
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
@@ -37,9 +53,10 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null); 
 
-  // Admin Mode State
+  // UI State
   const [isEditMode, setIsEditMode] = useState(false);
   const [newMatch, setNewMatch] = useState<Match | null>(null);
+  const [viewMode, setViewMode] = useState<'bracket' | 'list'>('bracket'); 
 
   // Sync state with props
   useEffect(() => {
@@ -58,8 +75,6 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                 dataService.getDaysConfig()
             ]);
             
-            // Filter only Playoff matches for this view context
-            // Note: We still fetch all to handle IDs correctly, filtering happens in render/memo
             setAllMatches(fetchedMatches);
             setAllTeams(Object.values(teamsMap));
             
@@ -78,8 +93,51 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
     loadData();
   }, []);
 
-  // Derive matches for current day AND stage = Playoffs/Finals
-  const matches = useMemo(() => {
+  // Filter matches for Bracket View (All Playoff matches)
+  const bracketMatches = useMemo(() => {
+      return allMatches.filter(m => m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS);
+  }, [allMatches]);
+
+  // Helper to get Label matching the Bracket View
+  const getBracketLabel = (match: Match) => {
+        // Sort identically to PlayoffBracket.tsx
+        const sortedMatches = [...bracketMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        
+        // 1. Identify Grand Final (Strict check + Overflow check)
+        let grandFinal = sortedMatches.find(m => m.stage === Stage.FINALS);
+        let winnersMatches = sortedMatches.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
+        
+        // Fix for implicit final (same as PlayoffBracket.tsx)
+        if (!grandFinal && winnersMatches.length > 7) {
+            grandFinal = winnersMatches[winnersMatches.length - 1];
+            winnersMatches = winnersMatches.slice(0, winnersMatches.length - 1);
+        }
+
+        if (match.id === grandFinal?.id) return "GRAN FINAL";
+
+        // Winners
+        const wIndex = winnersMatches.findIndex(m => m.id === match.id);
+        if (wIndex !== -1) {
+            if (wIndex < 4) return `R1 ${wIndex + 1}`; // Match 1, 2, 3, 4
+            if (wIndex < 6) return `R2 ${wIndex - 3}`; // Match 5, 6 -> 1, 2
+            return `FINAL WINNERS`;
+        }
+
+        // Losers
+        const losersMatches = sortedMatches.filter(m => m.bracketStage === 'losers' && m.stage !== Stage.FINALS);
+        const lIndex = losersMatches.findIndex(m => m.id === match.id);
+        if (lIndex !== -1) {
+             if (lIndex < 2) return `L-R1 ${lIndex + 1}`;
+             if (lIndex < 4) return `L-R2 ${lIndex - 1}`;
+             if (lIndex === 4) return `L-SEMIFINAL`;
+             return `L-FINAL`;
+        }
+
+        return `PARTIDO ${match.id}`; // Fallback
+  };
+
+  // Filter matches for List View (By Round)
+  const listMatches = useMemo(() => {
       return allMatches
         .filter(m => (m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS) && m.day === currentDay)
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
@@ -105,21 +163,26 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
   const isDayVisible = visibleDays.includes(currentDay);
   const isManuallyClosed = closedDays.includes(currentDay);
-  const now = new Date();
-  const firstMatchTime = matches.length > 0 ? new Date(matches[0].startTime) : null;
-  const isTimeLocked = firstMatchTime ? now >= firstMatchTime : false;
-  const isLockedForUser = isManuallyClosed || isTimeLocked;
+  
+  // Logic for Global Lock (Manual Only for flexibility)
+  const isGlobalPlayoffLock = useMemo(() => {
+      // Solo bloqueamos "globalmente" si el admin ha cerrado la jornada 1 manualmente.
+      // Ya NO bloqueamos por tiempo del primer partido, permitiendo picks individuales.
+      return closedDays.includes(1);
+  }, [closedDays]);
+
+  const isLockedForUser = isManuallyClosed || isGlobalPlayoffLock;
 
   const handleSelectWinner = (matchId: string, teamId: string) => {
     if (isEditMode) return;
-    if (isLockedForUser) return; 
-
-    const match = matches.find(m => m.id === matchId);
-    if (match) {
-        const startTime = new Date(match.startTime);
-        if (now >= startTime && !match.isCompleted && !isAdmin) return; 
-    }
     
+    // Validación individual de tiempo para seguridad
+    const match = allMatches.find(m => m.id === matchId);
+    if (match && !isAdmin) {
+        // Si el partido ya empezó, no permitir cambios aunque la jornada esté abierta
+        if (new Date() >= new Date(match.startTime)) return;
+    }
+
     setPredictions(prev => {
       const existing = prev.find(p => p.matchId === matchId);
       if (existing) {
@@ -137,10 +200,10 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           teamA: TEAMS.fnc,
           teamB: TEAMS.g2,
           startTime: new Date().toISOString(),
-          stage: Stage.PLAYOFFS, // Default to Playoffs
+          stage: Stage.PLAYOFFS, 
           isCompleted: false,
           day: currentDay,
-          bracketStage: 'winners' // Default bracket
+          bracketStage: 'winners'
       };
       setNewMatch(tempMatch);
   };
@@ -232,7 +295,6 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       if (totalRounds <= 1) return;
       const newTotal = totalRounds - 1;
       setTotalRounds(newTotal);
-      // Ensure we don't leave current view stranded
       if (currentDay > newTotal) setCurrentDay(newTotal);
       await dataService.updateGlobalConfig({ visibleDays, closedDays, playoffRounds: newTotal });
   };
@@ -249,15 +311,22 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       setSaveStatus('idle');
       setErrorMessage(null);
 
-      const currentDayMatchIds = matches.filter(m => !m.id.startsWith('temp-')).map(m => m.id);
+      const relevantMatchIds = viewMode === 'bracket' 
+          ? bracketMatches.map(m => m.id)
+          : listMatches.map(m => m.id);
       
-      const dayPredictions = predictions
-        .filter(p => currentDayMatchIds.includes(p.matchId))
+      const predsToSave = predictions
+        .filter(p => relevantMatchIds.includes(p.matchId))
         .map(p => ({
             user_id: currentUserId,
             match_id: p.matchId,
             predicted_winner_id: p.predictedWinnerId
         }));
+
+      if (predsToSave.length === 0) {
+          setIsSaving(false);
+          return;
+      }
 
       const fallbackTimer = setTimeout(() => {
           if (isSavingRef.current) {
@@ -269,7 +338,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       }, 60000);
 
       try {
-          await dataService.savePredictions(dayPredictions);
+          await dataService.savePredictions(predsToSave);
           
           if (onPredictionsSaved) {
               await onPredictionsSaved();
@@ -288,19 +357,14 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       }
   };
 
-  // Rounds generated dynamically from state
   const rounds = Array.from({ length: totalRounds }, (_, i) => i + 1);
-  const validMatches = matches.filter(m => !m.id.startsWith('temp-'));
-  const validMatchIds = validMatches.map(m => m.id);
-  const currentDayPredictionsCount = predictions.filter(p => validMatchIds.includes(p.matchId)).length;
-  const totalMatches = validMatches.length;
 
   return (
     <div className={`animate-in fade-in slide-in-from-bottom-4 pb-24 transition-all duration-300 ${isEditMode ? 'border-l-4 border-r-4 border-red-900/50 bg-red-950/10 min-h-screen' : ''}`}>
       
-      {/* Header with Round Selector */}
+      {/* Header */}
       <div className={`sticky top-0 z-30 pt-4 pb-4 -mx-4 px-4 border-b mb-6 backdrop-blur-md transition-colors ${isEditMode ? 'bg-red-950/90 border-red-800' : 'bg-[#0a1428]/95 border-gray-800'}`}>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-full border ${isEditMode ? 'bg-red-900 border-red-500' : 'bg-hextech-900 border-hextech-500/30'}`}>
                     <Trophy className={`w-5 h-5 ${isEditMode ? 'text-white' : 'text-hextech-500'}`} />
@@ -315,40 +379,94 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                 </div>
             </div>
 
-            {isAdmin && (
-                <button 
-                    onClick={() => {
-                        setIsEditMode(!isEditMode);
-                        setNewMatch(null); 
-                    }}
-                    className={`
-                        flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border transition-all
-                        ${isEditMode 
-                            ? 'bg-red-600 border-red-400 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)]' 
-                            : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white hover:border-gray-400'
-                        }
-                    `}
-                >
-                    <Settings className={`w-4 h-4 ${isEditMode ? 'animate-spin-slow' : ''}`} />
-                    {isEditMode ? 'Salir' : 'Admin'}
-                </button>
-            )}
+            <div className="flex items-center gap-2">
+                {/* View Switcher (Hidden on Mobile) */}
+                {!isEditMode && (
+                    <div className="hidden md:flex bg-[#0f1d36] p-1 rounded-lg border border-gray-700 items-center">
+                        <button 
+                            onClick={() => setViewMode('bracket')}
+                            className={`p-2 rounded flex items-center gap-2 text-xs font-bold uppercase transition-all ${viewMode === 'bracket' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            <GitMerge className="w-4 h-4" />
+                            <span className="hidden sm:inline">Árbol</span>
+                        </button>
+                        <button 
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 rounded flex items-center gap-2 text-xs font-bold uppercase transition-all ${viewMode === 'list' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            <List className="w-4 h-4" />
+                            <span className="hidden sm:inline">Lista</span>
+                        </button>
+                    </div>
+                )}
+
+                {isAdmin && (
+                    <button 
+                        onClick={() => {
+                            setIsEditMode(!isEditMode);
+                            setNewMatch(null); 
+                            // Force list view on edit for easier management
+                            if (!isEditMode) setViewMode('list');
+                        }}
+                        className={`
+                            flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border transition-all h-full
+                            ${isEditMode 
+                                ? 'bg-red-600 border-red-400 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)]' 
+                                : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white hover:border-gray-400'
+                            }
+                        `}
+                    >
+                        <Settings className={`w-4 h-4 ${isEditMode ? 'animate-spin-slow' : ''}`} />
+                        {isEditMode ? 'Salir' : 'Admin'}
+                    </button>
+                )}
+            </div>
         </div>
 
-        <DaySelector 
-            days={rounds} 
-            currentDay={currentDay} 
-            isEditMode={isEditMode}
-            activeDays={visibleDays}
-            closedDays={closedDays}
-            checkUnsaved={checkUnsavedChanges}
-            onSelect={setCurrentDay}
-        />
+        {/* --- SCORING LEGEND --- */}
+        {!isEditMode && (
+            <div className="flex flex-wrap justify-center gap-2 mb-4 animate-in fade-in slide-in-from-top-2">
+                <PointBadge points={3} label="R1 / L-R1" />
+                <PointBadge points={4} label="R2 / L-R2" />
+                <PointBadge points={6} label="L-Semi" />
+                <PointBadge points={8} label="Final W / L-Final" />
+                <PointBadge points={10} label="Gran Final" />
+            </div>
+        )}
+
+        {/* Round Selector (Shown in List View, Admin Mode OR Mobile) */}
+        {(viewMode === 'list' || isEditMode) && (
+            <div className="block md:block"> 
+                <DaySelector 
+                    days={rounds} 
+                    currentDay={currentDay} 
+                    isEditMode={isEditMode}
+                    activeDays={visibleDays}
+                    closedDays={closedDays}
+                    checkUnsaved={checkUnsavedChanges}
+                    onSelect={setCurrentDay}
+                />
+            </div>
+        )}
         
-        {/* Admin Dual Control Toolbar */}
+        {/* Mobile-only DaySelector fallback if viewMode is bracket (since bracket is hidden on mobile) */}
+        {viewMode === 'bracket' && !isEditMode && (
+            <div className="block md:hidden">
+                 <DaySelector 
+                    days={rounds} 
+                    currentDay={currentDay} 
+                    isEditMode={isEditMode}
+                    activeDays={visibleDays}
+                    closedDays={closedDays}
+                    checkUnsaved={checkUnsavedChanges}
+                    onSelect={setCurrentDay}
+                />
+            </div>
+        )}
+        
+        {/* Admin Toolbar */}
         {isEditMode && (
             <div className="mt-4 flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 justify-end">
-                {/* Round Management Controls */}
                  <div className="flex items-center gap-2 border-r border-red-800 pr-2 mr-2">
                     <button 
                         onClick={handleDeleteRound}
@@ -394,94 +512,120 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
         )}
       </div>
 
-      {/* Matches List */}
-      <div className="space-y-6 animate-in fade-in duration-500">
+      {/* CONTENT AREA */}
+      <div className="animate-in fade-in duration-500">
         
-        {!isEditMode && (
-            <>
-                {!isDayVisible && (
-                    <div className="flex flex-col items-center justify-center py-16 text-gray-500 border-2 border-dashed border-gray-800 rounded-2xl bg-black/20">
-                        <CalendarOff className="w-12 h-12 mb-4 opacity-50" />
-                        <h3 className="text-lg font-bold text-gray-400 mb-1">Ronda {currentDay}</h3>
-                        <p className="uppercase tracking-widest text-xs font-bold text-[#c8aa6e]">
-                            TBD / Por determinar
-                        </p>
+        {/* --- BRACKET VIEW (Desktop Only) --- */}
+        {viewMode === 'bracket' && !isEditMode && (
+            <div className="hidden md:block overflow-x-auto">
+                 {isLoadingMatches ? (
+                     <div className="flex flex-col items-center justify-center py-20 text-[#c8aa6e]">
+                        <Loader2 className="w-10 h-10 animate-spin mb-4" />
+                        <p>Generando cuadro de competición...</p>
                     </div>
-                )}
-
-                {isDayVisible && isLockedForUser && (
-                    <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center justify-center gap-2 text-red-300 mb-6 animate-in slide-in-from-top-2 font-bold uppercase tracking-widest text-sm">
-                        <Lock className="w-4 h-4" />
-                        <span>Predicciones Cerradas</span>
-                    </div>
-                )}
-            </>
+                 ) : (
+                     <PlayoffBracket 
+                        matches={bracketMatches} 
+                        teams={allTeams}
+                        predictions={predictions}
+                        onSelectWinner={handleSelectWinner}
+                        isLocked={isGlobalPlayoffLock}
+                     />
+                 )}
+            </div>
         )}
 
-        {(isEditMode || isDayVisible) && (
-            <>
-                {isLoadingMatches ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-[#c8aa6e]">
-                        <Loader2 className="w-8 h-8 animate-spin mb-4" />
-                        <p>Cargando cuadro...</p>
-                    </div>
-                ) : matches.length === 0 && !newMatch ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-gray-500 border-2 border-dashed border-gray-800 rounded-2xl">
-                        <Trophy className="w-12 h-12 mb-4 opacity-50" />
-                        <h3 className="text-lg font-bold text-gray-400 mb-1">Sin Partidos</h3>
-                        <p className="uppercase tracking-widest text-xs font-bold text-[#c8aa6e]">
-                            No hay encuentros programados en esta ronda
-                        </p>
-                    </div>
-                ) : (
-                    matches.map(match => (
-                        <MatchCard 
-                            key={match.id} 
-                            match={match}
-                            teams={allTeams}
-                            selectedWinnerId={predictions.find(p => p.matchId === match.id)?.predictedWinnerId}
-                            onSelectWinner={handleSelectWinner}
-                            isEditing={isEditMode}
-                            isDayLocked={isLockedForUser} 
-                            onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
-                            onDelete={() => handleAdminDelete(match.id)}
-                        />
-                    ))
+        {/* --- LIST VIEW (Mobile Always OR Desktop if selected) --- */}
+        <div className={viewMode === 'list' || isEditMode ? 'block' : 'block md:hidden'}>
+            <div className="space-y-6">
+                {!isEditMode && (
+                    <>
+                        {!isDayVisible && (
+                            <div className="flex flex-col items-center justify-center py-16 text-gray-500 border-2 border-dashed border-gray-800 rounded-2xl bg-black/20">
+                                <CalendarOff className="w-12 h-12 mb-4 opacity-50" />
+                                <h3 className="text-lg font-bold text-gray-400 mb-1">Ronda {currentDay}</h3>
+                                <p className="uppercase tracking-widest text-xs font-bold text-[#c8aa6e]">
+                                    TBD / Por determinar
+                                </p>
+                            </div>
+                        )}
+
+                        {isDayVisible && isLockedForUser && (
+                            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center justify-center gap-2 text-red-300 mb-6 animate-in slide-in-from-top-2 font-bold uppercase tracking-widest text-sm">
+                                <Lock className="w-4 h-4" />
+                                <span>Predicciones Cerradas</span>
+                            </div>
+                        )}
+                    </>
                 )}
 
-                {newMatch && (
-                    <div className="animate-in slide-in-from-bottom-8">
-                        <MatchCard 
-                            key="new-match-temp"
-                            match={newMatch}
-                            teams={allTeams}
-                            isEditing={true}
-                            onSelectWinner={() => {}}
-                            onUpdate={(updates) => handleAdminUpdate(newMatch.id, updates)}
-                            onCancel={() => setNewMatch(null)}
-                            onDelete={() => setNewMatch(null)}
-                        />
-                    </div>
-                )}
+                {(isEditMode || isDayVisible) && (
+                    <>
+                        {isLoadingMatches ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-[#c8aa6e]">
+                                <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                                <p>Cargando lista...</p>
+                            </div>
+                        ) : listMatches.length === 0 && !newMatch ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-gray-500 border-2 border-dashed border-gray-800 rounded-2xl">
+                                <Trophy className="w-12 h-12 mb-4 opacity-50" />
+                                <h3 className="text-lg font-bold text-gray-400 mb-1">Sin Partidos</h3>
+                                <p className="uppercase tracking-widest text-xs font-bold text-[#c8aa6e]">
+                                    No hay encuentros programados en esta ronda
+                                </p>
+                            </div>
+                        ) : (
+                            listMatches.map(match => (
+                                <MatchCard 
+                                    key={match.id} 
+                                    match={match}
+                                    teams={allTeams}
+                                    selectedWinnerId={predictions.find(p => p.matchId === match.id)?.predictedWinnerId}
+                                    onSelectWinner={handleSelectWinner}
+                                    isEditing={isEditMode}
+                                    isDayLocked={isLockedForUser} 
+                                    customTitle={getBracketLabel(match)} 
+                                    onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
+                                    onDelete={() => handleAdminDelete(match.id)}
+                                />
+                            ))
+                        )}
 
-                {isAdmin && isEditMode && !newMatch && (
-                    <button 
-                        onClick={handleCreateNewMatch}
-                        className="w-full py-4 border-2 border-dashed border-gray-700 rounded-xl flex items-center justify-center gap-2 text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800/50 transition-all group"
-                    >
-                        <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center group-hover:bg-gray-700">
-                            <Plus className="w-5 h-5" />
-                        </div>
-                        <span className="font-bold uppercase tracking-wider text-sm">Añadir Partido a Ronda {currentDay}</span>
-                    </button>
+                        {newMatch && (
+                            <div className="animate-in slide-in-from-bottom-8">
+                                <MatchCard 
+                                    key="new-match-temp"
+                                    match={newMatch}
+                                    teams={allTeams}
+                                    isEditing={true}
+                                    onSelectWinner={() => {}}
+                                    onUpdate={(updates) => handleAdminUpdate(newMatch.id, updates)}
+                                    onCancel={() => setNewMatch(null)}
+                                    onDelete={() => setNewMatch(null)}
+                                />
+                            </div>
+                        )}
+
+                        {isAdmin && isEditMode && !newMatch && (
+                            <button 
+                                onClick={handleCreateNewMatch}
+                                className="w-full py-4 border-2 border-dashed border-gray-700 rounded-xl flex items-center justify-center gap-2 text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800/50 transition-all group"
+                            >
+                                <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center group-hover:bg-gray-700">
+                                    <Plus className="w-5 h-5" />
+                                </div>
+                                <span className="font-bold uppercase tracking-wider text-sm">Añadir Partido a Ronda {currentDay}</span>
+                            </button>
+                        )}
+                    </>
                 )}
-            </>
-        )}
+            </div>
+        </div>
 
       </div>
 
       {/* Footer Action (Save Button) */}
-      {!isEditMode && matches.length > 0 && isDayVisible && !isLockedForUser && (
+      {!isEditMode && !isLockedForUser && (
           <div className="fixed bottom-8 left-0 right-0 px-4 flex flex-col items-center pointer-events-none z-40 gap-2">
             
             {saveStatus === 'error' && errorMessage && (
@@ -515,11 +659,9 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                     <span className="text-sm">
                         {saveStatus === 'success' ? 'GUARDADO' : saveStatus === 'error' ? 'REINTENTAR' : 'GUARDAR PREDICCIONES'}
                     </span>
-                    {saveStatus !== 'success' && saveStatus !== 'error' && (
-                        <span className="text-[10px] opacity-80 mt-1">
-                            {currentDayPredictionsCount} de {totalMatches} seleccionados
-                        </span>
-                    )}
+                    <span className="text-[10px] opacity-80 mt-1">
+                        Se guardarán todos los cambios
+                    </span>
                 </div>
             </button>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Match, Team, Stage } from '../types';
-import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2, AlertTriangle, Swords, ShieldAlert, Crown } from 'lucide-react';
+import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2, AlertTriangle, Swords, ShieldAlert, Crown, GitMerge } from 'lucide-react';
 import { WHITE_LOGO_TEAMS } from '../constants';
 
 interface MatchCardProps {
@@ -8,6 +8,7 @@ interface MatchCardProps {
   selectedWinnerId?: string;
   onSelectWinner: (matchId: string, teamId: string) => void;
   isDayLocked?: boolean; // Prop para bloqueo global de jornada
+  customTitle?: string; // Nuevo prop para mostrar "R1 1", "L-SEMI", etc.
   // Admin Props
   isEditing?: boolean;
   teams?: Team[]; // Required for editing dropdowns
@@ -109,6 +110,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     selectedWinnerId, 
     onSelectWinner,
     isDayLocked = false,
+    customTitle,
     isEditing = false,
     teams = [],
     onUpdate,
@@ -401,18 +403,25 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       {/* Header */}
       <div className="bg-black/30 px-4 py-2 flex justify-between items-center text-xs text-gray-400">
         <div className="flex items-center gap-2">
-           {(match.stage === Stage.PLAYOFFS || match.stage === Stage.FINALS) ? (
-              match.bracketStage === 'losers' ? (
-                  <span className="text-gray-500 font-bold uppercase flex items-center gap-1 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">
-                     <ShieldAlert className="w-3 h-3" /> Losers
-                  </span>
-               ) : (
-                   <span className="text-yellow-500 font-bold uppercase flex items-center gap-1 bg-yellow-900/20 px-1.5 py-0.5 rounded border border-yellow-700/50">
-                      <Crown className="w-3 h-3" /> Winners
-                   </span>
-               )
+           {customTitle ? (
+               // SHOW CUSTOM BRACKET TITLE (e.g., "R1 1" or "L-SEMI")
+               <span className="text-white font-bold uppercase flex items-center gap-1 bg-[#c8aa6e]/20 px-2 py-0.5 rounded border border-[#c8aa6e]/50 text-[#c8aa6e]">
+                  <GitMerge className="w-3 h-3" /> {customTitle}
+               </span>
            ) : (
-             <span className="uppercase tracking-wider font-semibold">{match.stage}</span>
+               (match.stage === Stage.PLAYOFFS || match.stage === Stage.FINALS) ? (
+                  match.bracketStage === 'losers' ? (
+                      <span className="text-gray-500 font-bold uppercase flex items-center gap-1 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">
+                         <ShieldAlert className="w-3 h-3" /> Losers
+                      </span>
+                   ) : (
+                       <span className="text-yellow-500 font-bold uppercase flex items-center gap-1 bg-yellow-900/20 px-1.5 py-0.5 rounded border border-yellow-700/50">
+                          <Crown className="w-3 h-3" /> Winners
+                       </span>
+                   )
+               ) : (
+                 <span className="uppercase tracking-wider font-semibold">{match.stage}</span>
+               )
            )}
            
            <span className="text-gray-600">|</span>

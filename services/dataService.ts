@@ -277,20 +277,60 @@ export const dataService = {
     // --- USERS & LEADERBOARD ---
     async getAllUsers(): Promise<User[]> {
         try {
-            // 1. Obtener TODOS los partidos para tener mapa de ID -> Dia/Ganador/Etapa
-            // y el Ranking Oficial del Admin para calcular puntos
-            const [matches, adminRanking] = await Promise.all([
+            // 1. Obtener datos maestros y config
+            const [matches, adminRanking, config] = await Promise.all([
                 this.getMatches(),
-                this.getAdminRanking()
+                this.getAdminRanking(),
+                this.getDaysConfig()
             ]);
             
-            // Mapa para búsqueda rápida: matchId -> { winnerId, day, stage }
-            const matchMap = new Map<string, { winnerId: string | null, day: number, stage: Stage }>();
+            const maxPlayoffRounds = config.playoffRounds || 5;
+            
+            // PRE-CALCULATION OF PLAYOFF MATCH POINTS
+            const playoffMatches = matches.filter(m => m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS)
+                                          .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+            
+            // Logic copied from PlayoffBracket.tsx to identify rounds
+            let grandFinal = playoffMatches.find(m => m.stage === Stage.FINALS);
+            let winnersMatches = playoffMatches.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
+            
+            if (!grandFinal && winnersMatches.length > 7) {
+                grandFinal = winnersMatches[winnersMatches.length - 1];
+                winnersMatches = winnersMatches.slice(0, winnersMatches.length - 1);
+            }
+            
+            const losersMatches = playoffMatches.filter(m => m.bracketStage === 'losers' && m.stage !== Stage.FINALS);
+
+            // Create a Map of MatchID -> Points Value
+            const matchPointsMap = new Map<string, number>();
+
+            // Grand Final (10 pts)
+            if (grandFinal) matchPointsMap.set(grandFinal.id, 10);
+
+            // Winners Bracket
+            winnersMatches.forEach((m, idx) => {
+                if (idx < 4) matchPointsMap.set(m.id, 3);      // R1 (Upper Round 1)
+                else if (idx < 6) matchPointsMap.set(m.id, 4); // R2 (Upper Round 2)
+                else matchPointsMap.set(m.id, 8);              // Final Winners
+            });
+
+            // Losers Bracket
+            losersMatches.forEach((m, idx) => {
+                if (idx < 2) matchPointsMap.set(m.id, 3);      // L-R1
+                else if (idx < 4) matchPointsMap.set(m.id, 4); // L-R2
+                else if (idx === 4) matchPointsMap.set(m.id, 6); // L-Semi
+                else matchPointsMap.set(m.id, 8);              // L-Final
+            });
+
+
+            // Mapa para búsqueda rápida
+            const matchMap = new Map<string, { winnerId: string | null, day: number, stage: Stage, pointsValue: number }>();
             matches.forEach(m => {
                 matchMap.set(m.id, { 
                     winnerId: m.winnerId || null, 
                     day: m.day || 0, // Fallback 0
-                    stage: m.stage 
+                    stage: m.stage,
+                    pointsValue: matchPointsMap.get(m.id) || 1 // Default to 1 for Groups, or bracket points
                 });
             });
 
@@ -304,30 +344,34 @@ export const dataService = {
                 const data = userDoc.data();
                 const userId = userDoc.id;
 
-                // A. PREDICCIONES DE PARTIDOS (MATCHDAY & PLAYOFFS)
+                // A. PREDICCIONES
                 const picksRef = doc(db, "users", userId, "picks", "winter_2026");
                 const picksSnap = await getDoc(picksRef);
                 const userPicks = picksSnap.exists() ? (picksSnap.data().list || []) : [];
 
                 const regularSeasonPointsPerDay = new Array(12).fill(0); // Index 1 to 11
-                let playoffsScore = 0;
+                const playoffPointsPerRound = new Array(maxPlayoffRounds + 1).fill(0);
+                let playoffsScoreTotal = 0;
 
                 userPicks.forEach((pick: any) => {
                     const info = matchMap.get(pick.matchId);
                     if (info && info.winnerId && pick.predictedWinnerId === info.winnerId) {
                         if (info.stage === Stage.GROUPS) {
                             if (info.day >= 1 && info.day <= 11) {
-                                regularSeasonPointsPerDay[info.day]++;
+                                regularSeasonPointsPerDay[info.day] += 1;
                             }
                         } else {
-                            playoffsScore++;
+                            // Playoffs
+                            playoffsScoreTotal += info.pointsValue;
+                            if (info.day >= 1 && info.day <= maxPlayoffRounds) {
+                                playoffPointsPerRound[info.day] += info.pointsValue;
+                            }
                         }
                     }
                 });
 
-                // B. PUNTUACIÓN DE RANKING (Calculada al vuelo)
+                // B. PUNTUACIÓN DE RANKING
                 let rankingScore = 0;
-                // Obtenemos el ranking del usuario
                 const rankingRef = doc(db, "users", userId, "picks", "winter_2026_ranking");
                 const rankingSnap = await getDoc(rankingRef);
                 const userRankingIds = rankingSnap.exists() ? rankingSnap.data().order || [] : [];
@@ -337,34 +381,44 @@ export const dataService = {
                          const adminIndex = adminRanking.indexOf(teamId);
                          if (adminIndex !== -1) {
                              const diff = Math.abs(userIndex - adminIndex);
-                             if (diff === 0) {
-                                 rankingScore += 6; // Acierto exacto
-                             } else if (diff === 1) {
-                                 rankingScore += 3; // Fallo por 1 posición
-                             }
+                             if (diff === 0) rankingScore += 6;
+                             else if (diff === 1) rankingScore += 3;
                          }
                     });
                 }
 
-                // C. CONSTRUCCIÓN DE RESULTADOS
-                
-                // Historial acumulativo J1...J11
+                // C. CONSTRUCCIÓN DE RESULTADOS (Secuencial: Regular -> Rank -> Playoffs)
                 const pointsHistory = [];
                 let cumulative = 0;
+                
+                // 1. Fase Regular (J1-J11)
                 for (let i = 1; i <= 11; i++) {
                     cumulative += regularSeasonPointsPerDay[i];
                     pointsHistory.push({ day: `J${i}`, points: cumulative });
                 }
-                pointsHistory.push({ day: 'Playoffs', points: cumulative + playoffsScore });
+
+                // 2. Ranking (Se suma después de la fase regular)
+                cumulative += rankingScore;
+                pointsHistory.push({ day: 'Rank', points: cumulative });
+
+                // 3. Playoffs (Se suman después del ranking)
+                for (let i = 1; i <= maxPlayoffRounds; i++) {
+                    cumulative += playoffPointsPerRound[i];
+                    pointsHistory.push({ day: `PO${i}`, points: cumulative });
+                }
 
                 // Breakdown de puntuaciones
                 const breakdown = data.scoreBreakdown || { crystalBall: 0, fantasy: 0 };
-                breakdown.matchday = cumulative;
-                breakdown.playoffs = playoffsScore;
-                breakdown.ranking = rankingScore; // Usar el calculado, no el de DB
+                // Calculate matchday total
+                let matchdayTotal = 0;
+                for(let i=1; i<=11; i++) matchdayTotal += regularSeasonPointsPerDay[i];
+
+                breakdown.matchday = matchdayTotal;
+                breakdown.playoffs = playoffsScoreTotal;
+                breakdown.ranking = rankingScore;
 
                 // Score Global
-                const globalScore = cumulative + playoffsScore + rankingScore;
+                const globalScore = matchdayTotal + playoffsScoreTotal + rankingScore;
 
                 // Mock Fantasy History
                 const fantasyTotal = breakdown.fantasy || 0;

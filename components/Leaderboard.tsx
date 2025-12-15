@@ -40,7 +40,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
     { id: 'fantasy', label: 'Fantasy', icon: UserPlus },
   ];
 
-  // Prepare data for MATCHDAY/GLOBAL chart
+  // Prepare data for GLOBAL chart
   const globalChartData = users[0].pointsHistory.map((h, index) => {
     const point: any = { name: h.day };
     users.forEach(user => {
@@ -158,12 +158,12 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
         </div>
       </div>
 
-      {/* Stats Chart - Moved to Matchday Tab */}
-      {activeCategory === 'matchday' && users[0]?.pointsHistory && (
+      {/* Stats Chart - Global Tab */}
+      {activeCategory === 'global' && users[0]?.pointsHistory && (
         <div className="bg-[#091428]/80 backdrop-blur-sm rounded-xl border border-gray-800 p-6 shadow-xl animate-in slide-in-from-bottom-4">
             <h3 className="text-lg font-bold text-gray-300 mb-4 flex items-center gap-2 uppercase tracking-wide">
                 <TrendingUp className="w-5 h-5 text-[#0ac8b9]" />
-                Progreso de la Temporada
+                Progreso Global
             </h3>
             <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
