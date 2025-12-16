@@ -81,6 +81,7 @@ export interface User {
   frame?: string; // New: Custom avatar frame ID
   banner?: string; // New: Custom profile banner ID
   badges?: string[]; // New: Unlocked Achievement Badges IDs
+  badgeProgress?: Record<string, { current: number, target: number }>; // New: Progress for achievements
   equippedBadges?: string[]; // New: Currently equipped badges (Max 3)
   score: number; // Global Score (Matchday + Ranking + Playoffs)
   scoreBreakdown: {

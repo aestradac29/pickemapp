@@ -51,19 +51,20 @@ export const BANNER_STYLES: Record<string, string> = {
     'default': 'bg-gradient-to-r from-[#0f1d36] to-[#0a1428]'
 };
 
-// Achievement Badges (Updated List)
+// Achievement Badges (Updated List based on User Request)
 export const BADGE_DEFINITIONS: Record<string, { label: string, icon: any, color: string, description: string }> = {
     'oracle': { label: 'Vidente', icon: Eye, color: 'text-purple-400 border-purple-500/50 bg-purple-900/20', description: 'Acertar 6/6 partidos en una jornada.' },
-    'mvp_fantasy': { label: 'Manager MVP', icon: Crown, color: 'text-yellow-400 border-yellow-500/50 bg-yellow-900/20', description: 'Obtener la mejor puntuación Fantasy de la semana.' },
-    'on_fire': { label: 'En Racha', icon: Flame, color: 'text-red-400 border-red-500/50 bg-red-900/20', description: '3 jornadas seguidas subiendo puntos.' },
-    'veteran': { label: 'Veterano', icon: Trophy, color: 'text-gray-300 border-gray-500/50 bg-gray-800/50', description: 'Alcanzar 100 puntos totales.' },
-    'lucky': { label: 'Suertudo', icon: Sparkles, color: 'text-green-400 border-green-500/50 bg-green-900/20', description: 'Ganar una jornada por solo 1 punto de diferencia.' },
-    'pro': { label: 'Pro', icon: Zap, color: 'text-blue-400 border-blue-500/50 bg-blue-900/20', description: 'Alcanzar el Top 1% Global.' },
+    'mvp_fantasy': { label: 'Manager MVP', icon: Crown, color: 'text-yellow-400 border-yellow-500/50 bg-yellow-900/20', description: 'Obtener la mejor puntuación Fantasy de la liga actual.' },
     
-    // Nuevos
+    // UPDATED BADGES
+    'on_fire': { label: 'En Racha', icon: Flame, color: 'text-red-400 border-red-500/50 bg-red-900/20', description: '3 jornadas seguidas acertando 5 o más partidos.' },
+    'confidence': { label: 'Confianza', icon: Sparkles, color: 'text-green-400 border-green-500/50 bg-green-900/20', description: 'Acierta el resultado de un partido en el que acierte un 10% de usuarios o menos.' }, 
+    'pro': { label: 'Pro', icon: Zap, color: 'text-blue-400 border-blue-500/50 bg-blue-900/20', description: 'Mantener el Top 1 en la clasificación durante 4 jornadas consecutivas.' },
+    'underdog': { label: 'Underdog', icon: Shield, color: 'text-orange-400 border-orange-500/50 bg-orange-900/20', description: 'Acierta tú solo una posición del ranking.' },
+    'on_the_limit': { label: 'Al Límite', icon: Clock, color: 'text-cyan-400 border-cyan-500/50 bg-cyan-900/20', description: 'Enviar predicciones 1h antes del cierre.' },
+
+    'veteran': { label: 'Veterano', icon: Trophy, color: 'text-gray-300 border-gray-500/50 bg-gray-800/50', description: 'Alcanzar 100 puntos totales.' },
     'strategist': { label: 'Estratega', icon: Map, color: 'text-emerald-400 border-emerald-500/50 bg-emerald-900/20', description: 'Acertar el orden exacto del Top 3 en el Ranking.' },
-    'underdog': { label: 'Underdog', icon: Shield, color: 'text-orange-400 border-orange-500/50 bg-orange-900/20', description: 'Ganar una apuesta contra el favorito de la IA.' },
-    'early_bird': { label: 'Madrugador', icon: Clock, color: 'text-cyan-400 border-cyan-500/50 bg-cyan-900/20', description: 'Enviar predicciones 24h antes del cierre.' },
     'collector': { label: 'Coleccionista', icon: Gem, color: 'text-pink-400 border-pink-500/50 bg-pink-900/20', description: 'Desbloquear 10 recompensas cosméticas.' },
     'social': { label: 'Social', icon: Share2, color: 'text-indigo-400 border-indigo-500/50 bg-indigo-900/20', description: 'Compartir tu perfil 5 veces.' },
     'analyst': { label: 'Analista', icon: Target, color: 'text-teal-400 border-teal-500/50 bg-teal-900/20', description: 'Acertar al MVP en la Bola de Cristal.' }

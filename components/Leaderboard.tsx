@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useMemo } from 'react';
 import { User } from '../types';
 import { Trophy, Medal, TrendingUp, Swords, ListOrdered, Sparkles, UserPlus, Globe } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, Tooltip, CartesianGrid } from 'recharts';
@@ -24,12 +25,65 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
 
   // Helper to get score based on active category
   const getScore = (user: User) => {
-    if (activeCategory === 'global') return user.score; // Already calculated in service (Matchday + Ranking + Playoffs)
+    if (activeCategory === 'global') return user.score; 
     return user.scoreBreakdown[activeCategory];
   };
 
-  // Sort users based on selected category score
-  const sortedUsers = [...users].sort((a, b) => getScore(b) - getScore(a));
+  // Sort users dynamically based on active category & specific tie-breaker rules
+  const sortedUsers = useMemo(() => {
+      return [...users].sort((a, b) => {
+          const scoreA = getScore(a);
+          const scoreB = getScore(b);
+
+          if (scoreA !== scoreB) {
+              return scoreB - scoreA;
+          }
+
+          // Global Tie-Breaker: Most correct matchday picks
+          if (activeCategory === 'global') {
+              return b.scoreBreakdown.matchday - a.scoreBreakdown.matchday;
+          }
+
+          // Other categories: No secondary sort (shared position)
+          return 0;
+      });
+  }, [users, activeCategory]);
+
+  // Calculate Ranks with Logic:
+  // - Shared Position (1, 1, 3...) for all ties.
+  // - Global specifically requires BOTH total score AND matchday score to match for a tie.
+  const ranks = useMemo(() => {
+      const r = new Array(sortedUsers.length).fill(0);
+      let currentRank = 1;
+      
+      for (let i = 0; i < sortedUsers.length; i++) {
+          if (i > 0) {
+              const prev = sortedUsers[i-1];
+              const curr = sortedUsers[i];
+              let isTie = false;
+
+              const scorePrev = getScore(prev);
+              const scoreCurr = getScore(curr);
+
+              if (activeCategory === 'global') {
+                  // For Global, strictly tied only if secondary stat matches too
+                  isTie = scorePrev === scoreCurr && prev.scoreBreakdown.matchday === curr.scoreBreakdown.matchday;
+              } else {
+                  // For others, tie if main score matches
+                  isTie = scorePrev === scoreCurr;
+              }
+
+              if (isTie) {
+                  r[i] = r[i-1]; // Share rank
+              } else {
+                  r[i] = i + 1; // Actual position (skip numbers)
+              }
+          } else {
+              r[i] = 1;
+          }
+      }
+      return r;
+  }, [sortedUsers, activeCategory]);
 
   // Tabs configuration
   const tabs: { id: LeaderboardCategory; label: string; icon: React.ElementType }[] = [
@@ -94,12 +148,12 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
       {/* Info Banner for Separation */}
       {activeCategory === 'global' && (
           <div className="text-center text-xs text-gray-400 bg-blue-900/10 border border-blue-900/30 p-2 rounded-lg">
-              Puntuación Global = Jornadas + Ranking + Playoffs
+              Puntuación Global = Jornadas + Ranking + Playoffs (Desempate: Aciertos Jornada)
           </div>
       )}
       {(activeCategory === 'fantasy' || activeCategory === 'crystalBall') && (
           <div className="text-center text-xs text-[#c8aa6e] bg-[#c8aa6e]/10 border border-[#c8aa6e]/30 p-2 rounded-lg">
-              Competición Independiente (No suma al Global)
+              Competición Independiente (Posición compartida en empates)
           </div>
       )}
 
@@ -112,20 +166,22 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
         
         <div className="space-y-3">
           {sortedUsers.map((user, idx) => {
+            const rank = ranks[idx]; // Use pre-calculated rank
+
             // --- VISUAL STYLING LOGIC ---
             
             // 1. BANNER: Priority to User Banner, else Rank 1 Special, else Default
             const userBanner = user.banner && BANNER_STYLES[user.banner] ? BANNER_STYLES[user.banner] : null;
             const rowClass = userBanner 
                 ? `${userBanner} border-gray-600 shadow-md` 
-                : idx === 0 
+                : rank === 1 
                     ? 'bg-gradient-to-r from-[#c8aa6e]/20 to-transparent border-[#c8aa6e]/50 shadow-[0_0_10px_rgba(200,170,110,0.1)]' 
                     : 'bg-[#0f1d36] border-gray-800 hover:border-gray-600';
 
             // 2. FRAME: Priority to User Frame, else Rank 1 Special, else Default Border
             const userFrame = user.frame && FRAME_STYLES[user.frame] ? FRAME_STYLES[user.frame] : null;
             // Simplify frame styles for smaller list items if needed, or use as is
-            const frameClass = userFrame || (idx === 0 ? 'border-[#c8aa6e] shadow-[0_0_10px_rgba(200,170,110,0.3)]' : 'border-gray-600');
+            const frameClass = userFrame || (rank === 1 ? 'border-[#c8aa6e] shadow-[0_0_10px_rgba(200,170,110,0.3)]' : 'border-gray-600');
 
             // 3. BADGES: Only show EQUIPPED badges. No auto-fallback.
             const badgesToShow = user.equippedBadges || [];
@@ -163,10 +219,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
 
                 <div className="flex items-center gap-4 relative z-10">
                     <div className="w-8 flex justify-center font-bold text-xl">
-                    {idx === 0 ? <span className="text-yellow-400 drop-shadow-lg">1º</span> : 
-                    idx === 1 ? <span className="text-gray-300 drop-shadow-md">2º</span> :
-                    idx === 2 ? <span className="text-amber-700 drop-shadow-md">3º</span> :
-                    <span className="text-gray-600">{idx + 1}º</span>}
+                    {rank === 1 ? <span className="text-yellow-400 drop-shadow-lg">1º</span> : 
+                    rank === 2 ? <span className="text-gray-300 drop-shadow-md">2º</span> :
+                    rank === 3 ? <span className="text-amber-700 drop-shadow-md">3º</span> :
+                    <span className="text-gray-600">{rank}º</span>}
                     </div>
                     
                     <div className="relative">
@@ -177,7 +233,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                                 className="w-full h-full object-cover" 
                             />
                         </div>
-                        {idx === 0 && (
+                        {rank === 1 && (
                             <div className="absolute -top-2 -right-1 bg-[#c8aa6e] rounded-full p-0.5 border border-[#0a1428] z-20">
                                 <Trophy className="w-3 h-3 text-[#0a1428]" />
                             </div>
@@ -186,7 +242,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                     
                     <div>
                         <div className="flex items-center gap-2">
-                            <p className={`font-bold text-lg drop-shadow-md ${userBanner ? 'text-white' : idx === 0 ? 'text-[#c8aa6e]' : 'text-gray-200'}`}>
+                            <p className={`font-bold text-lg drop-shadow-md ${userBanner ? 'text-white' : rank === 1 ? 'text-[#c8aa6e]' : 'text-gray-200'}`}>
                                 {user.name}
                             </p>
                             {badgesToShow.map(b => {
@@ -207,11 +263,18 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                                 <span>{activeCategory === 'fantasy' ? 'Manager' : 'Aspirante'}</span>
                             )}
                         </p>
+                        
+                        {/* Show Matchday hits in Global tab to explain tie-breaker */}
+                        {activeCategory === 'global' && (
+                            <p className="text-[9px] text-gray-500/80 uppercase tracking-tight">
+                                Jornadas acertadas: {user.scoreBreakdown.matchday}
+                            </p>
+                        )}
                     </div>
                 </div>
                 
                 <div className="text-right relative z-10">
-                    <p className={`text-2xl font-bold leading-none drop-shadow-md ${userBanner ? 'text-white' : idx === 0 ? 'text-white' : 'text-gray-300'}`}>
+                    <p className={`text-2xl font-bold leading-none drop-shadow-md ${userBanner ? 'text-white' : rank === 1 ? 'text-white' : 'text-gray-300'}`}>
                         {getScore(user)}
                     </p>
                     <p className={`text-[10px] uppercase font-bold tracking-wider mt-1 ${userBanner ? 'text-gray-400' : 'text-gray-500'}`}>Puntos</p>

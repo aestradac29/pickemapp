@@ -1,3 +1,4 @@
+
 import { Team, Player, Match, Role, Stage, User } from '../types';
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay } from '../constants';
 import { db } from '../lib/firebase';
@@ -325,8 +326,8 @@ export const dataService = {
             const q = query(usersRef, orderBy("username"), limit(50));
             const snapshot = await getDocs(q);
 
-            // 3. Procesar usuarios
-            const userPromises = snapshot.docs.map(async (userDoc) => {
+            // PHASE 1: Pre-calculate raw scores for everyone
+            const processedUsers = await Promise.all(snapshot.docs.map(async (userDoc) => {
                 const data = userDoc.data();
                 const userId = userDoc.id;
 
@@ -403,7 +404,50 @@ export const dataService = {
                     });
                 }
 
-                // D. CONSTRUCCIÓN DE RESULTADOS
+                return {
+                    id: userId,
+                    data,
+                    regularSeasonPointsPerDay,
+                    playoffPointsPerRound,
+                    playoffsScoreTotal,
+                    rankingScore,
+                    crystalBallScore,
+                    userRankingIds,
+                    userCrystalBall
+                };
+            }));
+
+            // PHASE 2: Determine Historical Ranking Leaders (For Pro Badge Streak)
+            // We calculate the cumulative score for each day (1-11) for all users
+            // and identify who was Rank 1 (highest score) at the end of each day.
+            const dailyLeaders = new Array(12).fill(null).map(() => new Set<string>()); // index 1-11 used
+            
+            for (let day = 1; day <= 11; day++) {
+                // Calculate cumulative score up to this day for everyone
+                const dayScores = processedUsers.map(u => {
+                    let sum = 0;
+                    // Sum matchday points up to current day loop
+                    for(let d = 1; d <= day; d++) sum += u.regularSeasonPointsPerDay[d];
+                    return { id: u.id, score: sum };
+                });
+
+                const maxScore = Math.max(...dayScores.map(s => s.score));
+                
+                // If there is a valid score > 0, find leaders
+                if (maxScore > 0) {
+                    dayScores.filter(s => s.score === maxScore).forEach(s => dailyLeaders[day].add(s.id));
+                }
+            }
+
+            // PHASE 3: Construct Final User Objects with Badges
+            const users: User[] = processedUsers.map((u) => {
+                const { 
+                    id, data, regularSeasonPointsPerDay, playoffPointsPerRound, 
+                    playoffsScoreTotal, rankingScore, crystalBallScore, 
+                    userRankingIds, userCrystalBall 
+                } = u;
+
+                // Construct History
                 const pointsHistory = [];
                 let cumulative = 0;
                 for (let i = 1; i <= 11; i++) {
@@ -411,7 +455,6 @@ export const dataService = {
                     pointsHistory.push({ day: `J${i}`, points: cumulative });
                 }
                 
-                // Sumar Ranking + Crystal Ball al histórico "post-regular" si están disponibles
                 let midSeasonBoost = rankingScore + crystalBallScore;
                 if (midSeasonBoost > 0) {
                     cumulative += midSeasonBoost;
@@ -430,7 +473,7 @@ export const dataService = {
                 breakdown.matchday = matchdayTotal;
                 breakdown.playoffs = playoffsScoreTotal;
                 breakdown.ranking = rankingScore;
-                breakdown.crystalBall = crystalBallScore; // Actualizar con valor calculado
+                breakdown.crystalBall = crystalBallScore;
 
                 const globalScore = matchdayTotal + playoffsScoreTotal + rankingScore + crystalBallScore;
 
@@ -444,25 +487,79 @@ export const dataService = {
 
                 // BADGES LOGIC
                 const badges: string[] = [];
-                if (globalScore > 100) badges.push('veteran');
-                if (regularSeasonPointsPerDay.some(p => p >= 6)) badges.push('oracle');
-                if (fantasyTotal > 80) badges.push('mvp_fantasy');
-                // Simulate "On Fire"
-                const len = pointsHistory.length;
-                if (len > 3 && pointsHistory[len-1].points > pointsHistory[len-2].points) badges.push('on_fire');
+                const badgeProgress: Record<string, { current: number, target: number }> = {};
 
-                // Determine equipped badges (Use saved ONLY)
+                // 1. Veteran
+                if (globalScore > 100) badges.push('veteran');
+                badgeProgress['veteran'] = { current: globalScore, target: 100 };
+
+                // 2. Oracle
+                const maxDailyHits = Math.max(...regularSeasonPointsPerDay);
+                if (maxDailyHits >= 6) badges.push('oracle');
+                badgeProgress['oracle'] = { current: maxDailyHits, target: 6 };
+
+                // 3. Strategist
+                let correctRankingCount = 0;
+                if (adminRanking.length >= 3 && userRankingIds.length >= 3) {
+                    if (adminRanking[0] === userRankingIds[0]) correctRankingCount++;
+                    if (adminRanking[1] === userRankingIds[1]) correctRankingCount++;
+                    if (adminRanking[2] === userRankingIds[2]) correctRankingCount++;
+                }
+                if (correctRankingCount === 3) badges.push('strategist');
+                badgeProgress['strategist'] = { current: correctRankingCount, target: 3 };
+
+                // 4. Analyst
+                const hasCorrectMVP = adminCrystalBall?.mvp && userCrystalBall?.mvp === adminCrystalBall.mvp;
+                if (hasCorrectMVP) badges.push('analyst');
+                badgeProgress['analyst'] = { current: hasCorrectMVP ? 1 : 0, target: 1 };
+
+                // 5. On Fire
+                let consecutiveHighScores = 0;
+                let maxConsecutive = 0;
+                for (let i = 1; i <= 11; i++) {
+                    if (regularSeasonPointsPerDay[i] >= 5) {
+                        consecutiveHighScores++;
+                    } else {
+                        consecutiveHighScores = 0;
+                    }
+                    if (consecutiveHighScores > maxConsecutive) maxConsecutive = consecutiveHighScores;
+                }
+                if (maxConsecutive >= 3) badges.push('on_fire');
+                badgeProgress['on_fire'] = { current: maxConsecutive, target: 3 };
+
+                // 6. Collector
+                const level = Math.floor(globalScore / 50) + 1;
+                const unlockedRewards = level; 
+                if (unlockedRewards >= 10) badges.push('collector');
+                badgeProgress['collector'] = { current: unlockedRewards, target: 10 };
+
+                // 7. Pro (Consecutive Rank 1 Logic)
+                let maxStreak = 0;
+                let currentStreak = 0;
+                // Check streaks in days 1-11
+                for (let d = 1; d <= 11; d++) {
+                    if (dailyLeaders[d].has(id)) {
+                        currentStreak++;
+                    } else {
+                        currentStreak = 0;
+                    }
+                    if (currentStreak > maxStreak) maxStreak = currentStreak;
+                }
+                if (maxStreak >= 4) badges.push('pro');
+                badgeProgress['pro'] = { current: maxStreak, target: 4 };
+
                 let equippedBadges = data.equippedBadges || [];
 
                 return {
-                    id: userId,
+                    id: id,
                     name: data.username || 'Invocador',
                     avatar: data.avatar_url || `https://ui-avatars.com/api/?name=${data.username || 'User'}&background=random`,
                     title: data.title || '',
                     frame: data.frame || '', 
                     banner: data.banner || '', 
-                    badges: badges, 
-                    equippedBadges: equippedBadges, // Ensure field exists
+                    badges: badges,
+                    badgeProgress: badgeProgress,
+                    equippedBadges: equippedBadges,
                     score: globalScore,
                     scoreBreakdown: breakdown,
                     rank: 0, 
@@ -470,14 +567,41 @@ export const dataService = {
                     fantasyHistory: fantasyHistory
                 };
             });
-
-            const users = await Promise.all(userPromises);
-            const sortedUsers = users.sort((a, b) => b.score - a.score);
             
-            // Assign Ranks and Rank-based badges
+            // --- POST-PROCESSING SORT & RELATIVE BADGES ---
+
+            // A. Sort by Score
+            const sortedUsers = users.sort((a, b) => {
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+                return b.scoreBreakdown.matchday - a.scoreBreakdown.matchday;
+            });
+            
+            // B. Calculate Max Fantasy in League for MVP Badge
+            const maxFantasyScore = Math.max(...sortedUsers.map(u => u.scoreBreakdown.fantasy));
+
+            // C. Assign Ranks & Finalize Badges
+            let currentRank = 1;
             sortedUsers.forEach((u, i) => {
-                u.rank = i + 1;
-                if (i === 0) u.badges?.push('pro'); // Rank 1 gets 'pro'
+                if (i > 0) {
+                    const prev = sortedUsers[i-1];
+                    const isTied = prev.score === u.score && prev.scoreBreakdown.matchday === u.scoreBreakdown.matchday;
+                    if (isTied) {
+                        // Share rank (keep currentRank)
+                    } else {
+                        currentRank = i + 1;
+                    }
+                } else {
+                    currentRank = 1;
+                }
+                
+                u.rank = currentRank;
+
+                // BADGE: MANAGER MVP (Highest Fantasy Score & > 0)
+                if (u.scoreBreakdown.fantasy === maxFantasyScore && maxFantasyScore > 0) {
+                    u.badges?.push('mvp_fantasy');
+                }
             });
             
             return sortedUsers;

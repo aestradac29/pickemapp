@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User } from '../types';
 import { dataService } from '../services/dataService';
@@ -627,7 +628,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                 <StatCard icon={UserIcon} label="Fantasy" value={user.scoreBreakdown.fantasy} type="cyan" />
             </div>
 
-            {/* REWARDS TRACK (SENDA DE LEYENDA - REDESIGNED) */}
+            {/* REWARDS TRACK */}
             <div className="bg-[#091428] rounded-xl border border-gray-800 overflow-hidden mb-8 relative">
                 {/* Background Pattern */}
                 <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1e293b 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
@@ -795,6 +796,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                         const isEquipped = user.equippedBadges?.includes(id);
                         const Icon = def.icon;
                         
+                        // Badge Progress Logic
+                        const progress = user.badgeProgress?.[id];
+                        const showProgress = !isUnlocked && progress && progress.target > 0;
+                        const progressPct = showProgress ? Math.min((progress.current / progress.target) * 100, 100) : 0;
+
                         // Extract base color class for styling locked state
                         const baseColor = def.color.split(' ')[0]; // e.g., 'text-purple-400'
 
@@ -804,26 +810,42 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                 onClick={() => isUnlocked && toggleBadgeEquip(id)}
                                 disabled={!isUnlocked}
                                 className={`
-                                    flex items-start gap-3 p-3 rounded-xl border transition-all relative overflow-hidden group text-left h-full
+                                    flex flex-col gap-2 p-3 rounded-xl border transition-all relative overflow-hidden group text-left h-full
                                     ${isEquipped 
                                         ? `bg-[#0f1d36] border-[#c8aa6e] ring-1 ring-[#c8aa6e]/50 shadow-[0_0_15px_rgba(200,170,110,0.15)]` 
                                         : isUnlocked 
                                             ? `bg-[#0f1d36] border-gray-700 hover:border-gray-500 hover:bg-[#1a2c4e]` 
-                                            : 'bg-[#050a14] border-gray-800 opacity-60 grayscale cursor-not-allowed'
+                                            : 'bg-[#050a14] border-gray-800 opacity-70 grayscale-[0.8] cursor-not-allowed'
                                     }
                                 `}
                             >
-                                <div className={`p-2 rounded-full border flex-shrink-0 transition-transform mt-0.5 ${isUnlocked ? 'bg-black/40 border-white/10 group-hover:scale-110' : 'bg-gray-900 border-gray-700'}`}>
-                                    <Icon className={`w-5 h-5 ${isUnlocked ? (isEquipped ? 'text-[#c8aa6e]' : baseColor) : 'text-gray-500'}`} />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className={`text-xs font-bold uppercase tracking-wider mb-1 leading-tight ${isEquipped ? 'text-[#c8aa6e]' : isUnlocked ? 'text-white' : 'text-gray-500'}`}>
-                                        {def.label}
+                                <div className="flex items-start gap-3 w-full">
+                                    <div className={`p-2 rounded-full border flex-shrink-0 transition-transform mt-0.5 ${isUnlocked ? 'bg-black/40 border-white/10 group-hover:scale-110' : 'bg-gray-900 border-gray-700'}`}>
+                                        <Icon className={`w-5 h-5 ${isUnlocked ? (isEquipped ? 'text-[#c8aa6e]' : baseColor) : 'text-gray-500'}`} />
                                     </div>
-                                    <div className="text-[10px] text-gray-500 leading-snug">
-                                        {def.description}
+                                    <div className="min-w-0 flex-1">
+                                        <div className={`text-xs font-bold uppercase tracking-wider mb-1 leading-tight ${isEquipped ? 'text-[#c8aa6e]' : isUnlocked ? 'text-white' : 'text-gray-500'}`}>
+                                            {def.label}
+                                        </div>
+                                        <div className="text-[10px] text-gray-500 leading-snug">
+                                            {def.description}
+                                        </div>
                                     </div>
                                 </div>
+
+                                {/* Progress Bar for Locked Badges */}
+                                {showProgress && (
+                                    <div className="w-full mt-2">
+                                        <div className="flex justify-between items-center text-[9px] text-gray-500 font-bold mb-1 uppercase tracking-wider">
+                                            <span>Progreso</span>
+                                            <span>{progress.current} / {progress.target}</span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                                            <div className="h-full bg-gray-500 transition-all duration-500" style={{ width: `${progressPct}%` }}></div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {isEquipped && (
                                     <div className="absolute top-2 right-2 flex items-center gap-1">
                                         <span className="text-[8px] font-bold uppercase bg-[#c8aa6e] text-[#0a1428] px-1.5 py-0.5 rounded">Equipado</span>
