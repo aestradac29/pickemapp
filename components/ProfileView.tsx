@@ -442,7 +442,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
             {showShareModal && user && <ShareModal user={user} onClose={() => setShowShareModal(false)} />}
 
             {/* Header / Identity with Dynamic Banner */}
-            <div className="relative z-[60] mb-8 rounded-2xl border border-gray-700 shadow-[0_0_30px_rgba(0,0,0,0.3)] transition-all duration-500">
+            <div className="relative z-[30] mb-8 rounded-2xl border border-gray-700 shadow-[0_0_30px_rgba(0,0,0,0.3)] transition-all duration-500">
                 <div className={`absolute inset-0 rounded-2xl overflow-hidden ${currentBannerClass} transition-all duration-500`}>
                     <div className="absolute top-0 left-0 w-full h-full bg-black/20"></div>
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#c8aa6e] to-transparent opacity-50"></div>
@@ -804,7 +804,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                 onClick={() => isUnlocked && toggleBadgeEquip(id)}
                                 disabled={!isUnlocked}
                                 className={`
-                                    flex items-center gap-3 p-3 rounded-xl border transition-all relative overflow-hidden group text-left
+                                    flex items-start gap-3 p-3 rounded-xl border transition-all relative overflow-hidden group text-left h-full
                                     ${isEquipped 
                                         ? `bg-[#0f1d36] border-[#c8aa6e] ring-1 ring-[#c8aa6e]/50 shadow-[0_0_15px_rgba(200,170,110,0.15)]` 
                                         : isUnlocked 
@@ -813,14 +813,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                     }
                                 `}
                             >
-                                <div className={`p-2 rounded-full border flex-shrink-0 transition-transform ${isUnlocked ? 'bg-black/40 border-white/10 group-hover:scale-110' : 'bg-gray-900 border-gray-700'}`}>
+                                <div className={`p-2 rounded-full border flex-shrink-0 transition-transform mt-0.5 ${isUnlocked ? 'bg-black/40 border-white/10 group-hover:scale-110' : 'bg-gray-900 border-gray-700'}`}>
                                     <Icon className={`w-5 h-5 ${isUnlocked ? (isEquipped ? 'text-[#c8aa6e]' : baseColor) : 'text-gray-500'}`} />
                                 </div>
-                                <div className="min-w-0">
-                                    <div className={`text-xs font-bold uppercase tracking-wider mb-0.5 truncate ${isEquipped ? 'text-[#c8aa6e]' : isUnlocked ? 'text-white' : 'text-gray-500'}`}>
+                                <div className="min-w-0 flex-1">
+                                    <div className={`text-xs font-bold uppercase tracking-wider mb-1 leading-tight ${isEquipped ? 'text-[#c8aa6e]' : isUnlocked ? 'text-white' : 'text-gray-500'}`}>
                                         {def.label}
                                     </div>
-                                    <div className="text-[10px] text-gray-500 leading-tight line-clamp-2">
+                                    <div className="text-[10px] text-gray-500 leading-snug">
                                         {def.description}
                                     </div>
                                 </div>
