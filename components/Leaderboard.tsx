@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { User } from '../types';
 import { Trophy, Medal, TrendingUp, Swords, ListOrdered, Sparkles, UserPlus, Globe } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, Tooltip, CartesianGrid } from 'recharts';
-import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS } from '../constants';
+import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS, WHITE_LOGO_TEAMS } from '../constants';
 
 interface LeaderboardProps {
   users: User[];
@@ -131,6 +130,18 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
             // 3. BADGES: Only show EQUIPPED badges. No auto-fallback.
             const badgesToShow = user.equippedBadges || [];
 
+            // 4. LOGO LOGIC
+            let bannerTeamLogo: string | undefined;
+            let isWhiteLogo = false;
+            if (user.banner && user.banner.startsWith('banner_')) {
+                const teamId = user.banner.replace('banner_', '');
+                const team = Object.values(TEAMS).find(t => t.id === teamId);
+                if (team) {
+                    bannerTeamLogo = team.logo;
+                    isWhiteLogo = WHITE_LOGO_TEAMS.includes(team.id);
+                }
+            }
+
             return (
                 <div 
                 key={user.id}
@@ -138,6 +149,17 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                 >
                 {/* Banner Overlay for consistency (darken slightly) */}
                 {userBanner && <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>}
+                
+                {/* Team Logo Watermark - Position Adjusted to Left of Score */}
+                {bannerTeamLogo && (
+                    <div className="absolute right-16 top-1/2 -translate-y-1/2 opacity-25 pointer-events-none transform rotate-12 scale-150">
+                        <img 
+                            src={bannerTeamLogo} 
+                            alt="" 
+                            className={`w-24 h-24 object-contain ${isWhiteLogo ? 'brightness-0 invert' : ''}`} 
+                        />
+                    </div>
+                )}
 
                 <div className="flex items-center gap-4 relative z-10">
                     <div className="w-8 flex justify-center font-bold text-xl">

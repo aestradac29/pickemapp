@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Search, Check } from 'lucide-react';
 
@@ -136,7 +137,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
       {/* Dropdown Menu */}
       {isOpen && !disabled && (
-        <div className="absolute z-50 mt-2 min-w-[300px] w-full max-w-[90vw] -left-2 sm:left-0 bg-[#091428] border border-gray-600 rounded-lg shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95 origin-top">
+        <div className="absolute z-[100] mt-2 min-w-[300px] w-full max-w-[90vw] -left-2 sm:left-0 bg-[#0f1923] border border-gray-600 rounded-lg shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95 origin-top">
           {/* Search Input */}
           <div className="p-3 border-b border-gray-700 bg-[#0f1d36]">
             <div className="relative">

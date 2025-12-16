@@ -24,14 +24,29 @@ export const FRAME_STYLES: Record<string, string> = {
 
 // Updated Banners with Animation Classes (defined in index.html)
 export const BANNER_STYLES: Record<string, string> = {
+    // --- TEAM BANNERS (12 Teams) ---
+    'banner_g2': 'bg-gradient-to-r from-gray-950 via-black to-gray-800 border-t-2 border-white/10',
+    'banner_fnc': 'bg-gradient-to-r from-orange-950 via-[#1a1005] to-orange-900 border-t-2 border-orange-500/20',
+    'banner_mkoi': 'bg-gradient-to-r from-purple-950 via-[#1a052e] to-violet-900 border-t-2 border-purple-500/20',
+    'banner_th': 'bg-gradient-to-r from-[#2a2415] via-[#1a1810] to-[#3d3420] border-t-2 border-[#c4a673]/20',
+    'banner_kc': 'bg-gradient-to-r from-[#0a1a35] via-[#050c1a] to-[#10274e] border-t-2 border-blue-500/20',
+    'banner_gx': 'bg-gradient-to-r from-[#2b0008] via-black to-[#4a0010] border-t-2 border-red-500/20',
+    'banner_vit': 'bg-gradient-to-r from-[#2b2900] via-black to-[#3d3a00] border-t-2 border-yellow-400/20',
+    'banner_sk': 'bg-gradient-to-r from-slate-900 via-black to-slate-800 border-t-2 border-slate-500/20',
+    'banner_shf': 'bg-gradient-to-r from-teal-950 via-[#0f172a] to-indigo-900 border-t-2 border-teal-500/20', // Shifters style
+    'banner_rat': 'bg-gradient-to-r from-gray-800 via-stone-900 to-gray-900 border-t-2 border-gray-500/20',
+    'banner_nvi': 'bg-gradient-to-r from-yellow-950/50 via-black to-yellow-900/50 border-t-2 border-yellow-400/20',
+    'banner_kcb': 'bg-gradient-to-r from-blue-900/50 via-[#0a1428] to-blue-800/50 border-t-2 border-blue-400/20',
+
+    // --- REGION/LORE BANNERS ---
     'banner_freljord': 'bg-gradient-to-r from-cyan-900 via-blue-800 to-slate-900 animate-pulse-slow',
-    'banner_bilgewater': 'bg-gradient-to-r from-teal-950 via-red-900 to-amber-900', // New
+    'banner_bilgewater': 'bg-gradient-to-r from-teal-950 via-red-900 to-amber-900', 
     'banner_zaun': 'bg-gradient-to-r from-emerald-900 via-teal-800 to-gray-900 bg-[length:200%_200%] animate-gradient-x',
-    'banner_ionia': 'bg-gradient-to-r from-rose-900 via-fuchsia-900 to-teal-900 animate-float', // New
+    'banner_ionia': 'bg-gradient-to-r from-rose-900 via-fuchsia-900 to-teal-900 animate-float', 
     'banner_shurima': 'bg-gradient-to-r from-amber-900 via-yellow-700 to-stone-900',
-    'banner_shadow_isles': 'bg-gradient-to-r from-green-950 via-gray-900 to-emerald-950 animate-pulse-slow', // New
+    'banner_shadow_isles': 'bg-gradient-to-r from-green-950 via-gray-900 to-emerald-950 animate-pulse-slow', 
     'banner_noxus': 'bg-gradient-to-r from-red-950 via-rose-900 to-slate-900 animate-pulse-slow',
-    'banner_targon': 'bg-gradient-to-r from-indigo-900 via-purple-800 to-blue-900 bg-[length:200%_200%] animate-gradient-x', // New
+    'banner_targon': 'bg-gradient-to-r from-indigo-900 via-purple-800 to-blue-900 bg-[length:200%_200%] animate-gradient-x', 
     'banner_void': 'bg-gradient-to-r from-violet-950 via-fuchsia-900 to-indigo-950 bg-[length:200%_200%] animate-gradient-x',
     'default': 'bg-gradient-to-r from-[#0f1d36] to-[#0a1428]'
 };
@@ -136,13 +151,13 @@ export const TEAMS: Record<string, Team> = {
     color: '#000000',
     logo: getLogo('SK_Gaminglogo_square.png')
   },
-  bds: { 
-    id: 'bds', 
-    name: 'Team BDS', 
-    shortName: 'BDS', 
+  shf: { 
+    id: 'shf', 
+    name: 'Shifters', 
+    shortName: 'SHF', 
     region: Region.LEC, 
-    color: '#ff0055',
-    logo: getLogo('Team_BDSlogo_square.png')
+    color: '#06b6d4', // Cyan
+    logo: getLogo('Shifterslogo_square.png') // Wiki file guess
   },
   th: { 
     id: 'th', 
@@ -200,12 +215,12 @@ export const PLAYERS: Player[] = [
   { id: 'kc-adc', name: "Caliste", role: Role.ADC, teamId: "kc", cost: 330, averagePoints: 21.0, kda: 4.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1716551820695_SK_Rahel.png" }, // Using placeholder or generic
   { id: 'kc-sup', name: "Targamas", role: Role.SUPPORT, teamId: "kc", cost: 260, averagePoints: 13.5, kda: 2.6, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705663456345_KC_Targamas.png" },
 
-  // --- Team BDS (Consistent Performers) ---
-  { id: 'bds-top', name: "Adam", role: Role.TOP, teamId: "bds", cost: 310, averagePoints: 17.5, kda: 3.1, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867625121_Adam_BDS_23.png" },
-  { id: 'bds-jng', name: "Sheo", role: Role.JUNGLE, teamId: "bds", cost: 280, averagePoints: 15.5, kda: 3.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867674681_Sheo_BDS_23.png" },
-  { id: 'bds-mid', name: "nuc", role: Role.MID, teamId: "bds", cost: 290, averagePoints: 16.2, kda: 3.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867653556_Nuc_BDS_23.png" },
-  { id: 'bds-adc', name: "Ice", role: Role.ADC, teamId: "bds", cost: 300, averagePoints: 17.8, kda: 4.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705662709214_BDS_Ice.png" },
-  { id: 'bds-sup', name: "Labrov", role: Role.SUPPORT, teamId: "bds", cost: 295, averagePoints: 16.5, kda: 3.6, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867639572_Labrov_BDS_23.png" },
+  // --- Shifters (Renamed from BDS) ---
+  { id: 'shf-top', name: "Adam", role: Role.TOP, teamId: "shf", cost: 310, averagePoints: 17.5, kda: 3.1, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867625121_Adam_BDS_23.png" },
+  { id: 'shf-jng', name: "Sheo", role: Role.JUNGLE, teamId: "shf", cost: 280, averagePoints: 15.5, kda: 3.5, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867674681_Sheo_BDS_23.png" },
+  { id: 'shf-mid', name: "nuc", role: Role.MID, teamId: "shf", cost: 290, averagePoints: 16.2, kda: 3.8, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867653556_Nuc_BDS_23.png" },
+  { id: 'shf-adc', name: "Ice", role: Role.ADC, teamId: "shf", cost: 300, averagePoints: 17.8, kda: 4.2, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1705662709214_BDS_Ice.png" },
+  { id: 'shf-sup', name: "Labrov", role: Role.SUPPORT, teamId: "shf", cost: 295, averagePoints: 16.5, kda: 3.6, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675867639572_Labrov_BDS_23.png" },
 
   // --- SK Gaming (Budget Warriors) ---
   { id: 'sk-top', name: "Irrelevant", role: Role.TOP, teamId: "sk", cost: 300, averagePoints: 17.0, kda: 3.3, photo: "https://am-a.akamaihd.net/image?resize=375:&f=http%3A%2F%2Fstatic.lolesports.com%2Fplayers%2F1675869038222_Irrelevant_SK_23.png" },

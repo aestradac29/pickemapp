@@ -4,7 +4,7 @@ import { dataService } from '../services/dataService';
 import { getChampions } from '../services/riotService';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { PenLine, Save, Loader2, CheckCircle2, User as UserIcon, Trophy, Sparkles, Swords, Medal, AlertCircle, Link, Image as ImageIcon, Gift, Lock, Star, Crown, CircleDashed, LayoutTemplate, Share2, Copy, Download, Camera } from 'lucide-react';
-import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS } from '../constants';
+import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS, WHITE_LOGO_TEAMS } from '../constants';
 import html2canvas from 'html2canvas';
 
 interface ProfileViewProps {
@@ -195,6 +195,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
     const [editForm, setEditForm] = useState({
         title: '',
         avatar: '',
+        banner: '',
         championId: '' 
     });
     
@@ -229,6 +230,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                 setEditForm({
                     title: me.title || '',
                     avatar: me.avatar || '',
+                    banner: me.banner || '',
                     championId: '' 
                 });
             }
@@ -246,7 +248,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
         try {
             await dataService.updateUserProfile(currentUserId, {
                 title: editForm.title,
-                avatar_url: editForm.avatar
+                avatar_url: editForm.avatar,
+                banner: editForm.banner
             });
             setSaveStatus('success');
             setIsEditing(false);
@@ -330,6 +333,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
         })).sort((a, b) => a.label.localeCompare(b.label));
     }, [championOptions]);
 
+    // Transform Teams into Banner Options
+    const bannerOptions: Option[] = useMemo(() => {
+        return Object.values(TEAMS).map(team => ({
+            id: `banner_${team.id}`, // e.g. 'banner_g2', 'banner_fnc'
+            label: `Estandarte ${team.shortName}`,
+            subLabel: team.name,
+            image: team.logo,
+            color: team.color,
+            imageClassName: WHITE_LOGO_TEAMS.includes(team.id) ? 'brightness-0 invert' : ''
+        }));
+    }, []);
+
     const handleAvatarChange = (champId: string) => {
         const selected = championOptions.find(c => c.id === champId);
         if (selected && selected.image) {
@@ -403,9 +418,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
 
-    // --- VISUAL CUSTOMIZATION ---
+    // --- VISUAL CUSTOMIZATION (Live Preview during edit) ---
+    const activeBannerId = isEditing ? editForm.banner : user.banner;
     const currentFrameClass = user.frame && FRAME_STYLES[user.frame] ? FRAME_STYLES[user.frame] : FRAME_STYLES['default'];
-    const currentBannerClass = user.banner && BANNER_STYLES[user.banner] ? BANNER_STYLES[user.banner] : BANNER_STYLES['default'];
+    // Logic: If active banner exists in styles, use it. If not, use default.
+    const currentBannerClass = activeBannerId && BANNER_STYLES[activeBannerId] ? BANNER_STYLES[activeBannerId] : BANNER_STYLES['default'];
+
+    // --- BANNER LOGO LOGIC ---
+    let bannerTeamLogo: string | undefined;
+    let isWhiteLogo = false;
+    if (activeBannerId && activeBannerId.startsWith('banner_')) {
+        const teamId = activeBannerId.replace('banner_', '');
+        const team = Object.values(TEAMS).find(t => t.id === teamId);
+        if (team) {
+            bannerTeamLogo = team.logo;
+            isWhiteLogo = WHITE_LOGO_TEAMS.includes(team.id);
+        }
+    }
 
     return (
         <div className="max-w-2xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4">
@@ -413,10 +442,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
             {showShareModal && user && <ShareModal user={user} onClose={() => setShowShareModal(false)} />}
 
             {/* Header / Identity with Dynamic Banner */}
-            <div className="relative z-20 mb-8 rounded-2xl border border-gray-700 shadow-[0_0_30px_rgba(0,0,0,0.3)] transition-all duration-500">
+            <div className="relative z-[60] mb-8 rounded-2xl border border-gray-700 shadow-[0_0_30px_rgba(0,0,0,0.3)] transition-all duration-500">
                 <div className={`absolute inset-0 rounded-2xl overflow-hidden ${currentBannerClass} transition-all duration-500`}>
                     <div className="absolute top-0 left-0 w-full h-full bg-black/20"></div>
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#c8aa6e] to-transparent opacity-50"></div>
+                    
+                    {/* Team Logo Watermark in Banner */}
+                    {bannerTeamLogo && (
+                        <div className="absolute -right-8 top-1/2 -translate-y-1/2 opacity-10 pointer-events-none transform rotate-12 scale-150">
+                            <img 
+                                src={bannerTeamLogo} 
+                                alt="" 
+                                className={`w-64 h-64 object-contain ${isWhiteLogo ? 'brightness-0 invert' : ''}`} 
+                            />
+                        </div>
+                    )}
                 </div>
                 
                 <div className="relative z-10 p-6 flex flex-col sm:flex-row items-start gap-8">
@@ -477,6 +517,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                         value={editForm.title}
                                         onChange={(val) => setEditForm(prev => ({ ...prev, title: val }))}
                                         placeholder="Buscar título..."
+                                    />
+                                </div>
+                                <div className="relative z-30">
+                                    <SearchableSelect 
+                                        label="Elige tu Estandarte"
+                                        options={bannerOptions}
+                                        value={editForm.banner}
+                                        onChange={(val) => setEditForm(prev => ({ ...prev, banner: val }))}
+                                        placeholder="Buscar equipo..."
                                     />
                                 </div>
                             </div>
@@ -543,7 +592,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                 <button 
                                     onClick={() => {
                                         setIsEditing(false);
-                                        setEditForm({ title: user.title || '', avatar: user.avatar || '', championId: '' }); 
+                                        setEditForm({ title: user.title || '', avatar: user.avatar || '', championId: '', banner: user.banner || '' }); 
                                     }}
                                     className="p-2 rounded bg-gray-800 text-gray-400 hover:text-white"
                                 >
