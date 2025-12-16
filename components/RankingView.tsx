@@ -1,5 +1,5 @@
+
 import React, { useState, useEffect } from 'react';
-import { WHITE_LOGO_TEAMS } from '../constants';
 import { Team } from '../types';
 import { GripVertical, Save, Trophy, AlertOctagon, Loader2, CheckCircle2, AlertCircle, Settings, Lock, XCircle } from 'lucide-react';
 import { dataService } from '../services/dataService';
@@ -250,7 +250,6 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
 
         {rankedTeams.map((team, index) => {
           const isEliminated = index >= 8;
-          const shouldInvert = WHITE_LOGO_TEAMS.includes(team.id);
           
           // Logic for scoring display
           let scoreBadge = null;
@@ -340,7 +339,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
                     <img 
                       src={team.logo} 
                       alt={team.name} 
-                      className={`w-full h-full object-contain p-1 ${isEliminated ? 'opacity-70' : ''} ${shouldInvert ? 'brightness-0 invert' : ''}`} 
+                      className={`w-full h-full object-contain p-1 ${isEliminated ? 'opacity-70' : ''}`} 
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${team.shortName}&background=${team.color.replace('#','')}&color=fff&size=64&bold=true`;
                       }}

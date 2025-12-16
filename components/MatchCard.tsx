@@ -1,7 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Match, Team, Stage } from '../types';
 import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2, AlertTriangle, Swords, ShieldAlert, Crown, GitMerge } from 'lucide-react';
-import { WHITE_LOGO_TEAMS } from '../constants';
 
 interface MatchCardProps {
   match: Match;
@@ -33,8 +33,6 @@ const TeamButton = ({
     isLocked: boolean;
     onSelect: (id: string, teamId: string) => void; 
 }) => {
-    const shouldInvert = WHITE_LOGO_TEAMS.includes(team.id);
-
     // Determinar si es el ganador oficial
     const isWinner = match.winnerId === team.id;
     // Determinar si es una predicción fallida (Estaba seleccionado, el partido acabó, y NO es el ganador)
@@ -62,7 +60,7 @@ const TeamButton = ({
                  <img 
                     src={team.logo} 
                     alt={team.name}
-                    className={`w-14 h-14 object-contain drop-shadow-md ${shouldInvert ? 'brightness-0 invert' : ''}`}
+                    className={`w-14 h-14 object-contain drop-shadow-md`}
                     onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                         (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');

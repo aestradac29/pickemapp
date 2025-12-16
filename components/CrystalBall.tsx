@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { ROLE_ICONS, WHITE_LOGO_TEAMS } from '../constants';
+import { ROLE_ICONS } from '../constants';
 import { Sparkles, RefreshCw, Trophy, User, Sword, Shield, Hash, Loader2, Save, CheckCircle2, AlertCircle, Settings, Medal, Star, HelpCircle, XCircle, Lock } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { getChampions } from '../services/riotService';
@@ -357,7 +358,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
     subLabel: t.region,
     image: t.logo,
     color: t.color,
-    imageClassName: WHITE_LOGO_TEAMS.includes(t.id) ? 'brightness-0 invert' : ''
+    imageClassName: ''
   }));
 
   const allPlayerOptions: Option[] = players

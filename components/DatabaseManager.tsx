@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Player, Team, Role } from '../types';
 import { dataService } from '../services/dataService';
-import { Save, Loader2, Search, Settings, RefreshCw, PenLine, X, Check, Database, Users, Shield } from 'lucide-react';
+import { Save, Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield } from 'lucide-react';
 import { ROLE_ICONS } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
@@ -111,7 +112,7 @@ export const DatabaseManager: React.FC = () => {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-4 mb-6">
+            <div className="flex flex-wrap gap-4 mb-6">
                 <button 
                     onClick={() => setActiveTab('players')}
                     className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold uppercase tracking-wider transition-all border ${activeTab === 'players' ? 'bg-[#c8aa6e] text-[#0a1428] border-[#c8aa6e]' : 'bg-[#0f1923] text-gray-400 border-gray-700 hover:text-white'}`}
@@ -315,7 +316,7 @@ export const DatabaseManager: React.FC = () => {
                                     <th className="p-4">Logo</th>
                                     <th className="p-4">ID</th>
                                     <th className="p-4">Nombre Completo</th>
-                                    <th className="p-4">Tag (3 letras)</th>
+                                    <th className="p-4">Tag (4 letras)</th>
                                     <th className="p-4">Región</th>
                                     <th className="p-4">Color (HEX)</th>
                                     <th className="p-4">Logo URL</th>
@@ -358,7 +359,7 @@ export const DatabaseManager: React.FC = () => {
                                                         value={editFormTeam.shortName}
                                                         onChange={e => setEditFormTeam({...editFormTeam, shortName: e.target.value})}
                                                         className="bg-black border border-gray-600 rounded p-1 w-16 uppercase"
-                                                        maxLength={3}
+                                                        maxLength={4}
                                                     />
                                                 ) : <span className="font-mono">{team.shortName}</span>}
                                             </td>

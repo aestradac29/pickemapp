@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { User } from '../types';
 import { Trophy, Medal, TrendingUp, Swords, ListOrdered, Sparkles, UserPlus, Globe } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, Tooltip, CartesianGrid } from 'recharts';
-import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS, WHITE_LOGO_TEAMS } from '../constants';
+import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS } from '../constants';
 
 interface LeaderboardProps {
   users: User[];
@@ -188,13 +188,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
 
             // 4. LOGO LOGIC
             let bannerTeamLogo: string | undefined;
-            let isWhiteLogo = false;
             if (user.banner && user.banner.startsWith('banner_')) {
                 const teamId = user.banner.replace('banner_', '');
                 const team = Object.values(TEAMS).find(t => t.id === teamId);
                 if (team) {
                     bannerTeamLogo = team.logo;
-                    isWhiteLogo = WHITE_LOGO_TEAMS.includes(team.id);
                 }
             }
 
@@ -212,7 +210,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                         <img 
                             src={bannerTeamLogo} 
                             alt="" 
-                            className={`w-24 h-24 object-contain ${isWhiteLogo ? 'brightness-0 invert' : ''}`} 
+                            className={`w-24 h-24 object-contain`} 
                         />
                     </div>
                 )}

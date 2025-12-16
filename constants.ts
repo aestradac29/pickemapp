@@ -24,20 +24,6 @@ export const FRAME_STYLES: Record<string, string> = {
 
 // Updated Banners with Animation Classes (defined in index.html)
 export const BANNER_STYLES: Record<string, string> = {
-    // --- TEAM BANNERS (12 Teams) ---
-    'banner_g2': 'bg-gradient-to-r from-gray-950 via-black to-gray-800 border-t-2 border-white/10',
-    'banner_fnc': 'bg-gradient-to-r from-orange-950 via-[#1a1005] to-orange-900 border-t-2 border-orange-500/20',
-    'banner_mkoi': 'bg-gradient-to-r from-purple-950 via-[#1a052e] to-violet-900 border-t-2 border-purple-500/20',
-    'banner_th': 'bg-gradient-to-r from-[#2a2415] via-[#1a1810] to-[#3d3420] border-t-2 border-[#c4a673]/20',
-    'banner_kc': 'bg-gradient-to-r from-[#0a1a35] via-[#050c1a] to-[#10274e] border-t-2 border-blue-500/20',
-    'banner_gx': 'bg-gradient-to-r from-[#2b0008] via-black to-[#4a0010] border-t-2 border-red-500/20',
-    'banner_vit': 'bg-gradient-to-r from-[#2b2900] via-black to-[#3d3a00] border-t-2 border-yellow-400/20',
-    'banner_sk': 'bg-gradient-to-r from-slate-900 via-black to-slate-800 border-t-2 border-slate-500/20',
-    'banner_shf': 'bg-gradient-to-r from-teal-950 via-[#0f172a] to-indigo-900 border-t-2 border-teal-500/20', // Shifters style
-    'banner_rat': 'bg-gradient-to-r from-gray-800 via-stone-900 to-gray-900 border-t-2 border-gray-500/20',
-    'banner_nvi': 'bg-gradient-to-r from-yellow-950/50 via-black to-yellow-900/50 border-t-2 border-yellow-400/20',
-    'banner_kcb': 'bg-gradient-to-r from-blue-900/50 via-[#0a1428] to-blue-800/50 border-t-2 border-blue-400/20',
-
     // --- REGION/LORE BANNERS ---
     'banner_freljord': 'bg-gradient-to-r from-cyan-900 via-blue-800 to-slate-900 animate-pulse-slow',
     'banner_bilgewater': 'bg-gradient-to-r from-teal-950 via-red-900 to-amber-900', 
@@ -70,11 +56,11 @@ export const BADGE_DEFINITIONS: Record<string, { label: string, icon: any, color
     'analyst': { label: 'Analista', icon: Target, color: 'text-teal-400 border-teal-500/50 bg-teal-900/20', description: 'Acertar al MVP en la Bola de Cristal.' }
 };
 
+// Teams that need logo inversion (Black logos to White on dark backgrounds)
+export const WHITE_LOGO_TEAMS = ['g2', 'sk'];
+
 // Helper: URLs directas a la Wiki. Gracias al meta tag "no-referrer" en index.html, esto funcionará sin bloqueos CORS.
 const getLogo = (filename: string) => `https://lol.fandom.com/wiki/Special:FilePath/${filename}`;
-
-// Teams that need their logo inverted to white for visibility on dark backgrounds
-export const WHITE_LOGO_TEAMS = ['rat', 'sk', 'gx'];
 
 // Mock Teams - LEC Winter 2026 Context (12 Teams including guests)
 export const TEAMS: Record<string, Team> = {

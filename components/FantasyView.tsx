@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { ROLE_ICONS, WHITE_LOGO_TEAMS } from '../constants';
+import { ROLE_ICONS } from '../constants';
 import { Role, Player, Team, User } from '../types';
 import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Settings, PenLine } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
@@ -23,9 +24,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, playerId, onSelect, readO
   const teamColor = teamInfo?.color || '#0ac8b9';
   const [imgError, setImgError] = useState(false);
   
-  // Check if we need to force the logo to white
-  const forceWhiteLogo = teamInfo && WHITE_LOGO_TEAMS.includes(teamInfo.id);
-
   // Reset error state when player changes
   React.useEffect(() => {
       setImgError(false);
@@ -76,7 +74,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, playerId, onSelect, readO
                   <img 
                     src={teamInfo.logo} 
                     alt="" 
-                    className={`w-48 h-48 opacity-30 ${forceWhiteLogo ? 'brightness-0 invert' : 'grayscale'}`}
+                    className={`w-48 h-48 opacity-30 grayscale`}
                     onError={(e) => {
                        // Hide watermark if load fails to avoid ugly broken icon
                        (e.target as HTMLImageElement).style.display = 'none';
@@ -105,7 +103,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, playerId, onSelect, readO
                            <img 
                               src={teamInfo.logo} 
                               alt="" 
-                              className={`w-6 h-6 rounded-full object-contain ${forceWhiteLogo ? 'brightness-0 invert' : ''}`}
+                              className={`w-6 h-6 rounded-full object-contain`}
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${teamInfo.shortName}&background=${teamInfo.color.replace('#','')}&color=fff&size=32`;
                               }}
