@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { MATCHES, USERS } from './constants';
 import { MatchCard } from './components/MatchCard';
@@ -14,7 +15,7 @@ import { PasswordResetModal } from './components/PasswordResetModal';
 import { DatabaseManager } from './components/DatabaseManager'; // Import nuevo
 import { ProfileView } from './components/ProfileView'; // Import nuevo
 import { ViewState, UserPrediction, User } from './types';
-import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert } from 'lucide-react';
+import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft } from 'lucide-react';
 import { authService } from './services/authService';
 import { dataService } from './services/dataService';
 
@@ -232,22 +233,26 @@ const App: React.FC = () => {
       
       {/* Navbar */}
       {currentUser && !showPasswordResetModal && view !== ViewState.LOGIN && (
-        <nav className="sticky top-0 z-50 bg-[#091428]/90 backdrop-blur-md border-b border-hextech-500/30">
-          <div className="max-w-5xl mx-auto px-4">
+        <nav className="sticky top-0 z-50 bg-[#091428]/90 backdrop-blur-md border-b border-hextech-500/30 shadow-lg">
+          <div className="max-w-6xl mx-auto px-4">
             <div className="flex items-center justify-between h-16">
+              
+              {/* Logo & Branding - Clickable to Home */}
               <div 
-                className={`flex items-center gap-3 ${selectedSplit ? 'cursor-pointer' : ''}`} 
+                className={`flex items-center gap-3 cursor-pointer group`} 
                 onClick={() => selectedSplit && setView(ViewState.DASHBOARD)}
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-hextech-500 to-hextech-900 rounded rotate-45 flex items-center justify-center border border-hextech-400">
+                <div className="w-9 h-9 bg-gradient-to-br from-hextech-500 to-hextech-900 rounded rotate-45 flex items-center justify-center border border-hextech-400 shadow-md group-hover:scale-105 transition-transform">
                   <span className="text-white -rotate-45 font-bold text-sm">L</span>
                 </div>
                 <div className="flex flex-col">
-                    <h1 className="font-bold text-lg tracking-wide text-hextech-400 leading-none hidden sm:block">
+                    <h1 className="font-bold text-lg tracking-wide text-hextech-400 leading-none">
                         PICK'EM <span className="text-hextech-500">PRO</span>
                     </h1>
                     {selectedSplit && (
-                        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">{selectedSplit}</span>
+                        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest group-hover:text-hextech-400 transition-colors">
+                            {selectedSplit}
+                        </span>
                     )}
                 </div>
               </div>
@@ -257,7 +262,7 @@ const App: React.FC = () => {
                 {view !== ViewState.DASHBOARD && view !== ViewState.SPLIT_SELECTION && (
                     <button 
                         onClick={() => setView(ViewState.DASHBOARD)}
-                        className="text-gray-400 hover:text-[#c8aa6e] flex items-center gap-1 text-sm font-medium"
+                        className="text-gray-400 hover:text-[#c8aa6e] flex items-center gap-1 text-sm font-medium transition-colors"
                     >
                         <ChevronLeft className="w-4 h-4" /> Volver al Inicio
                     </button>
@@ -266,8 +271,9 @@ const App: React.FC = () => {
                 {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
                    <button 
                         onClick={() => setView(ViewState.SPLIT_SELECTION)}
-                        className="text-xs border border-gray-700 rounded px-2 py-1 text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
+                        className="text-xs border border-gray-700 bg-gray-800/50 rounded-full px-3 py-1.5 text-gray-300 hover:text-white hover:border-[#c8aa6e] hover:bg-[#0a1428] transition-all flex items-center gap-1.5"
                    >
+                        <ArrowRightLeft className="w-3 h-3" />
                         Cambiar Split
                    </button>
                 )}
@@ -285,7 +291,7 @@ const App: React.FC = () => {
                         className={`w-9 h-9 rounded-full border-2 group-hover:border-[#c8aa6e] transition-colors ${isAdmin ? 'border-red-500' : 'border-gray-600'}`}
                     />
                     <div className="flex flex-col items-start justify-center">
-                        <span className="text-sm font-bold text-hextech-300 leading-none group-hover:text-[#c8aa6e] transition-colors">{currentUser}</span>
+                        <span className="text-sm font-bold text-hextech-300 leading-none group-hover:text-[#c8aa6e] transition-colors max-w-[100px] truncate">{currentUser}</span>
                         {isAdmin && (
                             <div className="flex items-center gap-1 mt-0.5 bg-red-900/30 px-1.5 py-0.5 rounded border border-red-500/30">
                                 <ShieldAlert className="w-3 h-3 text-red-400" />
@@ -297,7 +303,7 @@ const App: React.FC = () => {
 
                 <button 
                     onClick={handleLogout}
-                    className="p-2 text-gray-400 hover:text-red-400 transition-colors ml-2"
+                    className="p-2 text-gray-400 hover:text-red-400 transition-colors ml-2 hover:bg-red-900/20 rounded-full"
                     title="Cerrar Sesión"
                 >
                     <LogOut className="w-5 h-5" />
@@ -305,33 +311,52 @@ const App: React.FC = () => {
               </div>
 
               {/* Mobile Menu Button */}
-              <div className="md:hidden">
-                <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-hextech-400 p-2">
-                  {isMenuOpen ? <X /> : <Menu />}
-                </button>
+              <div className="md:hidden flex items-center gap-4">
+                 {/* Quick Change Split for Mobile (Icon Only) */}
+                 {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
+                    <button 
+                        onClick={() => setView(ViewState.SPLIT_SELECTION)}
+                        className="p-2 text-gray-400 hover:text-[#c8aa6e]"
+                        title="Cambiar Split"
+                    >
+                        <ArrowRightLeft className="w-5 h-5" />
+                    </button>
+                 )}
+                 <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-hextech-400 p-2 hover:bg-gray-800 rounded-lg transition-colors">
+                   {isMenuOpen ? <X /> : <Menu />}
+                 </button>
               </div>
             </div>
           </div>
 
           {/* Mobile Menu Dropdown */}
           {isMenuOpen && (
-             <div className="md:hidden bg-[#091428] border-b border-gray-800">
+             <div className="md:hidden bg-[#091428] border-b border-gray-800 animate-in slide-in-from-top-2">
                 <div className="px-4 py-2 space-y-1">
                     <button 
                         onClick={() => { setView(ViewState.PROFILE); setIsMenuOpen(false); }}
-                        className="w-full px-3 py-2 text-sm font-bold border-b border-gray-800 mb-2 flex items-center gap-2 hover:bg-gray-800 rounded"
+                        className="w-full px-3 py-3 text-sm font-bold border-b border-gray-800 mb-2 flex items-center gap-3 hover:bg-gray-800 rounded transition-colors"
                     >
-                        <span className="text-gray-500">Sesión:</span> 
-                        <span className="text-hextech-300">{currentUser}</span>
-                        {isAdmin && <span className="text-[10px] bg-red-900/50 text-red-300 px-1.5 rounded border border-red-500/50">ADMIN</span>}
+                        <img 
+                            src={currentUserAvatar || `https://ui-avatars.com/api/?name=${currentUser}&background=random`} 
+                            className="w-8 h-8 rounded-full border border-gray-600"
+                        />
+                        <div className="flex flex-col items-start">
+                            <span className="text-hextech-300">{currentUser}</span>
+                            {isAdmin && <span className="text-[10px] bg-red-900/50 text-red-300 px-1.5 rounded border border-red-500/50 uppercase">Admin</span>}
+                        </div>
                     </button>
                     {selectedSplit && (
                         <>
-                            <button onClick={() => { setView(ViewState.DASHBOARD); setIsMenuOpen(false); }} className="block w-full text-left py-2 px-3 text-gray-300 hover:bg-gray-800 rounded">Inicio</button>
-                            <button onClick={() => { setView(ViewState.SPLIT_SELECTION); setIsMenuOpen(false); }} className="block w-full text-left py-2 px-3 text-gray-300 hover:bg-gray-800 rounded">Cambiar Split</button>
+                            <button onClick={() => { setView(ViewState.DASHBOARD); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium">Inicio</button>
+                            <button onClick={() => { setView(ViewState.SPLIT_SELECTION); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium flex items-center gap-2">
+                                <ArrowRightLeft className="w-4 h-4" /> Cambiar Split
+                            </button>
                         </>
                     )}
-                    <button onClick={handleLogout} className="block w-full text-left py-2 px-3 text-red-400 hover:bg-gray-800 rounded">Cerrar Sesión</button>
+                    <button onClick={handleLogout} className="block w-full text-left py-3 px-3 text-red-400 hover:bg-red-900/20 rounded font-medium flex items-center gap-2 mt-2 border-t border-gray-800">
+                        <LogOut className="w-4 h-4" /> Cerrar Sesión
+                    </button>
                 </div>
              </div>
           )}
@@ -339,7 +364,7 @@ const App: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <main className="max-w-4xl mx-auto px-4 py-6">
+      <main className="max-w-6xl mx-auto px-4 py-6">
         {renderContent()}
       </main>
 
