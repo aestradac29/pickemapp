@@ -1,18 +1,18 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User } from '../types';
+import { User, Team } from '../types';
 import { dataService } from '../services/dataService';
 import { getChampions } from '../services/riotService';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { PenLine, Save, Loader2, CheckCircle2, User as UserIcon, Trophy, Sparkles, Swords, Medal, AlertCircle, Link, Image as ImageIcon, Gift, Lock, Star, Crown, CircleDashed, LayoutTemplate, Share2, Copy, Download, Camera } from 'lucide-react';
-import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS, WHITE_LOGO_TEAMS } from '../constants';
+import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS } from '../constants';
 import html2canvas from 'html2canvas';
 
 interface ProfileViewProps {
     currentUserId: string | null;
 }
 
-// Title Pool for Levels (Reduced pool as we have more banners now)
+// Title Pool for Levels
 const REWARD_TITLES = [
     "Iniciado", "Novato", "Aprendiz", "Recluta", "Escudero", 
     "Explorador", "Guerrero", "Veterano", "Centinela", "Guardián",
@@ -25,7 +25,7 @@ const REWARD_TITLES = [
     "Destructor", "Creador", "Soberano", "Emperador", "Dios"
 ];
 
-// Generate 50 Levels of Rewards with new Banners
+// Generate 50 Levels of Rewards
 const LEVEL_REWARDS = Array.from({ length: 50 }, (_, i) => {
     const level = i + 1;
     let reward: any = { level };
@@ -47,19 +47,52 @@ const LEVEL_REWARDS = Array.from({ length: 50 }, (_, i) => {
     else if (level === 48) { reward.id = 'banner_void'; reward.label = 'Estandarte del Vacío'; reward.type = 'banner'; reward.icon = LayoutTemplate; }
     else if (level === 50) { reward.id = 'frame_diamond'; reward.label = 'Marco Diamante'; reward.type = 'frame'; reward.icon = Trophy; }
     else {
-        // Titles for everything else, using modulo to cycle through reduced list
         const titleIndex = i % REWARD_TITLES.length;
         reward.id = `title_lvl_${level}`;
         reward.label = REWARD_TITLES[titleIndex];
         reward.type = 'title';
-        // Unified Icon for Titles (PenLine)
         reward.icon = PenLine;
     }
     return reward;
 });
 
+// --- HELPER: RENDER BANNER ---
+// Calculates styles based on whether it is a Team Banner (Dynamic) or a Static Reward Banner
+const getBannerStyle = (bannerId: string | undefined, teams: Team[]) => {
+    let style = {};
+    let className = BANNER_STYLES['default'];
+    let teamData = null;
+
+    if (bannerId) {
+        // 1. Check if it is a Team Banner
+        if (bannerId.startsWith('banner_')) {
+            const teamId = bannerId.replace('banner_', '');
+            // Check against dynamic teams list first
+            teamData = teams.find(t => t.id === teamId);
+            
+            if (teamData) {
+                // If there's a specific dark-gradient banner defined in constants for this team ID (e.g. banner_vit), use it
+                // This ensures yellow/orange teams get a dark contrast background
+                if (BANNER_STYLES[`banner_${teamId}`]) {
+                    className = BANNER_STYLES[`banner_${teamId}`];
+                } else {
+                    style = { backgroundColor: teamData.color };
+                    className = ''; // Remove default gradients if team color is used
+                }
+            } else if (BANNER_STYLES[bannerId]) {
+                // Fallback to static constant banners (e.g. Regions)
+                className = BANNER_STYLES[bannerId];
+            }
+        } else if (BANNER_STYLES[bannerId]) {
+             className = BANNER_STYLES[bannerId];
+        }
+    }
+
+    return { style, className, teamData };
+};
+
 // --- SHARE MODAL COMPONENT ---
-const ShareModal = ({ user, onClose }: { user: User, onClose: () => void }) => {
+const ShareModal = ({ user, teams, onClose }: { user: User, teams: Team[], onClose: () => void }) => {
     const cardRef = useRef<HTMLDivElement>(null);
     const [copied, setCopied] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -75,18 +108,13 @@ const ShareModal = ({ user, onClose }: { user: User, onClose: () => void }) => {
         if (!cardRef.current) return;
         setIsGenerating(true);
         try {
-            // Use html2canvas to capture the card
             const canvas = await html2canvas(cardRef.current, {
-                backgroundColor: '#091428', // Force background color
-                scale: 2, // Higher resolution
-                useCORS: true, // Attempt to handle cross-origin images (like avatars)
+                backgroundColor: '#091428',
+                scale: 2,
+                useCORS: true,
                 logging: false
             });
-
-            // Convert to data URL
             const image = canvas.toDataURL("image/png");
-
-            // Trigger download
             const link = document.createElement('a');
             link.href = image;
             link.download = `PickemPro-${user.name}-Profile.png`;
@@ -101,7 +129,7 @@ const ShareModal = ({ user, onClose }: { user: User, onClose: () => void }) => {
         }
     };
 
-    const currentBannerClass = user.banner && BANNER_STYLES[user.banner] ? BANNER_STYLES[user.banner] : BANNER_STYLES['default'];
+    const { style: bannerStyle, className: bannerClass } = getBannerStyle(user.banner, teams);
     const currentFrameClass = user.frame && FRAME_STYLES[user.frame] ? FRAME_STYLES[user.frame] : FRAME_STYLES['default'];
 
     return (
@@ -114,8 +142,11 @@ const ShareModal = ({ user, onClose }: { user: User, onClose: () => void }) => {
                 {/* THE CARD (Capture Target) */}
                 <div ref={cardRef} className="relative pb-6 bg-[#091428]">
                     {/* Banner Header */}
-                    <div className={`h-32 ${currentBannerClass} relative`}>
+                    <div className={`h-32 relative ${bannerClass}`} style={bannerStyle}>
                         <div className="absolute inset-0 bg-black/20"></div>
+                        {/* If no class and style is present, add a subtle gradient overlay */}
+                        {!bannerClass && <div className="absolute inset-0 bg-gradient-to-t from-[#091428] to-transparent opacity-60"></div>}
+                        
                         <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
                              <div className={`w-24 h-24 rounded-full border-4 shadow-xl overflow-hidden bg-[#0a1428] ${currentFrameClass}`}>
                                 <img src={user.avatar} className="w-full h-full object-cover" alt="" crossOrigin="anonymous" />
@@ -142,7 +173,6 @@ const ShareModal = ({ user, onClose }: { user: User, onClose: () => void }) => {
                             </div>
                         </div>
 
-                        {/* Equipped Badges Row (Max 3) */}
                         {user.equippedBadges && user.equippedBadges.length > 0 && (
                             <div className="flex justify-center gap-2 mb-4">
                                 {user.equippedBadges.slice(0,3).map(b => {
@@ -187,6 +217,7 @@ const ShareModal = ({ user, onClose }: { user: User, onClose: () => void }) => {
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [teams, setTeams] = useState<Team[]>([]); // Store loaded teams
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [championOptions, setChampionOptions] = useState<Option[]>([]);
@@ -200,43 +231,42 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
         championId: '' 
     });
     
-    // Equip State (Instant feedback)
+    // Equip State
     const [equippingId, setEquippingId] = useState<string | null>(null);
-    
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
     useEffect(() => {
-        loadProfile();
-        loadChampions();
+        loadData();
     }, [currentUserId]);
 
-    const loadChampions = async () => {
-        try {
-            const champs = await getChampions();
-            setChampionOptions(champs.sort((a, b) => a.label.localeCompare(b.label)));
-        } catch (e) {
-            console.error("Error loading champions", e);
-        }
-    };
-
-    const loadProfile = async () => {
-        if (!currentUserId) return;
+    const loadData = async () => {
         setIsLoading(true);
         try {
-            const users = await dataService.getAllUsers();
-            const me = users.find(u => u.id === currentUserId);
-            if (me) {
-                setUser(me);
-                setEditForm({
-                    title: me.title || '',
-                    avatar: me.avatar || '',
-                    banner: me.banner || '',
-                    championId: '' 
-                });
+            // Load champions, teams, and user profile in parallel
+            const [champs, teamsMap, users] = await Promise.all([
+                getChampions(),
+                dataService.getTeams(),
+                dataService.getAllUsers()
+            ]);
+
+            setChampionOptions(champs.sort((a, b) => a.label.localeCompare(b.label)));
+            setTeams(Object.values(teamsMap));
+
+            if (currentUserId) {
+                const me = users.find(u => u.id === currentUserId);
+                if (me) {
+                    setUser(me);
+                    setEditForm({
+                        title: me.title || '',
+                        avatar: me.avatar || '',
+                        banner: me.banner || '',
+                        championId: '' 
+                    });
+                }
             }
         } catch (e) {
-            console.error("Error loading profile", e);
+            console.error("Error loading profile data", e);
         } finally {
             setIsLoading(false);
         }
@@ -254,7 +284,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
             });
             setSaveStatus('success');
             setIsEditing(false);
-            loadProfile(); // Refresh
+            
+            // Update local state instead of full reload to prevent flicker
+            setUser(prev => prev ? ({ ...prev, title: editForm.title, avatar: editForm.avatar, banner: editForm.banner }) : null);
+            
         } catch (e) {
             console.error(e);
             setSaveStatus('error');
@@ -266,7 +299,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
     const handleEquipReward = async (reward: typeof LEVEL_REWARDS[0]) => {
         if (!currentUserId || !user) return;
         
-        // Prevent equipping locked items
         const level = Math.floor(user.score / 50) + 1;
         if (level < reward.level) return;
 
@@ -300,10 +332,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
         let newEquipped = [...currentEquipped];
 
         if (newEquipped.includes(badgeId)) {
-            // Unequip
             newEquipped = newEquipped.filter(id => id !== badgeId);
         } else {
-            // Equip (Check limit)
             if (newEquipped.length >= 3) {
                 alert("Solo puedes equiparte 3 insignias a la vez.");
                 return;
@@ -311,15 +341,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
             newEquipped.push(badgeId);
         }
 
-        // Optimistic Update
         setUser(prev => prev ? ({ ...prev, equippedBadges: newEquipped }) : null);
 
-        // Save
         try {
             await dataService.updateUserProfile(currentUserId, { equippedBadges: newEquipped } as any);
         } catch (e) {
             console.error("Error saving badges", e);
-            // Revert on error could go here
         }
     };
 
@@ -334,17 +361,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
         })).sort((a, b) => a.label.localeCompare(b.label));
     }, [championOptions]);
 
-    // Transform Teams into Banner Options
+    // Transform Loaded Teams into Banner Options
     const bannerOptions: Option[] = useMemo(() => {
-        return Object.values(TEAMS).map(team => ({
-            id: `banner_${team.id}`, // e.g. 'banner_g2', 'banner_fnc'
+        return teams.map(team => ({
+            id: `banner_${team.id}`, 
             label: `Estandarte ${team.shortName}`,
             subLabel: team.name,
-            image: team.logo,
+            image: team.logo, 
             color: team.color,
-            imageClassName: WHITE_LOGO_TEAMS.includes(team.id) ? 'brightness-0 invert' : ''
+            imageClassName: ''
         }));
-    }, []);
+    }, [teams]);
 
     const handleAvatarChange = (champId: string) => {
         const selected = championOptions.find(c => c.id === champId);
@@ -374,7 +401,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
         );
     }
 
-    // Improved StatCard
     const StatCard = ({ icon: Icon, label, value, type }: { icon: any, label: string, value: number, type: 'gold' | 'blue' | 'purple' | 'cyan' }) => {
         const theme = {
             gold: { bg: 'bg-yellow-900/10', border: 'border-yellow-500/30', text: 'text-yellow-400', icon: 'text-yellow-500', glow: 'shadow-[0_0_15px_rgba(234,179,8,0.1)]' },
@@ -422,42 +448,40 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
     // --- VISUAL CUSTOMIZATION (Live Preview during edit) ---
     const activeBannerId = isEditing ? editForm.banner : user.banner;
     const currentFrameClass = user.frame && FRAME_STYLES[user.frame] ? FRAME_STYLES[user.frame] : FRAME_STYLES['default'];
-    // Logic: If active banner exists in styles, use it. If not, use default.
-    const currentBannerClass = activeBannerId && BANNER_STYLES[activeBannerId] ? BANNER_STYLES[activeBannerId] : BANNER_STYLES['default'];
-
-    // --- BANNER LOGO LOGIC ---
-    let bannerTeamLogo: string | undefined;
-    let isWhiteLogo = false;
-    if (activeBannerId && activeBannerId.startsWith('banner_')) {
-        const teamId = activeBannerId.replace('banner_', '');
-        const team = Object.values(TEAMS).find(t => t.id === teamId);
-        if (team) {
-            bannerTeamLogo = team.logo;
-            isWhiteLogo = WHITE_LOGO_TEAMS.includes(team.id);
-        }
-    }
+    
+    // Calculate Dynamic Banner Styles
+    const { style: currentBannerStyle, className: currentBannerClass, teamData: activeTeamData } = getBannerStyle(activeBannerId, teams);
 
     return (
         <div className="max-w-2xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4">
             
-            {showShareModal && user && <ShareModal user={user} onClose={() => setShowShareModal(false)} />}
+            {showShareModal && user && <ShareModal user={user} teams={teams} onClose={() => setShowShareModal(false)} />}
 
             {/* Header / Identity with Dynamic Banner */}
-            <div className="relative z-[30] mb-8 rounded-2xl border border-gray-700 shadow-[0_0_30px_rgba(0,0,0,0.3)] transition-all duration-500">
-                <div className={`absolute inset-0 rounded-2xl overflow-hidden ${currentBannerClass} transition-all duration-500`}>
-                    <div className="absolute top-0 left-0 w-full h-full bg-black/20"></div>
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#c8aa6e] to-transparent opacity-50"></div>
-                    
-                    {/* Team Logo Watermark in Banner */}
-                    {bannerTeamLogo && (
-                        <div className="absolute -right-8 top-1/2 -translate-y-1/2 opacity-10 pointer-events-none transform rotate-12 scale-150">
-                            <img 
-                                src={bannerTeamLogo} 
-                                alt="" 
-                                className={`w-64 h-64 object-contain ${isWhiteLogo ? 'brightness-0 invert' : ''}`} 
-                            />
-                        </div>
+            <div className={`relative z-[30] mb-8 rounded-2xl border border-gray-700 shadow-[0_0_30px_rgba(0,0,0,0.3)] transition-all duration-500 ${isEditing ? 'overflow-visible' : 'overflow-hidden'}`}>
+                
+                {/* Dynamic Banner Background */}
+                <div className={`absolute inset-0 rounded-2xl overflow-hidden ${currentBannerClass}`} style={currentBannerStyle}>
+                    {/* If using team color, add overlay for depth */}
+                    {activeTeamData && (
+                        <>
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white/10 to-transparent opacity-50"></div>
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-black/60 to-transparent"></div>
+                            
+                            {/* Watermark Logo */}
+                            {activeTeamData.logo && (
+                                <div className="absolute -right-12 -top-12 opacity-50 pointer-events-none transform rotate-12 scale-150">
+                                    <img 
+                                        src={activeTeamData.logo} 
+                                        alt="" 
+                                        className={`w-96 h-96 object-contain`} 
+                                    />
+                                </div>
+                            )}
+                        </>
                     )}
+                    {/* Default darkening for readability */}
+                    {!activeTeamData && <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>}
                 </div>
                 
                 <div className="relative z-10 p-6 flex flex-col sm:flex-row items-start gap-8">
@@ -503,36 +527,42 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                         {isEditing ? (
                             <div className="space-y-4 pt-2">
                                 <div className="relative z-50">
-                                    <SearchableSelect 
-                                        label="Elige tu Campeón (Avatar)"
-                                        options={championOptions}
-                                        value={currentAvatarChampId}
-                                        onChange={handleAvatarChange}
-                                        placeholder="Buscar campeón..."
-                                    />
+                                    <div className="bg-[#091428]/95 backdrop-blur-md p-3 rounded-xl border border-gray-700 shadow-xl">
+                                        <SearchableSelect 
+                                            label="Elige tu Campeón (Avatar)"
+                                            options={championOptions}
+                                            value={currentAvatarChampId}
+                                            onChange={handleAvatarChange}
+                                            placeholder="Buscar campeón..."
+                                        />
+                                    </div>
                                 </div>
                                 <div className="relative z-40">
-                                    <SearchableSelect 
-                                        label="Elige tu Título"
-                                        options={titleOptions}
-                                        value={editForm.title}
-                                        onChange={(val) => setEditForm(prev => ({ ...prev, title: val }))}
-                                        placeholder="Buscar título..."
-                                    />
+                                    <div className="bg-[#091428]/95 backdrop-blur-md p-3 rounded-xl border border-gray-700 shadow-xl">
+                                        <SearchableSelect 
+                                            label="Elige tu Título"
+                                            options={titleOptions}
+                                            value={editForm.title}
+                                            onChange={(val) => setEditForm(prev => ({ ...prev, title: val }))}
+                                            placeholder="Buscar título..."
+                                        />
+                                    </div>
                                 </div>
                                 <div className="relative z-30">
-                                    <SearchableSelect 
-                                        label="Elige tu Estandarte"
-                                        options={bannerOptions}
-                                        value={editForm.banner}
-                                        onChange={(val) => setEditForm(prev => ({ ...prev, banner: val }))}
-                                        placeholder="Buscar equipo..."
-                                    />
+                                    <div className="bg-[#091428]/95 backdrop-blur-md p-3 rounded-xl border border-gray-700 shadow-xl">
+                                        <SearchableSelect 
+                                            label="Elige tu Estandarte"
+                                            options={bannerOptions}
+                                            value={editForm.banner}
+                                            onChange={(val) => setEditForm(prev => ({ ...prev, banner: val }))}
+                                            placeholder="Buscar equipo..."
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         ) : (
                             <div className="text-center sm:text-left">
-                                <h1 className="text-3xl font-bold text-white mb-1 drop-shadow-lg">{user.name}</h1>
+                                <h1 className="text-3xl font-bold text-white mb-1 drop-shadow-lg tracking-tight">{user.name}</h1>
                                 {user.title ? (
                                     <span className="inline-block bg-gradient-to-r from-[#c8aa6e]/20 to-transparent text-[#c8aa6e] border-l-2 border-[#c8aa6e] pl-3 pr-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-2">
                                         {user.title}
@@ -549,21 +579,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                             if(!badge) return null;
                                             const Icon = badge.icon;
                                             return (
-                                                <div key={badgeId} className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] font-bold uppercase ${badge.color}`} title={badge.description}>
+                                                <div key={badgeId} className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] font-bold uppercase ${badge.color} backdrop-blur-sm shadow-md`} title={badge.description}>
                                                     <Icon className="w-3 h-3" />
                                                     <span>{badge.label}</span>
                                                 </div>
                                             );
                                         })
                                     ) : (
-                                        <div className="text-[10px] text-gray-500 italic bg-black/20 px-2 py-1 rounded">
+                                        <div className="text-[10px] text-gray-500 italic bg-black/20 px-2 py-1 rounded backdrop-blur-sm">
                                             Sin insignias equipadas
                                         </div>
                                     )}
                                 </div>
 
                                 <div className="flex items-center justify-center sm:justify-start gap-4 mt-4">
-                                    <div className="text-gray-300 text-sm flex items-center gap-2 bg-black/40 px-4 py-2 rounded-lg border border-white/10 backdrop-blur-md">
+                                    <div className="text-gray-300 text-sm flex items-center gap-2 bg-black/40 px-4 py-2 rounded-lg border border-white/10 backdrop-blur-md shadow-lg">
                                         <div className="p-1 bg-[#0a1428] rounded border border-gray-600">
                                             <Medal className="w-4 h-4 text-yellow-500" />
                                         </div>
@@ -576,7 +606,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                     {/* Share Button */}
                                     <button 
                                         onClick={() => setShowShareModal(true)}
-                                        className="text-gray-300 text-sm flex items-center gap-2 bg-[#c8aa6e]/10 hover:bg-[#c8aa6e]/20 px-4 py-2 rounded-lg border border-[#c8aa6e]/30 backdrop-blur-md transition-colors group"
+                                        className="text-gray-300 text-sm flex items-center gap-2 bg-[#c8aa6e]/10 hover:bg-[#c8aa6e]/20 px-4 py-2 rounded-lg border border-[#c8aa6e]/30 backdrop-blur-md transition-colors group shadow-lg"
                                     >
                                         <Share2 className="w-4 h-4 text-[#c8aa6e]" />
                                         <span className="text-[#c8aa6e] font-bold text-xs uppercase">Compartir</span>
@@ -611,7 +641,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                         ) : (
                             <button 
                                 onClick={() => setIsEditing(true)}
-                                className="p-2 rounded-full bg-[#0a1428]/50 border border-gray-400/30 text-gray-300 hover:text-white hover:border-[#c8aa6e] transition-all m-4 sm:m-0 backdrop-blur-sm"
+                                className="p-2 rounded-full bg-[#0a1428]/30 border border-white/10 text-gray-300 hover:text-white hover:border-[#c8aa6e] transition-all m-4 sm:m-0 backdrop-blur-sm shadow-lg"
                             >
                                 <PenLine className="w-5 h-5" />
                             </button>
@@ -663,9 +693,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                             const Icon = reward.icon;
 
                             // Determine styles for visual preview (Always apply style to show preview even if locked)
-                            let cardStyle = "bg-[#0a1428]";
+                            let cardStyle: any = { className: "bg-[#0a1428]" };
                             if (reward.type === 'banner') {
-                                cardStyle = BANNER_STYLES[reward.id] || "bg-gradient-to-br from-gray-800 to-black";
+                                cardStyle = getBannerStyle(reward.id, teams);
                             }
 
                             return (
@@ -689,8 +719,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                                     ? 'border-blue-500/50 hover:border-blue-400' 
                                                     : 'border-gray-800 opacity-90'
                                             }
-                                            ${isMajor ? cardStyle : 'bg-[#050a14]'}
-                                        `}>
+                                            ${isMajor && reward.type !== 'banner' ? 'bg-[#050a14]' : ''}
+                                            ${isMajor && reward.type === 'banner' ? cardStyle.className : ''}
+                                        `} style={isMajor && reward.type === 'banner' ? cardStyle.style : {}}>
                                             {isMajor ? (
                                                 /* MAJOR REWARD CONTENT */
                                                 <div className="flex flex-col items-center justify-center h-full w-full relative z-10 p-2">
@@ -700,16 +731,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                                             <img src={user.avatar} className="w-full h-full object-cover" alt="" />
                                                         </div>
                                                     ) : (
-                                                        // Icon for Banners
-                                                        <Icon className={`w-8 h-8 mb-2 drop-shadow-md ${isUnlocked ? 'text-white' : 'text-white/80'}`} />
+                                                        // Icon for Banners - Now handled by BannerRenderer logic or fallback icon
+                                                        <div className="w-full h-full relative">
+                                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                                <Icon className={`w-8 h-8 drop-shadow-md ${isUnlocked ? 'text-white' : 'text-white/50'}`} />
+                                                            </div>
+                                                        </div>
                                                     )}
                                                     
-                                                    <div className="text-center">
-                                                        <div className={`text-[7px] font-bold uppercase tracking-wider mb-0.5 ${isUnlocked ? 'text-blue-200' : 'text-gray-400'}`}>
-                                                            {reward.type === 'frame' ? 'Marco' : 'Estandarte'}
-                                                        </div>
-                                                        <div className={`text-[8px] font-bold leading-tight line-clamp-2 ${isEquipped ? 'text-[#c8aa6e]' : isUnlocked ? 'text-white' : 'text-gray-300'}`}>
-                                                            {reward.label.replace(/Marco |Estandarte /g, '')}
+                                                    {/* Internal Label for Major Items (Inside Card) */}
+                                                    <div className="absolute bottom-0 left-0 w-full bg-black/60 backdrop-blur-sm py-1">
+                                                        <div className={`text-[7px] text-center font-bold uppercase tracking-wider ${isUnlocked ? 'text-gray-200' : 'text-gray-500'}`}>
+                                                            {reward.label.replace('Estandarte ', '').replace('Marco ', '')}
                                                         </div>
                                                     </div>
                                                 </div>

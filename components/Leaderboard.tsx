@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { User } from '../types';
+import { User, Team } from '../types';
 import { Trophy, Medal, TrendingUp, Swords, ListOrdered, Sparkles, UserPlus, Globe } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, Tooltip, CartesianGrid } from 'recharts';
 import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS } from '../constants';
@@ -49,9 +49,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
       });
   }, [users, activeCategory]);
 
-  // Calculate Ranks with Logic:
-  // - Shared Position (1, 1, 3...) for all ties.
-  // - Global specifically requires BOTH total score AND matchday score to match for a tie.
+  // Calculate Ranks with Logic
   const ranks = useMemo(() => {
       const r = new Array(sortedUsers.length).fill(0);
       let currentRank = 1;
@@ -66,17 +64,15 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
               const scoreCurr = getScore(curr);
 
               if (activeCategory === 'global') {
-                  // For Global, strictly tied only if secondary stat matches too
                   isTie = scorePrev === scoreCurr && prev.scoreBreakdown.matchday === curr.scoreBreakdown.matchday;
               } else {
-                  // For others, tie if main score matches
                   isTie = scorePrev === scoreCurr;
               }
 
               if (isTie) {
-                  r[i] = r[i-1]; // Share rank
+                  r[i] = r[i-1];
               } else {
-                  r[i] = i + 1; // Actual position (skip numbers)
+                  r[i] = i + 1;
               }
           } else {
               r[i] = 1;
@@ -106,7 +102,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
     return point;
   });
 
-  // Prepare data for FANTASY chart (12 rounds)
+  // Prepare data for FANTASY chart
   const fantasyChartData = users[0].fantasyHistory ? users[0].fantasyHistory.map((h, index) => {
       const point: any = { name: h.day };
       users.forEach(user => {
@@ -166,55 +162,98 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
         
         <div className="space-y-3">
           {sortedUsers.map((user, idx) => {
-            const rank = ranks[idx]; // Use pre-calculated rank
+            const rank = ranks[idx];
 
             // --- VISUAL STYLING LOGIC ---
             
-            // 1. BANNER: Priority to User Banner, else Rank 1 Special, else Default
-            const userBanner = user.banner && BANNER_STYLES[user.banner] ? BANNER_STYLES[user.banner] : null;
-            const rowClass = userBanner 
-                ? `${userBanner} border-gray-600 shadow-md` 
-                : rank === 1 
-                    ? 'bg-gradient-to-r from-[#c8aa6e]/20 to-transparent border-[#c8aa6e]/50 shadow-[0_0_10px_rgba(200,170,110,0.1)]' 
-                    : 'bg-[#0f1d36] border-gray-800 hover:border-gray-600';
+            let rowClass = '';
+            let rowStyle = {};
+            let bannerTeamData: Team | undefined;
+            const bannerId = user.banner;
 
-            // 2. FRAME: Priority to User Frame, else Rank 1 Special, else Default Border
+            // 1. Check for specific banner definition (e.g. 'banner_shf' or 'banner_bds' mapped in constants)
+            let specificBannerClass = bannerId && BANNER_STYLES[bannerId] ? BANNER_STYLES[bannerId] : null;
+
+            // 2. Identify Team Data (even if specific class exists, we might need logo)
+            if (bannerId && bannerId.startsWith('banner_')) {
+                const teamId = bannerId.replace('banner_', '');
+                bannerTeamData = Object.values(TEAMS).find(t => t.id === teamId);
+                
+                // Special handling for legacy/renamed teams (like bds -> shf) if not found directly
+                if (!bannerTeamData && teamId === 'bds') {
+                    bannerTeamData = TEAMS.shf;
+                }
+
+                // If no specific gradient defined, use team color
+                if (!specificBannerClass && bannerTeamData) {
+                    rowStyle = { backgroundColor: bannerTeamData.color };
+                }
+            }
+
+            // 3. FINAL CLASS PRIORITY
+            if (specificBannerClass) {
+                rowClass = `${specificBannerClass} border-gray-600 shadow-md`;
+            } else if (Object.keys(rowStyle).length > 0) {
+                rowClass = 'shadow-md border-transparent';
+            } else if (rank === 1) {
+                rowClass = 'bg-gradient-to-r from-[#c8aa6e]/20 to-transparent border-[#c8aa6e]/50 shadow-[0_0_10px_rgba(200,170,110,0.1)]';
+            } else {
+                rowClass = 'bg-[#0f1d36] border-gray-800 hover:border-gray-600';
+            }
+
+            const hasCustomBanner = specificBannerClass || Object.keys(rowStyle).length > 0;
+
+            // 4. FRAME
             const userFrame = user.frame && FRAME_STYLES[user.frame] ? FRAME_STYLES[user.frame] : null;
-            // Simplify frame styles for smaller list items if needed, or use as is
             const frameClass = userFrame || (rank === 1 ? 'border-[#c8aa6e] shadow-[0_0_10px_rgba(200,170,110,0.3)]' : 'border-gray-600');
 
-            // 3. BADGES: Only show EQUIPPED badges. No auto-fallback.
+            // 5. BADGES
             const badgesToShow = user.equippedBadges || [];
 
-            // 4. LOGO LOGIC
-            let bannerTeamLogo: string | undefined;
-            if (user.banner && user.banner.startsWith('banner_')) {
-                const teamId = user.banner.replace('banner_', '');
-                const team = Object.values(TEAMS).find(t => t.id === teamId);
-                if (team) {
-                    bannerTeamLogo = team.logo;
-                }
+            // Text Colors based on Banner presence
+            const nameColor = hasCustomBanner ? 'text-white' : rank === 1 ? 'text-[#c8aa6e]' : 'text-gray-200';
+            const subtitleColor = hasCustomBanner ? 'text-gray-200' : 'text-gray-500';
+            const scoreColor = hasCustomBanner ? 'text-white' : rank === 1 ? 'text-white' : 'text-gray-300';
+
+            // Override logo for SK Watermark
+            let watermarkLogo = bannerTeamData?.logo;
+            if (bannerTeamData?.id === 'sk') {
+                watermarkLogo = "https://static.lolesports.com/teams/1643979272144_SK_Monochrome.png";
             }
 
             return (
                 <div 
                 key={user.id}
                 className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 relative overflow-hidden ${rowClass}`}
+                style={rowStyle}
                 >
-                {/* Banner Overlay for consistency (darken slightly) */}
-                {userBanner && <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>}
-                
-                {/* Team Logo Watermark - Position Adjusted to Left of Score */}
-                {bannerTeamLogo && (
-                    <div className="absolute right-16 top-1/2 -translate-y-1/2 opacity-25 pointer-events-none transform rotate-12 scale-150">
-                        <img 
-                            src={bannerTeamLogo} 
-                            alt="" 
-                            className={`w-24 h-24 object-contain`} 
-                        />
-                    </div>
+                {/* Dynamic Banner Visuals (Gradients + Watermark) */}
+                {bannerTeamData && (
+                    <>
+                        {/* If using plain color (no gradient class), add overlays for texture */}
+                        {!specificBannerClass && (
+                            <>
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white/10 to-transparent opacity-40 pointer-events-none"></div>
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-black/60 to-transparent pointer-events-none"></div>
+                            </>
+                        )}
+                        
+                        {/* Team Logo Watermark - Adjusted for visibility without mix-blend-overlay */}
+                        {watermarkLogo && (
+                            <div className="absolute right-24 sm:right-1/3 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none transform rotate-12 scale-150 grayscale-[0.3] z-0">
+                                <img 
+                                    src={watermarkLogo} 
+                                    alt="" 
+                                    className="w-32 h-32 object-contain" 
+                                />
+                            </div>
+                        )}
+                    </>
                 )}
 
+                {/* Overlay to ensure text readability on bright banners */}
+                {specificBannerClass && <div className="absolute inset-0 bg-black/10 pointer-events-none z-0"></div>}
+                
                 <div className="flex items-center gap-4 relative z-10">
                     <div className="w-8 flex justify-center font-bold text-xl">
                     {rank === 1 ? <span className="text-yellow-400 drop-shadow-lg">1º</span> : 
@@ -240,7 +279,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                     
                     <div>
                         <div className="flex items-center gap-2">
-                            <p className={`font-bold text-lg drop-shadow-md ${userBanner ? 'text-white' : rank === 1 ? 'text-[#c8aa6e]' : 'text-gray-200'}`}>
+                            {/* USERNAME STYLE: Black Weight, Italic */}
+                            <p className={`font-black italic text-xl sm:text-2xl tracking-tight drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)] ${nameColor}`}>
                                 {user.name}
                             </p>
                             {badgesToShow.map(b => {
@@ -248,15 +288,15 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                                 if (!def) return null;
                                 const Icon = def.icon;
                                 return (
-                                    <div key={b} className={`p-0.5 rounded-full ${def.color.split(' ')[2]} border ${def.color.split(' ')[1]}`} title={def.label}>
+                                    <div key={b} className={`p-0.5 rounded-full ${def.color.split(' ')[2]} border ${def.color.split(' ')[1]} bg-black/40`} title={def.label}>
                                         <Icon className={`w-3 h-3 ${def.color.split(' ')[0]}`} />
                                     </div>
                                 );
                             })}
                         </div>
-                        <p className={`text-xs font-medium truncate max-w-[150px] sm:max-w-xs ${userBanner ? 'text-gray-300' : 'text-gray-500'}`}>
+                        <p className={`text-xs font-medium truncate max-w-[150px] sm:max-w-xs ${subtitleColor}`}>
                             {user.title ? (
-                                <span className={`${userBanner ? 'text-[#c8aa6e]' : 'text-[#c8aa6e]'} italic`}>{user.title}</span>
+                                <span className="text-[#c8aa6e] font-bold italic drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{user.title}</span>
                             ) : (
                                 <span>{activeCategory === 'fantasy' ? 'Manager' : 'Aspirante'}</span>
                             )}
@@ -264,7 +304,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                         
                         {/* Show Matchday hits in Global tab to explain tie-breaker */}
                         {activeCategory === 'global' && (
-                            <p className="text-[9px] text-gray-500/80 uppercase tracking-tight">
+                            <p className="text-[9px] text-gray-400/80 uppercase tracking-tight">
                                 Jornadas acertadas: {user.scoreBreakdown.matchday}
                             </p>
                         )}
@@ -272,10 +312,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                 </div>
                 
                 <div className="text-right relative z-10">
-                    <p className={`text-2xl font-bold leading-none drop-shadow-md ${userBanner ? 'text-white' : rank === 1 ? 'text-white' : 'text-gray-300'}`}>
+                    <p className={`text-2xl font-bold leading-none drop-shadow-md ${scoreColor}`}>
                         {getScore(user)}
                     </p>
-                    <p className={`text-[10px] uppercase font-bold tracking-wider mt-1 ${userBanner ? 'text-gray-400' : 'text-gray-500'}`}>Puntos</p>
+                    <p className={`text-[10px] uppercase font-bold tracking-wider mt-1 ${hasCustomBanner ? 'text-gray-300' : 'text-gray-500'}`}>Puntos</p>
                 </div>
                 </div>
             );
