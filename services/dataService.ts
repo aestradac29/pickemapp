@@ -442,11 +442,27 @@ export const dataService = {
                     return { day: label, points: points }; 
                 });
 
+                // BADGES LOGIC
+                const badges: string[] = [];
+                if (globalScore > 100) badges.push('veteran');
+                if (regularSeasonPointsPerDay.some(p => p >= 6)) badges.push('oracle');
+                if (fantasyTotal > 80) badges.push('mvp_fantasy');
+                // Simulate "On Fire"
+                const len = pointsHistory.length;
+                if (len > 3 && pointsHistory[len-1].points > pointsHistory[len-2].points) badges.push('on_fire');
+
+                // Determine equipped badges (Use saved ONLY)
+                let equippedBadges = data.equippedBadges || [];
+
                 return {
                     id: userId,
                     name: data.username || 'Invocador',
                     avatar: data.avatar_url || `https://ui-avatars.com/api/?name=${data.username || 'User'}&background=random`,
                     title: data.title || '',
+                    frame: data.frame || '', 
+                    banner: data.banner || '', 
+                    badges: badges, 
+                    equippedBadges: equippedBadges, // Ensure field exists
                     score: globalScore,
                     scoreBreakdown: breakdown,
                     rank: 0, 
@@ -458,8 +474,11 @@ export const dataService = {
             const users = await Promise.all(userPromises);
             const sortedUsers = users.sort((a, b) => b.score - a.score);
             
-            // Assign Ranks
-            sortedUsers.forEach((u, i) => u.rank = i + 1);
+            // Assign Ranks and Rank-based badges
+            sortedUsers.forEach((u, i) => {
+                u.rank = i + 1;
+                if (i === 0) u.badges?.push('pro'); // Rank 1 gets 'pro'
+            });
             
             return sortedUsers;
 
@@ -470,7 +489,7 @@ export const dataService = {
     },
 
     // --- OTHER METHODS ---
-    async updateUserProfile(userId: string, updates: { avatar_url?: string, title?: string }) {
+    async updateUserProfile(userId: string, updates: { avatar_url?: string, title?: string, frame?: string, banner?: string }) {
         const docRef = doc(db, "users", userId);
         await setDoc(docRef, cleanPayload(updates), { merge: true });
     },

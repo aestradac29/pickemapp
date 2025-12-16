@@ -78,6 +78,10 @@ export interface User {
   name: string;
   avatar: string;
   title?: string; // New: Custom user title
+  frame?: string; // New: Custom avatar frame ID
+  banner?: string; // New: Custom profile banner ID
+  badges?: string[]; // New: Unlocked Achievement Badges IDs
+  equippedBadges?: string[]; // New: Currently equipped badges (Max 3)
   score: number; // Global Score (Matchday + Ranking + Playoffs)
   scoreBreakdown: {
     matchday: number;

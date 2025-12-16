@@ -1,4 +1,6 @@
+
 import { Team, Region, Match, Stage, User, Role, Player } from './types';
+import { Sparkles, Trophy, Flame, Eye, Crown, Zap, Target, Shield, Clock, Map, Gem, Share2 } from 'lucide-react';
 
 // Role Icons (Official LoL Assets - SVG versions from CommunityDragon for best quality)
 export const ROLE_ICONS: Record<Role, string> = {
@@ -7,6 +9,49 @@ export const ROLE_ICONS: Record<Role, string> = {
   [Role.MID]: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/svg/position-middle.svg",
   [Role.ADC]: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/svg/position-bottom.svg",
   [Role.SUPPORT]: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/svg/position-utility.svg"
+};
+
+// Cosmetic Styles (Frames & Banners)
+export const FRAME_STYLES: Record<string, string> = {
+    'frame_bronze': 'border-[#cd7f32] shadow-[0_0_15px_rgba(205,127,50,0.3)]',
+    'frame_silver': 'border-slate-300 shadow-[0_0_15px_rgba(203,213,225,0.3)]',
+    'frame_gold': 'border-[#fbbf24] shadow-[0_0_20px_rgba(251,191,36,0.4)]',
+    'frame_platinum': 'border-[#26e8a6] shadow-[0_0_20px_rgba(38,232,166,0.4)]',
+    'frame_master': 'border-[#d53aff] shadow-[0_0_20px_rgba(213,58,255,0.4)] ring-1 ring-[#d53aff]/30',
+    'frame_diamond': 'border-[#22d3ee] shadow-[0_0_25px_rgba(34,211,238,0.5)] ring-2 ring-[#22d3ee]/20',
+    'default': 'border-[#0a1428]'
+};
+
+// Updated Banners with Animation Classes (defined in index.html)
+export const BANNER_STYLES: Record<string, string> = {
+    'banner_freljord': 'bg-gradient-to-r from-cyan-900 via-blue-800 to-slate-900 animate-pulse-slow',
+    'banner_bilgewater': 'bg-gradient-to-r from-teal-950 via-red-900 to-amber-900', // New
+    'banner_zaun': 'bg-gradient-to-r from-emerald-900 via-teal-800 to-gray-900 bg-[length:200%_200%] animate-gradient-x',
+    'banner_ionia': 'bg-gradient-to-r from-rose-900 via-fuchsia-900 to-teal-900 animate-float', // New
+    'banner_shurima': 'bg-gradient-to-r from-amber-900 via-yellow-700 to-stone-900',
+    'banner_shadow_isles': 'bg-gradient-to-r from-green-950 via-gray-900 to-emerald-950 animate-pulse-slow', // New
+    'banner_noxus': 'bg-gradient-to-r from-red-950 via-rose-900 to-slate-900 animate-pulse-slow',
+    'banner_targon': 'bg-gradient-to-r from-indigo-900 via-purple-800 to-blue-900 bg-[length:200%_200%] animate-gradient-x', // New
+    'banner_void': 'bg-gradient-to-r from-violet-950 via-fuchsia-900 to-indigo-950 bg-[length:200%_200%] animate-gradient-x',
+    'default': 'bg-gradient-to-r from-[#0f1d36] to-[#0a1428]'
+};
+
+// Achievement Badges (Updated List)
+export const BADGE_DEFINITIONS: Record<string, { label: string, icon: any, color: string, description: string }> = {
+    'oracle': { label: 'Vidente', icon: Eye, color: 'text-purple-400 border-purple-500/50 bg-purple-900/20', description: 'Acertar 6/6 partidos en una jornada.' },
+    'mvp_fantasy': { label: 'Manager MVP', icon: Crown, color: 'text-yellow-400 border-yellow-500/50 bg-yellow-900/20', description: 'Obtener la mejor puntuación Fantasy de la semana.' },
+    'on_fire': { label: 'En Racha', icon: Flame, color: 'text-red-400 border-red-500/50 bg-red-900/20', description: '3 jornadas seguidas subiendo puntos.' },
+    'veteran': { label: 'Veterano', icon: Trophy, color: 'text-gray-300 border-gray-500/50 bg-gray-800/50', description: 'Alcanzar 100 puntos totales.' },
+    'lucky': { label: 'Suertudo', icon: Sparkles, color: 'text-green-400 border-green-500/50 bg-green-900/20', description: 'Ganar una jornada por solo 1 punto de diferencia.' },
+    'pro': { label: 'Pro', icon: Zap, color: 'text-blue-400 border-blue-500/50 bg-blue-900/20', description: 'Alcanzar el Top 1% Global.' },
+    
+    // Nuevos
+    'strategist': { label: 'Estratega', icon: Map, color: 'text-emerald-400 border-emerald-500/50 bg-emerald-900/20', description: 'Acertar el orden exacto del Top 3 en el Ranking.' },
+    'underdog': { label: 'Underdog', icon: Shield, color: 'text-orange-400 border-orange-500/50 bg-orange-900/20', description: 'Ganar una apuesta contra el favorito de la IA.' },
+    'early_bird': { label: 'Madrugador', icon: Clock, color: 'text-cyan-400 border-cyan-500/50 bg-cyan-900/20', description: 'Enviar predicciones 24h antes del cierre.' },
+    'collector': { label: 'Coleccionista', icon: Gem, color: 'text-pink-400 border-pink-500/50 bg-pink-900/20', description: 'Desbloquear 10 recompensas cosméticas.' },
+    'social': { label: 'Social', icon: Share2, color: 'text-indigo-400 border-indigo-500/50 bg-indigo-900/20', description: 'Compartir tu perfil 5 veces.' },
+    'analyst': { label: 'Analista', icon: Target, color: 'text-teal-400 border-teal-500/50 bg-teal-900/20', description: 'Acertar al MVP en la Bola de Cristal.' }
 };
 
 // Helper: URLs directas a la Wiki. Gracias al meta tag "no-referrer" en index.html, esto funcionará sin bloqueos CORS.

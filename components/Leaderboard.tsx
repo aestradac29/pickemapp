@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { User } from '../types';
 import { Trophy, Medal, TrendingUp, Swords, ListOrdered, Sparkles, UserPlus, Globe } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, Tooltip, CartesianGrid } from 'recharts';
+import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS } from '../constants';
 
 interface LeaderboardProps {
   users: User[];
@@ -110,55 +112,91 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
         </h3>
         
         <div className="space-y-3">
-          {sortedUsers.map((user, idx) => (
-            <div 
-              key={user.id}
-              className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${
-                idx === 0 
-                  ? 'bg-gradient-to-r from-[#c8aa6e]/20 to-transparent border-[#c8aa6e]/50 shadow-[0_0_10px_rgba(200,170,110,0.1)]' 
-                  : 'bg-[#0f1d36] border-gray-800 hover:border-gray-600'
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-8 flex justify-center font-bold text-xl">
-                  {idx === 0 ? <span className="text-yellow-400 drop-shadow-lg">1º</span> : 
-                   idx === 1 ? <span className="text-gray-300 drop-shadow-md">2º</span> :
-                   idx === 2 ? <span className="text-amber-700 drop-shadow-md">3º</span> :
-                   <span className="text-gray-600">{idx + 1}º</span>}
-                </div>
-                <div className="relative">
-                    <img 
-                    src={user.avatar} 
-                    alt={user.name} 
-                    className={`w-12 h-12 rounded-full border-2 object-cover ${idx === 0 ? 'border-[#c8aa6e]' : 'border-gray-600'}`} 
-                    />
-                    {idx === 0 && (
-                        <div className="absolute -top-2 -right-1 bg-[#c8aa6e] rounded-full p-0.5 border border-[#0a1428]">
-                            <Trophy className="w-3 h-3 text-[#0a1428]" />
+          {sortedUsers.map((user, idx) => {
+            // --- VISUAL STYLING LOGIC ---
+            
+            // 1. BANNER: Priority to User Banner, else Rank 1 Special, else Default
+            const userBanner = user.banner && BANNER_STYLES[user.banner] ? BANNER_STYLES[user.banner] : null;
+            const rowClass = userBanner 
+                ? `${userBanner} border-gray-600 shadow-md` 
+                : idx === 0 
+                    ? 'bg-gradient-to-r from-[#c8aa6e]/20 to-transparent border-[#c8aa6e]/50 shadow-[0_0_10px_rgba(200,170,110,0.1)]' 
+                    : 'bg-[#0f1d36] border-gray-800 hover:border-gray-600';
+
+            // 2. FRAME: Priority to User Frame, else Rank 1 Special, else Default Border
+            const userFrame = user.frame && FRAME_STYLES[user.frame] ? FRAME_STYLES[user.frame] : null;
+            // Simplify frame styles for smaller list items if needed, or use as is
+            const frameClass = userFrame || (idx === 0 ? 'border-[#c8aa6e] shadow-[0_0_10px_rgba(200,170,110,0.3)]' : 'border-gray-600');
+
+            // 3. BADGES: Only show EQUIPPED badges. No auto-fallback.
+            const badgesToShow = user.equippedBadges || [];
+
+            return (
+                <div 
+                key={user.id}
+                className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 relative overflow-hidden ${rowClass}`}
+                >
+                {/* Banner Overlay for consistency (darken slightly) */}
+                {userBanner && <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>}
+
+                <div className="flex items-center gap-4 relative z-10">
+                    <div className="w-8 flex justify-center font-bold text-xl">
+                    {idx === 0 ? <span className="text-yellow-400 drop-shadow-lg">1º</span> : 
+                    idx === 1 ? <span className="text-gray-300 drop-shadow-md">2º</span> :
+                    idx === 2 ? <span className="text-amber-700 drop-shadow-md">3º</span> :
+                    <span className="text-gray-600">{idx + 1}º</span>}
+                    </div>
+                    
+                    <div className="relative">
+                        <div className={`w-12 h-12 rounded-full border-2 overflow-hidden bg-[#0a1428] ${frameClass}`}>
+                            <img 
+                                src={user.avatar} 
+                                alt={user.name} 
+                                className="w-full h-full object-cover" 
+                            />
                         </div>
-                    )}
+                        {idx === 0 && (
+                            <div className="absolute -top-2 -right-1 bg-[#c8aa6e] rounded-full p-0.5 border border-[#0a1428] z-20">
+                                <Trophy className="w-3 h-3 text-[#0a1428]" />
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <p className={`font-bold text-lg drop-shadow-md ${userBanner ? 'text-white' : idx === 0 ? 'text-[#c8aa6e]' : 'text-gray-200'}`}>
+                                {user.name}
+                            </p>
+                            {badgesToShow.map(b => {
+                                const def = BADGE_DEFINITIONS[b];
+                                if (!def) return null;
+                                const Icon = def.icon;
+                                return (
+                                    <div key={b} className={`p-0.5 rounded-full ${def.color.split(' ')[2]} border ${def.color.split(' ')[1]}`} title={def.label}>
+                                        <Icon className={`w-3 h-3 ${def.color.split(' ')[0]}`} />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className={`text-xs font-medium truncate max-w-[150px] sm:max-w-xs ${userBanner ? 'text-gray-300' : 'text-gray-500'}`}>
+                            {user.title ? (
+                                <span className={`${userBanner ? 'text-[#c8aa6e]' : 'text-[#c8aa6e]'} italic`}>{user.title}</span>
+                            ) : (
+                                <span>{activeCategory === 'fantasy' ? 'Manager' : 'Aspirante'}</span>
+                            )}
+                        </p>
+                    </div>
                 </div>
-                <div>
-                  <p className={`font-bold text-lg ${idx === 0 ? 'text-[#c8aa6e]' : 'text-gray-200'}`}>
-                    {user.name}
-                  </p>
-                  <p className="text-xs text-gray-500 font-medium truncate max-w-[150px] sm:max-w-xs">
-                      {user.title ? (
-                          <span className="text-[#c8aa6e] italic">{user.title}</span>
-                      ) : (
-                          <span>{activeCategory === 'fantasy' ? 'Manager' : 'Aspirante'}</span>
-                      )}
-                  </p>
+                
+                <div className="text-right relative z-10">
+                    <p className={`text-2xl font-bold leading-none drop-shadow-md ${userBanner ? 'text-white' : idx === 0 ? 'text-white' : 'text-gray-300'}`}>
+                        {getScore(user)}
+                    </p>
+                    <p className={`text-[10px] uppercase font-bold tracking-wider mt-1 ${userBanner ? 'text-gray-400' : 'text-gray-500'}`}>Puntos</p>
                 </div>
-              </div>
-              <div className="text-right">
-                <p className={`text-2xl font-bold leading-none ${idx === 0 ? 'text-white' : 'text-gray-300'}`}>
-                    {getScore(user)}
-                </p>
-                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mt-1">Puntos</p>
-              </div>
-            </div>
-          ))}
+                </div>
+            );
+          })}
         </div>
       </div>
 
