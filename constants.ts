@@ -11,6 +11,44 @@ export const ROLE_ICONS: Record<Role, string> = {
   [Role.SUPPORT]: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/svg/position-utility.svg"
 };
 
+// Lista de países comunes en LoL Esports
+export const COUNTRIES = [
+    { code: 'KR', name: 'Corea del Sur' },
+    { code: 'CN', name: 'China' },
+    { code: 'ES', name: 'España' },
+    { code: 'FR', name: 'Francia' },
+    { code: 'DE', name: 'Alemania' },
+    { code: 'DK', name: 'Dinamarca' },
+    { code: 'SE', name: 'Suecia' },
+    { code: 'PL', name: 'Polonia' },
+    { code: 'GB', name: 'Reino Unido' },
+    { code: 'TR', name: 'Turquía' },
+    { code: 'CZ', name: 'Rep. Checa' },
+    { code: 'GR', name: 'Grecia' },
+    { code: 'PT', name: 'Portugal' },
+    { code: 'IT', name: 'Italia' },
+    { code: 'BE', name: 'Bélgica' },
+    { code: 'NL', name: 'Países Bajos' },
+    { code: 'HR', name: 'Croacia' },
+    { code: 'SI', name: 'Eslovenia' },
+    { code: 'SK', name: 'Eslovaquia' },
+    { code: 'NO', name: 'Noruega' },
+    { code: 'FI', name: 'Finlandia' },
+    { code: 'RO', name: 'Rumanía' },
+    { code: 'BG', name: 'Bulgaria' },
+    { code: 'RS', name: 'Serbia' },
+    { code: 'LT', name: 'Lituania' },
+    { code: 'LV', name: 'Letonia' },
+    { code: 'EE', name: 'Estonia' },
+    { code: 'US', name: 'Estados Unidos' },
+    { code: 'CA', name: 'Canadá' },
+    { code: 'AU', name: 'Australia' },
+    { code: 'BR', name: 'Brasil' },
+    { code: 'AR', name: 'Argentina' },
+    { code: 'CH', name: 'Suiza' },
+    { code: 'UA', name: 'Ucrania' },
+];
+
 // Fantasy Schedule Definition
 export const FANTASY_SCHEDULE = [
     { id: 1, label: 'Jornada 1', matchdays: [1, 2, 3], stage: Stage.GROUPS },

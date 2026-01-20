@@ -45,6 +45,7 @@ export interface Team {
   region: Region;
   color: string;
   logo?: string;
+  country?: string; // New: Country code or name
 }
 
 export interface Player {
@@ -62,6 +63,7 @@ export interface Player {
   priceChange?: number; // e.g. +20, -10 (Trend)
   isHot?: boolean; // If they are on a streak
   highlight?: string; // New: Statistical Highlight (e.g., "MVP", "Penta")
+  country?: string; // New: Country code or name
 }
 
 // Estructura de estadísticas para un jugador en un partido específico

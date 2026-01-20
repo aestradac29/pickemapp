@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Team, Role } from '../types';
 import { dataService } from '../services/dataService';
-import { Save, Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield } from 'lucide-react';
-import { ROLE_ICONS } from '../constants';
+import { Save, Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, Flag } from 'lucide-react';
+import { ROLE_ICONS, COUNTRIES } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'players' | 'teams'>('players');
@@ -94,6 +94,25 @@ export const DatabaseManager: React.FC = () => {
         }
     };
 
+    // Helper para renderizar la bandera
+    const renderFlag = (countryCode?: string) => {
+        if (!countryCode) return <span className="text-gray-600">-</span>;
+        const country = COUNTRIES.find(c => c.code === countryCode);
+        return (
+            <div className="flex items-center gap-2 justify-center" title={country?.name || countryCode}>
+                <img 
+                    src={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`} 
+                    srcSet={`https://flagcdn.com/w80/${countryCode.toLowerCase()}.png 2x`}
+                    width="24" 
+                    height="16" // Aspect ratio approx for flags
+                    alt={countryCode} 
+                    className="rounded-sm shadow-sm object-cover"
+                />
+                <span className="text-[10px] font-mono text-gray-400">{countryCode}</span>
+            </div>
+        );
+    };
+
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] text-[#c8aa6e]">
@@ -178,6 +197,7 @@ export const DatabaseManager: React.FC = () => {
                             <thead className="bg-[#1a2c4e] text-gray-400 uppercase font-bold text-xs">
                                 <tr>
                                     <th className="p-4">Jugador</th>
+                                    <th className="p-4 text-center">País</th>
                                     <th className="p-4">Equipo</th>
                                     <th className="p-4">Rol</th>
                                     <th className="p-4">Coste ($)</th>
@@ -204,6 +224,26 @@ export const DatabaseManager: React.FC = () => {
                                                         className="bg-black border border-gray-600 rounded p-1 w-32"
                                                     />
                                                 ) : player.name}
+                                            </td>
+
+                                            {/* COUNTRY (SELECTOR) */}
+                                            <td className="p-4 text-center">
+                                                {isEditing ? (
+                                                    <select 
+                                                        value={editFormPlayer.country || ''}
+                                                        onChange={e => setEditFormPlayer({...editFormPlayer, country: e.target.value})}
+                                                        className="bg-black border border-gray-600 rounded p-1 text-xs w-20 text-center"
+                                                    >
+                                                        <option value="">-</option>
+                                                        {COUNTRIES.sort((a,b) => a.name.localeCompare(b.name)).map(c => (
+                                                            <option key={c.code} value={c.code}>
+                                                                {c.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    renderFlag(player.country)
+                                                )}
                                             </td>
 
                                             {/* TEAM */}
@@ -345,6 +385,7 @@ export const DatabaseManager: React.FC = () => {
                                     <th className="p-4">Nombre Completo</th>
                                     <th className="p-4">Tag (4 letras)</th>
                                     <th className="p-4">Región</th>
+                                    <th className="p-4 text-center">País</th>
                                     <th className="p-4">Color (HEX)</th>
                                     <th className="p-4">Logo URL</th>
                                     <th className="p-4 text-right">Acciones</th>
@@ -400,6 +441,26 @@ export const DatabaseManager: React.FC = () => {
                                                         className="bg-black border border-gray-600 rounded p-1 w-20 uppercase"
                                                     />
                                                 ) : <span className="text-xs bg-gray-800 px-2 py-1 rounded">{team.region}</span>}
+                                            </td>
+
+                                            {/* COUNTRY (SELECTOR) */}
+                                            <td className="p-4 text-center">
+                                                {isEditing ? (
+                                                    <select 
+                                                        value={editFormTeam.country || ''}
+                                                        onChange={e => setEditFormTeam({...editFormTeam, country: e.target.value})}
+                                                        className="bg-black border border-gray-600 rounded p-1 text-xs w-20 text-center"
+                                                    >
+                                                        <option value="">-</option>
+                                                        {COUNTRIES.sort((a,b) => a.name.localeCompare(b.name)).map(c => (
+                                                            <option key={c.code} value={c.code}>
+                                                                {c.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    renderFlag(team.country)
+                                                )}
                                             </td>
 
                                             {/* COLOR */}

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ROLE_ICONS, FANTASY_SCHEDULE } from '../constants';
+import { ROLE_ICONS, FANTASY_SCHEDULE, COUNTRIES } from '../constants';
 import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User } from '../types';
 import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, TrendingDown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
@@ -60,6 +60,11 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
   // Price Trend (Visual indicators only)
   const priceChange = player?.priceChange || 0;
   const isPriceUp = priceChange >= 0;
+
+  // Country Name for Tooltip
+  const countryName = player?.country 
+    ? (COUNTRIES.find(c => c.code === player.country)?.name || player.country) 
+    : '';
 
   return (
     <div className="relative group perspective-1000 hover:z-50 h-full w-full">
@@ -121,9 +126,23 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
                       className={`w-24 h-24 rounded-full border-4 shadow-xl relative z-10 object-cover bg-gray-900 ${!player.photo || imgError ? 'p-4 bg-black/50' : ''}`}
                       style={{ borderColor: teamColor }}
                   />
-                  <div className="absolute -bottom-1 -right-1 bg-[#0a1428] rounded-full p-1 border border-gray-600 z-20 shadow-lg">
+                  
+                  {/* Team Logo (Bottom Right) */}
+                  <div className="absolute -bottom-1 -right-1 bg-[#0a1428] rounded-full p-1 border border-gray-600 z-20 shadow-lg" title={teamInfo.name}>
                       {teamInfo.logo ? <img src={teamInfo.logo} alt="" className="w-6 h-6 rounded-full object-contain" /> : <div className="w-6 h-6 rounded-full" style={{ backgroundColor: teamColor }}></div>}
                   </div>
+
+                  {/* Country Flag (Bottom Left) */}
+                  {player.country && (
+                      <div className="absolute -bottom-1 -left-1 bg-[#0a1428] rounded-full p-1 border border-gray-600 z-20 shadow-lg" title={countryName}>
+                          <img 
+                              src={`https://flagcdn.com/w40/${player.country.toLowerCase()}.png`}
+                              srcSet={`https://flagcdn.com/w80/${player.country.toLowerCase()}.png 2x`}
+                              alt={countryName}
+                              className="w-6 h-6 rounded-full object-cover"
+                          />
+                      </div>
+                  )}
                </div>
 
                {/* Name & Team */}
