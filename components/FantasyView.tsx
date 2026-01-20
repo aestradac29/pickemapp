@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ROLE_ICONS, FANTASY_SCHEDULE, COUNTRIES } from '../constants';
 import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User } from '../types';
-import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, TrendingDown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole } from 'lucide-react';
+import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, TrendingDown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole, Skull, Crosshair, Droplet } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { dataService } from '../services/dataService';
 
@@ -409,7 +409,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
           setOriginalTeam(null);
           setMyCaptain(null);
       }
-  };
+    };
 
   const loadData = async () => {
     setIsLoadingData(true);
@@ -694,10 +694,8 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
   const isRoundStartedOrPast = viewRoundId < activeConfigRound || (viewRoundId === activeConfigRound && roundLocked);
   const canViewTeam = isOwnTeam || isRoundStartedOrPast;
 
-  // ... (Return JSX is mostly the same) ...
   return (
     <div className="w-[98%] max-w-[2400px] mx-auto animate-in fade-in pb-20 pt-4 relative">
-        {/* Modal, Rules, Headers ... same as before ... */}
         
       {/* --- CONFIRMATION MODAL (ROUND CHANGE) --- */}
       {pendingRoundChange !== null && (
@@ -737,12 +735,175 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                 </div>
             </div>
         </div>
-    
       )}
 
-      {/* ... Header and Tabs Code ... */}
-      
-      {/* MAIN CONTENT */}
+      {/* --- RULES MODAL (NEW) --- */}
+      {showRules && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+            <div className="bg-[#091428] border-2 border-[#0ac8b9] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-[0_0_50px_rgba(10,200,185,0.2)] flex flex-col">
+                <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#0f1d36] sticky top-0 z-10">
+                    <div className="flex items-center gap-3">
+                        <Info className="w-6 h-6 text-[#0ac8b9]" />
+                        <h2 className="text-xl font-bold text-white uppercase tracking-wide">Sistema de Puntuación</h2>
+                    </div>
+                    <button onClick={() => setShowRules(false)} className="text-gray-400 hover:text-white transition-colors">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+                
+                <div className="p-6 space-y-8 bg-[#091428] text-sm text-gray-300">
+                    
+                    {/* General Stats */}
+                    <div>
+                        <h3 className="text-[#0ac8b9] font-bold uppercase tracking-wider mb-3 border-b border-[#0ac8b9]/30 pb-1">Estadísticas Base</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div className="bg-[#0f1d36] p-3 rounded border border-gray-700 flex flex-col items-center">
+                                <span className="text-white font-bold text-lg">+1.5</span>
+                                <span className="text-[10px] text-gray-500 uppercase">Kill</span>
+                            </div>
+                            <div className="bg-[#0f1d36] p-3 rounded border border-gray-700 flex flex-col items-center">
+                                <span className="text-red-400 font-bold text-lg">-1.0</span>
+                                <span className="text-[10px] text-gray-500 uppercase">Death</span>
+                            </div>
+                            <div className="bg-[#0f1d36] p-3 rounded border border-gray-700 flex flex-col items-center">
+                                <span className="text-white font-bold text-lg">+1.0</span>
+                                <span className="text-[10px] text-gray-500 uppercase">Assist</span>
+                            </div>
+                            <div className="bg-[#0f1d36] p-3 rounded border border-gray-700 flex flex-col items-center">
+                                <span className="text-white font-bold text-lg">+0.01</span>
+                                <span className="text-[10px] text-gray-500 uppercase">CS</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bonus & Multikills */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h3 className="text-yellow-500 font-bold uppercase tracking-wider mb-3 border-b border-yellow-500/30 pb-1">Bonus Globales</h3>
+                            <ul className="space-y-2">
+                                <li className="flex justify-between items-center bg-[#0f1d36]/50 p-2 rounded">
+                                    <span className="flex items-center gap-2"><Trophy className="w-4 h-4 text-yellow-400" /> Victoria</span>
+                                    <span className="font-bold text-white">+1</span>
+                                </li>
+                                <li className="flex justify-between items-center bg-[#0f1d36]/50 p-2 rounded">
+                                    <span className="flex items-center gap-2"><Crown className="w-4 h-4 text-yellow-400" /> MVP</span>
+                                    <span className="font-bold text-yellow-400">+3</span>
+                                </li>
+                                <li className="flex justify-between items-center bg-[#0f1d36]/50 p-2 rounded">
+                                    <span className="flex items-center gap-2"><Droplet className="w-4 h-4 text-red-400" /> First Blood</span>
+                                    <span className="font-bold text-white">+1</span>
+                                </li>
+                                <li className="flex justify-between items-center bg-[#0f1d36]/50 p-2 rounded" title="10 o más kills">
+                                    <span className="flex items-center gap-2"><Swords className="w-4 h-4 text-orange-400" /> High Kill (+10)</span>
+                                    <span className="font-bold text-orange-400">+3</span>
+                                </li>
+                                <li className="flex justify-between items-center bg-[#0f1d36]/50 p-2 rounded" title="0 Muertes y KDA >= 5">
+                                    <span className="flex items-center gap-2"><Shield className="w-4 h-4 text-blue-400" /> Perfect Game</span>
+                                    <span className="font-bold text-blue-400">+3</span>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h3 className="text-purple-400 font-bold uppercase tracking-wider mb-3 border-b border-purple-500/30 pb-1">Multikills</h3>
+                            <ul className="space-y-2">
+                                <li className="flex justify-between items-center bg-[#0f1d36]/50 p-2 rounded">
+                                    <span>Double Kill</span>
+                                    <span className="font-bold text-white">+1</span>
+                                </li>
+                                <li className="flex justify-between items-center bg-[#0f1d36]/50 p-2 rounded">
+                                    <span>Triple Kill</span>
+                                    <span className="font-bold text-white">+2</span>
+                                </li>
+                                <li className="flex justify-between items-center bg-[#0f1d36]/50 p-2 rounded">
+                                    <span className="flex items-center gap-2"><Crosshair className="w-4 h-4 text-orange-400" /> Quadra Kill</span>
+                                    <span className="font-bold text-orange-400">+3</span>
+                                </li>
+                                <li className="flex justify-between items-center bg-[#0f1d36]/50 p-2 rounded">
+                                    <span className="flex items-center gap-2"><Skull className="w-4 h-4 text-purple-500" /> PENTA KILL</span>
+                                    <span className="font-bold text-purple-500">+4</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* Role Specifics */}
+                    <div>
+                        <h3 className="text-blue-400 font-bold uppercase tracking-wider mb-3 border-b border-blue-500/30 pb-1">Bonificaciones de Rol</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                            <div className="bg-[#0f1d36] p-3 rounded border border-gray-700">
+                                <div className="text-orange-400 font-bold uppercase mb-1">Top / Mid</div>
+                                <div className="flex justify-between text-gray-400">
+                                    <span>{'>25% / 30%'} Daño Equipo</span>
+                                    <span className="text-white font-bold">+3</span>
+                                </div>
+                            </div>
+                            <div className="bg-[#0f1d36] p-3 rounded border border-gray-700">
+                                <div className="text-green-400 font-bold uppercase mb-1">Jungle</div>
+                                <div className="flex justify-between text-gray-400 mb-1">
+                                    <span>Alma Dragón (4)</span>
+                                    <span className="text-white font-bold">+1.5</span>
+                                </div>
+                                <div className="flex justify-between text-gray-400">
+                                    <span>Baron Nashor</span>
+                                    <span className="text-white font-bold">+2 /u</span>
+                                </div>
+                            </div>
+                            <div className="bg-[#0f1d36] p-3 rounded border border-gray-700">
+                                <div className="text-blue-400 font-bold uppercase mb-1">ADC</div>
+                                <div className="flex justify-between text-gray-400">
+                                    <span>{'>1000'} DPM</span>
+                                    <span className="text-white font-bold">+3</span>
+                                </div>
+                            </div>
+                            <div className="bg-[#0f1d36] p-3 rounded border border-gray-700 col-span-1 sm:col-span-2 md:col-span-3">
+                                <div className="text-cyan-400 font-bold uppercase mb-1">Support</div>
+                                <div className="flex flex-wrap gap-4 text-gray-400">
+                                    <div className="flex items-center gap-2">
+                                        <span>{'>10'} Asistencias:</span>
+                                        <span className="text-white font-bold">+2</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span>1er Dragón:</span>
+                                        <span className="text-white font-bold">+1</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span>Vision Score:</span>
+                                        <span className="text-white font-bold">x0.03</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* PLAYOFFS MULTIPLIERS SECTION */}
+                    <div className="bg-[#0f1d36] p-3 rounded border border-blue-900/50">
+                        <h3 className="text-[#c8aa6e] font-bold uppercase tracking-wider mb-2 border-b border-[#c8aa6e]/30 pb-1">Multiplicadores de Playoffs</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-center">
+                            <div className="bg-black/30 p-2 rounded">
+                                <span className="block text-gray-400 mb-1">Winners Bracket</span>
+                                <span className="text-white font-bold text-lg">+15%</span>
+                            </div>
+                            <div className="bg-black/30 p-2 rounded">
+                                <span className="block text-gray-400 mb-1">Losers Bracket</span>
+                                <span className="text-gray-500 font-bold text-lg">0%</span>
+                            </div>
+                            <div className="bg-black/30 p-2 rounded border border-yellow-500/30">
+                                <span className="block text-yellow-200 mb-1">Gran Final</span>
+                                <span className="text-yellow-400 font-bold text-lg">+25%</span>
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-2 text-center italic">* Los porcentajes se aplican al total de puntos del jugador en ese partido.</p>
+                    </div>
+
+                    <div className="p-3 bg-yellow-900/10 border border-yellow-500/20 rounded-lg text-xs text-yellow-200/80 text-center">
+                        <span className="font-bold text-yellow-400">CAPITÁN:</span> Multiplica x1.5 todos los puntos obtenidos (se acumula con Playoffs).
+                    </div>
+
+                </div>
+            </div>
+        </div>
+      )}
       
       {/* HEADER BAR */}
       <div className="flex flex-col gap-6 mb-6">
@@ -813,7 +974,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                       <History className="w-4 h-4" /> Historial
                   </button>
                   <div className="w-px h-6 bg-gray-700 mx-1"></div>
-                  <button onClick={() => setShowRules(true)} className="p-2 text-gray-400 hover:text-[#0ac8b9] transition-colors rounded-md hover:bg-[#0a1428]">
+                  <button onClick={() => setShowRules(true)} className="p-2 text-gray-400 hover:text-[#0ac8b9] transition-colors rounded-md hover:bg-[#0a1428]" title="Ver reglas de puntuación">
                     <Info className="w-4 h-4" />
                   </button>
               </div>
