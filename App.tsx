@@ -255,7 +255,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a1428] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1a2c4e] via-[#0a1428] to-[#0a1428] text-[#f0e6d2] font-sans">
+    <div className="min-h-screen bg-[#0a1428] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1a2c4e] via-[#0a1428] to-[#0a1428] text-[#f0e6d2] font-sans flex flex-col">
       
       {/* Navbar */}
       {currentUser && !showPasswordResetModal && view !== ViewState.LOGIN && (
@@ -269,7 +269,7 @@ const App: React.FC = () => {
                 onClick={() => selectedSplit && setView(ViewState.DASHBOARD)}
               >
                 <div className="w-9 h-9 bg-gradient-to-br from-hextech-500 to-hextech-900 rounded rotate-45 flex items-center justify-center border border-hextech-400 shadow-md group-hover:scale-105 transition-transform">
-                  <span className="text-white -rotate-45 font-bold text-sm">L</span>
+                  <span className="text-white -rotate-45 font-bold text-sm">P</span>
                 </div>
                 <div className="flex flex-col">
                     <h1 className="font-bold text-lg tracking-wide text-hextech-400 leading-none">
@@ -390,9 +390,21 @@ const App: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
         {renderContent()}
       </main>
+
+      {/* Footer */}
+      <footer className="w-full bg-[#050a14] border-t border-white/5 py-8 mt-auto backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto px-4 text-center">
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-medium">
+                Pick’em Pro es una plataforma independiente de predicciones de esports.
+            </p>
+            <p className="text-[10px] text-gray-600 mt-1">
+                No está afiliada, patrocinada ni respaldada por Riot Games ni por ninguna de sus competiciones o equipos.
+            </p>
+        </div>
+      </footer>
 
       {/* Password Reset Modal */}
       {showPasswordResetModal && (
