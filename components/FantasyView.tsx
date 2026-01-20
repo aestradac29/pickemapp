@@ -586,12 +586,12 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
 
   const handleForceRecalculate = async () => {
       if (!isAdmin) return;
-      if (!window.confirm("Esto recalculará TODOS los puntos Fantasy basándose en las estadísticas actuales. ¿Continuar?")) return;
+      if (!window.confirm("CONFIRMACIÓN: Esto escaneará TODOS los equipos de usuarios y recalculará sus puntos basándose en las estadísticas de partidos actuales.\n\nÚsalo SOLO si has editado estadísticas de partidos YA finalizados y quieres corregir puntuaciones.")) return;
       
       setIsAdminSaving(true);
       try {
           await dataService.forceRecalculateAll();
-          alert("Puntos recalculados correctamente.");
+          alert("Puntos recalculados correctamente. El Leaderboard se actualizará.");
           await loadData();
       } catch(e) {
           alert("Error al recalcular.");
@@ -950,9 +950,9 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                     <button 
                         onClick={handleForceRecalculate}
                         className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold uppercase border bg-purple-900/50 border-purple-500 text-purple-300 hover:bg-purple-900/80 transition-colors"
-                        title="Recalcular puntos de la jornada actual basado en stats"
+                        title="Recalcular puntuaciones: Sincroniza todos los equipos de usuarios con las estadísticas de partidos editadas."
                     >
-                        <RefreshCcw className="w-3 h-3" />
+                        <RefreshCcw className="w-3 h-3" /> Recalcular
                     </button>
                 </div>
             )}
