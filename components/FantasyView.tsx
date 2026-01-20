@@ -145,6 +145,22 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
                    )}
                </div>
 
+                {/* SELL BUTTON (MOVED HERE) */}
+                {!readOnly && !locked && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onSelect(role, null); }}
+                        className={`w-full py-1.5 mb-3 text-[10px] font-bold uppercase tracking-wider rounded border transition-all flex items-center justify-center gap-1.5
+                            ${isValueProtected
+                                ? 'bg-red-900/40 text-red-200 border-red-500/50 hover:bg-red-600 hover:text-white hover:border-red-400 animate-pulse'
+                                : 'bg-gray-800 text-gray-400 border-gray-700 hover:bg-red-900/30 hover:text-red-300 hover:border-red-500/50'
+                            }`}
+                        title={isValueProtected ? "¡CUIDADO! Si vendes y guardas, perderás el precio protegido." : "Vender jugador"}
+                    >
+                        <X className="w-3 h-3" />
+                        Vender
+                    </button>
+                )}
+
                {/* STATS GRID */}
                <div className="w-full mt-auto space-y-1.5">
                   <div className="grid grid-cols-2 gap-1.5">
@@ -205,29 +221,14 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
                       </div>
                   </div>
                   
-                  {/* Market Price Context (Only if protected) */}
+                  {/* Market Price Context (Only if protected) - REMOVED LINE-THROUGH */}
                   {isValueProtected && !locked && (
                       <div className="text-[9px] text-center text-gray-400 font-mono bg-black/40 rounded py-0.5 border border-gray-800">
-                          Precio actual en tienda: <span className="text-red-400 line-through">${currentMarketCost}</span>
+                          Precio actual en tienda: <span className="text-red-400">${currentMarketCost}</span>
                       </div>
                   )}
                </div>
             </div>
-
-            {/* Remove Button */}
-            {!readOnly && !locked && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); onSelect(role, null); }}
-                className={`absolute top-2 right-10 p-2 rounded-full transition-colors z-20 shadow-lg border ${
-                    isValueProtected 
-                    ? 'text-red-300 bg-red-900/40 border-red-500/50 hover:bg-red-600 hover:text-white hover:border-red-400 animate-pulse' 
-                    : 'text-gray-500 bg-black/40 border-gray-700 hover:text-red-400 hover:bg-red-900/20 hover:border-red-500/30'
-                }`}
-                title={isValueProtected ? "¡CUIDADO! Si vendes, perderás el precio protegido. Si lo vuelves a fichar sin guardar, lo recuperarás." : "Vender jugador"}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
           </>
         ) : (
           // EMPTY SLOT
