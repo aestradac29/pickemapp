@@ -21,6 +21,7 @@ export const DatabaseManager: React.FC = () => {
     // Filter State
     const [search, setSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState<Role | 'ALL'>('ALL');
+    const [teamFilter, setTeamFilter] = useState<string>('ALL');
 
     // Action State
     const [isSaving, setIsSaving] = useState(false);
@@ -48,9 +49,10 @@ export const DatabaseManager: React.FC = () => {
     // --- PLAYERS LOGIC ---
     const filteredPlayers = players.filter(p => {
         const matchesRole = roleFilter === 'ALL' || p.role === roleFilter;
+        const matchesTeam = teamFilter === 'ALL' || p.teamId === teamFilter;
         const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
                               p.id.toLowerCase().includes(search.toLowerCase());
-        return matchesRole && matchesSearch;
+        return matchesRole && matchesTeam && matchesSearch;
     });
 
     const startEditPlayer = (player: Player) => {
@@ -134,7 +136,7 @@ export const DatabaseManager: React.FC = () => {
                 <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
                     {/* Filters */}
                     <div className="p-4 bg-[#0f1923] border-b border-gray-700 flex flex-col md:flex-row gap-4 justify-between items-center">
-                        <div className="flex items-center gap-2 w-full md:w-auto">
+                        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                             <select 
                                 value={roleFilter}
                                 onChange={(e) => setRoleFilter(e.target.value as Role | 'ALL')}
@@ -143,6 +145,18 @@ export const DatabaseManager: React.FC = () => {
                                 <option value="ALL">Todos los Roles</option>
                                 {Object.values(Role).map(r => <option key={r} value={r}>{r}</option>)}
                             </select>
+
+                            <select 
+                                value={teamFilter}
+                                onChange={(e) => setTeamFilter(e.target.value)}
+                                className="bg-[#050a14] text-white text-sm rounded border border-gray-600 p-2.5 outline-none focus:border-[#c8aa6e] max-w-[150px]"
+                            >
+                                <option value="ALL">Todos los Equipos</option>
+                                {teams.sort((a,b) => a.name.localeCompare(b.name)).map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+
                             <div className="relative flex-1 md:w-64">
                                 <input 
                                     value={search}

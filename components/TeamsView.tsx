@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { dataService } from '../services/dataService';
 import { Team, Player, Role, Match, Stage } from '../types';
 import { ROLE_ICONS } from '../constants';
-import { Loader2, Users, TrendingUp, TrendingDown, Coins, X, Activity, Target, Skull, Trophy, ListOrdered, LayoutGrid } from 'lucide-react';
+import { Loader2, Users, TrendingUp, TrendingDown, Coins, X, Activity, Target, Skull, Trophy, ListOrdered, LayoutGrid, Minus } from 'lucide-react';
 
 interface PlayerHistoryModalProps {
     player: Player;
@@ -186,7 +186,7 @@ export const TeamsView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     
     // Tab State
-    const [activeTab, setActiveTab] = useState<'teams' | 'roles'>('teams');
+    const [activeTab, setActiveTab] = useState<'teams' | 'roles' | 'trends'>('teams');
 
     // Modal State
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -251,6 +251,21 @@ export const TeamsView: React.FC = () => {
         return result;
     }, [players]);
 
+    // Sort Players by Price Change within Roles for 'trends' tab
+    const playersByTrend = useMemo(() => {
+        const result: Record<Role, Player[]> = {
+            [Role.TOP]: [], [Role.JUNGLE]: [], [Role.MID]: [], [Role.ADC]: [], [Role.SUPPORT]: []
+        };
+        
+        Object.values(Role).forEach(role => {
+            result[role] = players
+                .filter(p => p.role === role)
+                .sort((a, b) => (b.priceChange || 0) - (a.priceChange || 0));
+        });
+        
+        return result;
+    }, [players]);
+
     if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-[#c8aa6e]" /></div>;
 
     return (
@@ -263,7 +278,7 @@ export const TeamsView: React.FC = () => {
                     Estadísticas & Rosters
                 </h2>
 
-                <div className="flex bg-[#0f1d36] p-1 rounded-lg border border-gray-700">
+                <div className="flex flex-wrap justify-center bg-[#0f1d36] p-1 rounded-lg border border-gray-700">
                     <button 
                         onClick={() => setActiveTab('teams')}
                         className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-bold uppercase transition-all ${activeTab === 'teams' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
@@ -275,6 +290,12 @@ export const TeamsView: React.FC = () => {
                         className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-bold uppercase transition-all ${activeTab === 'roles' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
                     >
                         <ListOrdered className="w-4 h-4" /> Ranking por Rol
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('trends')}
+                        className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-bold uppercase transition-all ${activeTab === 'trends' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <TrendingUp className="w-4 h-4" /> Tendencias
                     </button>
                 </div>
             </div>
@@ -510,6 +531,75 @@ export const TeamsView: React.FC = () => {
                                             <div className="text-right">
                                                 <div className={`font-bold text-sm ${rank <= 3 ? 'text-white' : 'text-gray-400'}`}>
                                                     {p.totalPoints?.toFixed(1) || '0.0'}
+                                                </div>
+                                                <div className="text-[9px] text-gray-600">
+                                                    Avg: {p.averagePoints?.toFixed(1)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* TAB: TRENDS (PRICE CHANGES) */}
+            {activeTab === 'trends' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6 animate-in fade-in">
+                    {Object.values(Role).map(role => (
+                        <div key={role} className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden flex flex-col h-full shadow-xl">
+                            {/* Column Header */}
+                            <div className="p-4 bg-[#0f1d36] border-b border-gray-700 flex flex-col items-center text-center">
+                                <div className="w-12 h-12 rounded-full bg-black/30 border border-gray-600 flex items-center justify-center mb-2">
+                                    <img src={ROLE_ICONS[role]} className="w-6 h-6 opacity-90" alt={role} />
+                                </div>
+                                <h3 className="font-bold text-[#c8aa6e] uppercase tracking-widest text-sm">{role}</h3>
+                            </div>
+
+                            {/* Player List by Trend */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#050a14] max-h-[800px]">
+                                {playersByTrend[role].map((p, index) => {
+                                    const team = teams[p.teamId];
+                                    const change = p.priceChange || 0;
+                                    const isUp = change > 0;
+                                    const isDown = change < 0;
+                                    
+                                    let rowBg = 'hover:bg-[#1a2c4e]';
+                                    if (isUp) rowBg = 'hover:bg-green-900/10';
+                                    if (isDown) rowBg = 'hover:bg-red-900/10';
+
+                                    return (
+                                        <div 
+                                            key={p.id}
+                                            onClick={() => setSelectedPlayer(p)}
+                                            className={`flex items-center gap-2 p-3 border-b border-gray-800 cursor-pointer transition-colors ${rowBg}`}
+                                        >
+                                            {/* Photo */}
+                                            <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden border border-gray-700 flex-shrink-0">
+                                                <img 
+                                                    src={p.photo || ROLE_ICONS[role]} 
+                                                    className="w-full h-full object-cover transform scale-110 pt-1"
+                                                    onError={(e) => (e.target as HTMLImageElement).src = ROLE_ICONS[role]} 
+                                                />
+                                            </div>
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-xs font-bold text-gray-200 truncate">{p.name}</div>
+                                                <div className="flex items-center gap-1.5 text-[9px] text-gray-500">
+                                                    {team?.logo && <img src={team.logo} className="w-3 h-3 object-contain opacity-70" />}
+                                                    <span className="uppercase">{team?.shortName}</span>
+                                                    <span className="text-[#0ac8b9] font-bold ml-1">${p.cost}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Price Change */}
+                                            <div className="text-right">
+                                                <div className={`font-bold text-sm flex items-center justify-end gap-1 ${isUp ? 'text-green-400' : isDown ? 'text-red-400' : 'text-gray-500'}`}>
+                                                    {isUp ? <TrendingUp className="w-3 h-3" /> : isDown ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                                    {Math.abs(change)}
                                                 </div>
                                                 <div className="text-[9px] text-gray-600">
                                                     Avg: {p.averagePoints?.toFixed(1)}
