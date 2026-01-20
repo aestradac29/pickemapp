@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Match, Team, Stage } from '../types';
-import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2, AlertTriangle, Swords, ShieldAlert, Crown, GitMerge } from 'lucide-react';
+import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2, AlertTriangle, Swords, ShieldAlert, Crown, GitMerge, BarChart2, FileBarChart } from 'lucide-react';
 
 interface MatchCardProps {
   match: Match;
@@ -15,6 +15,8 @@ interface MatchCardProps {
   onUpdate?: (updates: any) => Promise<void> | void;
   onCancel?: () => void; // New prop for cancelling new match
   onDelete?: () => Promise<void> | void; // New prop for deleting
+  onEditStats?: (match: Match) => void; // Trigger stats modal (ADMIN)
+  onViewStats?: (match: Match) => void; // Trigger stats viewer (USER)
 }
 
 // Sub-component extracted for performance and cleanliness
@@ -23,7 +25,7 @@ const TeamButton = ({
     isSelected, 
     match, 
     isEditing, 
-    isLocked,
+    isLocked, 
     onSelect 
 }: { 
     team: Team; 
@@ -113,7 +115,9 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     teams = [],
     onUpdate,
     onCancel,
-    onDelete
+    onDelete,
+    onEditStats,
+    onViewStats
 }) => {
   
   // Local Edit State
@@ -137,6 +141,9 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   // Effective Lock: Global Day Lock OR Individual Time Lock
   const isTimeLocked = new Date() > new Date(match.startTime) && !match.isCompleted;
   const isLocked = isDayLocked || isTimeLocked;
+
+  // Has Stats Data?
+  const hasStats = (match.games && match.games.length > 0) || (match.stats && Object.keys(match.stats).length > 0);
 
   // Sync state with props when match changes
   useEffect(() => {
@@ -246,6 +253,25 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                       {match.id.startsWith('temp') ? 'Creando Nuevo Partido' : 'Editando Partido'}
                   </span>
                   <div className="flex items-center gap-2">
+                    
+                    {/* STATS BUTTON (Only for non-temp matches) */}
+                    {!match.id.startsWith('temp') && onEditStats && (
+                        <button 
+                            type="button"
+                            onClick={() => onEditStats(match)}
+                            className={`flex items-center gap-1 text-xs font-bold uppercase px-3 py-1.5 rounded border transition-colors mr-2
+                                ${hasStats 
+                                    ? 'bg-green-900/30 border-green-500 text-green-300 hover:bg-green-900/50' 
+                                    : 'bg-purple-900/30 border-purple-500 text-purple-300 hover:bg-purple-900/50'
+                                }
+                            `}
+                            title="Editar Estadísticas Fantasy"
+                        >
+                            <BarChart2 className="w-3 h-3" />
+                            Stats
+                        </button>
+                    )}
+
                     {/* Botón de borrar: Ahora activa el modo confirmación */}
                     {!match.id.startsWith('temp') && onDelete && (
                         <button 
@@ -397,7 +423,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 
   // --- NORMAL RENDER ---
   return (
-    <div className={`w-full bg-gray-900/50 backdrop-blur-sm rounded-xl border overflow-hidden mb-4 shadow-xl transition-all ${match.isCompleted ? 'border-gray-800 opacity-80' : isLocked ? 'border-gray-800 opacity-90' : 'border-gray-700'}`}>
+    <div className={`w-full bg-gray-900/50 backdrop-blur-sm rounded-xl border overflow-hidden mb-4 shadow-xl transition-all ${match.isCompleted ? 'border-gray-800 opacity-90' : isLocked ? 'border-gray-800 opacity-95' : 'border-gray-700'}`}>
       {/* Header */}
       <div className="bg-black/30 px-4 py-2 flex justify-between items-center text-xs text-gray-400">
         <div className="flex items-center gap-2">
@@ -430,6 +456,8 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                <span>BO{match.bestOf || 1}</span>
            </div>
         </div>
+        
+        {/* RIGHT SIDE HEADER ACTIONS */}
         <div className="flex items-center gap-2">
             {match.isCompleted && <span className="text-green-400 font-bold uppercase flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Finalizado</span>}
             {isLocked && !match.isCompleted && <span className="text-red-400 font-bold uppercase flex items-center gap-1"><Lock className="w-3 h-3"/> Cerrado</span>}
@@ -460,8 +488,20 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             onSelect={onSelectWinner}
           />
           
-          <div className="flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center justify-center gap-2">
             <span className="text-gray-600 font-bold text-xl italic">VS</span>
+            
+            {/* VIEW STATS BUTTON (User Mode) */}
+            {match.isCompleted && hasStats && onViewStats && !isEditing && (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onViewStats(match); }}
+                    className="flex flex-col items-center justify-center bg-blue-900/20 hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 hover:border-blue-400 rounded px-2 py-1 transition-colors group z-20"
+                    title="Ver Estadísticas Detalladas"
+                >
+                    <FileBarChart className="w-4 h-4 mb-0.5 group-hover:text-white" />
+                    <span className="text-[9px] font-bold uppercase">Stats</span>
+                </button>
+            )}
           </div>
 
           <TeamButton 

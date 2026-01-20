@@ -4,13 +4,18 @@ import { User, Team } from '../types';
 import { dataService } from '../services/dataService';
 import { getChampions } from '../services/riotService';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
-import { PenLine, Save, Loader2, CheckCircle2, User as UserIcon, Trophy, Sparkles, Swords, Medal, AlertCircle, Link, Image as ImageIcon, Gift, Lock, Star, Crown, CircleDashed, LayoutTemplate, Share2, Copy, Download, Camera } from 'lucide-react';
+import { PenLine, Save, Loader2, CheckCircle2, User as UserIcon, Trophy, Sparkles, Swords, Medal, AlertCircle, Link, Image as ImageIcon, Gift, Lock, Star, Crown, CircleDashed, LayoutTemplate, Share2, Copy, Download, Camera, Zap, Eye } from 'lucide-react';
 import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS } from '../constants';
 import html2canvas from 'html2canvas';
 
 interface ProfileViewProps {
-    currentUserId: string | null;
+    viewingUserId: string | null;
+    sessionUserId: string | null;
 }
+
+// Configuration constants for Leveling
+const XP_MULTIPLIER = 3;
+const XP_PER_LEVEL = 50;
 
 // Title Pool for Levels
 const REWARD_TITLES = [
@@ -22,7 +27,8 @@ const REWARD_TITLES = [
     "Brujo", "Invocador", "Gran Invocador", "Maestro", "Gran Maestro",
     "Leyenda", "Mito", "Semidiós", "Divinidad", "Titán",
     "Coloso", "Inmortal", "Eterno", "Infinito", "Omnipotente",
-    "Destructor", "Creador", "Soberano", "Emperador", "Dios"
+    "Destructor", "Creador", "Soberano", "Emperador", "Dios",
+    "Ascendido", "Primigenio", "Omnisciente", "Absoluto"
 ];
 
 // Generate 50 Levels of Rewards
@@ -97,6 +103,9 @@ const ShareModal = ({ user, teams, onClose }: { user: User, teams: Team[], onClo
     const [copied, setCopied] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
 
+    // Calculate level for sharing image
+    const level = Math.floor((user.score * XP_MULTIPLIER) / XP_PER_LEVEL) + 1;
+
     const handleCopy = () => {
         const text = `🏆 Pick'em Pro Profile\n👤 ${user.name}\n🏅 Rank #${user.rank}\n✨ ${user.score} Puntos\n🔗 Únete: app.pickempro.gg`;
         navigator.clipboard.writeText(text);
@@ -168,7 +177,7 @@ const ShareModal = ({ user, teams, onClose }: { user: User, teams: Team[], onClo
                                 <div className="text-[9px] text-gray-500 uppercase">Puntos</div>
                             </div>
                             <div className="bg-[#0f1d36] p-2 rounded border border-gray-700">
-                                <div className="text-xl font-bold text-blue-400">{(user.score / 50).toFixed(0)}</div>
+                                <div className="text-xl font-bold text-blue-400">{level}</div>
                                 <div className="text-[9px] text-gray-500 uppercase">Nivel</div>
                             </div>
                         </div>
@@ -215,7 +224,7 @@ const ShareModal = ({ user, teams, onClose }: { user: User, teams: Team[], onClo
     );
 };
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
+export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, sessionUserId }) => {
     const [user, setUser] = useState<User | null>(null);
     const [teams, setTeams] = useState<Team[]>([]); // Store loaded teams
     const [isLoading, setIsLoading] = useState(true);
@@ -236,9 +245,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
+    // Derived Logic
+    const isOwnProfile = viewingUserId === sessionUserId;
+
     useEffect(() => {
         loadData();
-    }, [currentUserId]);
+    }, [viewingUserId]); // Reload if viewingUserId changes
 
     const loadData = async () => {
         setIsLoading(true);
@@ -253,14 +265,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
             setChampionOptions(champs.sort((a, b) => a.label.localeCompare(b.label)));
             setTeams(Object.values(teamsMap));
 
-            if (currentUserId) {
-                const me = users.find(u => u.id === currentUserId);
-                if (me) {
-                    setUser(me);
+            if (viewingUserId) {
+                const viewingUser = users.find(u => u.id === viewingUserId);
+                if (viewingUser) {
+                    setUser(viewingUser);
                     setEditForm({
-                        title: me.title || '',
-                        avatar: me.avatar || '',
-                        banner: me.banner || '',
+                        title: viewingUser.title || '',
+                        avatar: viewingUser.avatar || '',
+                        banner: viewingUser.banner || '',
                         championId: '' 
                     });
                 }
@@ -273,11 +285,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
     };
 
     const handleSave = async () => {
-        if (!currentUserId) return;
+        if (!isOwnProfile || !sessionUserId) return;
         setIsSaving(true);
         setSaveStatus('idle');
         try {
-            await dataService.updateUserProfile(currentUserId, {
+            await dataService.updateUserProfile(sessionUserId, {
                 title: editForm.title,
                 avatar_url: editForm.avatar,
                 banner: editForm.banner
@@ -297,10 +309,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
     };
 
     const handleEquipReward = async (reward: typeof LEVEL_REWARDS[0]) => {
-        if (!currentUserId || !user) return;
+        if (!isOwnProfile || !sessionUserId || !user) return;
         
-        const level = Math.floor(user.score / 50) + 1;
-        if (level < reward.level) return;
+        // Calculate dynamic level with multiplier
+        const currentLevel = Math.floor((user.score * XP_MULTIPLIER) / XP_PER_LEVEL) + 1;
+        if (currentLevel < reward.level) return;
 
         setEquippingId(reward.id);
         const updates: any = {};
@@ -317,7 +330,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
         }
 
         try {
-            await dataService.updateUserProfile(currentUserId, updates);
+            await dataService.updateUserProfile(sessionUserId, updates);
         } catch (e) {
             console.error("Error equipping reward", e);
         } finally {
@@ -326,7 +339,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
     };
 
     const toggleBadgeEquip = async (badgeId: string) => {
-        if (!user || !currentUserId) return;
+        if (!isOwnProfile || !user || !sessionUserId) return;
         
         const currentEquipped = user.equippedBadges || [];
         let newEquipped = [...currentEquipped];
@@ -344,7 +357,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
         setUser(prev => prev ? ({ ...prev, equippedBadges: newEquipped }) : null);
 
         try {
-            await dataService.updateUserProfile(currentUserId, { equippedBadges: newEquipped } as any);
+            await dataService.updateUserProfile(sessionUserId, { equippedBadges: newEquipped } as any);
         } catch (e) {
             console.error("Error saving badges", e);
         }
@@ -433,10 +446,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
 
     const currentAvatarChampId = championOptions.find(c => c.image === editForm.avatar)?.id;
 
-    // --- LEVEL & PROGRESS CALCULATIONS ---
-    const level = Math.floor(user.score / 50) + 1;
-    const scoreInCurrentLevel = user.score % 50;
-    const progressPercent = (scoreInCurrentLevel / 50) * 100;
+    // --- LEVEL & PROGRESS CALCULATIONS (WITH MULTIPLIER) ---
+    const totalXp = user.score * XP_MULTIPLIER;
+    const level = Math.floor(totalXp / XP_PER_LEVEL) + 1;
+    const xpInCurrentLevel = totalXp % XP_PER_LEVEL;
+    const progressPercent = (xpInCurrentLevel / XP_PER_LEVEL) * 100;
     
     // SVG Dimensions for the ring
     const size = 144; 
@@ -456,6 +470,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
         <div className="max-w-2xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4">
             
             {showShareModal && user && <ShareModal user={user} teams={teams} onClose={() => setShowShareModal(false)} />}
+
+            {/* Spectator Mode Banner */}
+            {!isOwnProfile && (
+                <div className="mb-6 bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg flex items-center gap-3 animate-in slide-in-from-top-2">
+                    <Eye className="w-5 h-5 text-blue-400" />
+                    <div>
+                        <p className="text-sm font-bold text-blue-200 uppercase">Modo Espectador</p>
+                        <p className="text-xs text-blue-300/70">Estás viendo el perfil de <span className="font-bold text-white">{user.name}</span>.</p>
+                    </div>
+                </div>
+            )}
 
             {/* Header / Identity with Dynamic Banner */}
             <div className={`relative z-[30] mb-8 rounded-2xl border border-gray-700 shadow-[0_0_30px_rgba(0,0,0,0.3)] transition-all duration-500 ${isEditing ? 'overflow-visible' : 'overflow-hidden'}`}>
@@ -510,8 +535,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                     <div className="bg-[#0a1428] border-2 border-[#c8aa6e] text-[#c8aa6e] text-[10px] font-bold px-3 py-0.5 rounded-full shadow-[0_0_10px_rgba(200,170,110,0.3)] tracking-wider">
                                         LVL {level}
                                     </div>
-                                    <span className="text-[9px] text-gray-500 font-mono mt-0.5 bg-black/60 px-1.5 rounded backdrop-blur-sm border border-gray-800">
-                                        {scoreInCurrentLevel} / 50 XP
+                                    <span className="text-[9px] text-gray-500 font-mono mt-0.5 bg-black/60 px-1.5 rounded backdrop-blur-sm border border-gray-800 flex items-center gap-1">
+                                        {xpInCurrentLevel} / {XP_PER_LEVEL} XP
                                     </span>
                                 </div>
                             </>
@@ -616,37 +641,39 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                         )}
                     </div>
 
-                    {/* Edit Toggle */}
-                    <div className="absolute top-4 right-4 sm:static sm:ml-auto">
-                        {isEditing ? (
-                            <div className="flex gap-2 mt-4 sm:mt-0 justify-end w-full">
+                    {/* Edit Toggle (Only if Own Profile) */}
+                    {isOwnProfile && (
+                        <div className="absolute top-4 right-4 sm:static sm:ml-auto">
+                            {isEditing ? (
+                                <div className="flex gap-2 mt-4 sm:mt-0 justify-end w-full">
+                                    <button 
+                                        onClick={() => {
+                                            setIsEditing(false);
+                                            setEditForm({ title: user.title || '', avatar: user.avatar || '', championId: '', banner: user.banner || '' }); 
+                                        }}
+                                        className="p-2 rounded bg-gray-800 text-gray-400 hover:text-white"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button 
+                                        onClick={handleSave}
+                                        disabled={isSaving}
+                                        className="px-4 py-2 rounded bg-[#c8aa6e] text-[#0a1428] font-bold hover:bg-[#e0c285] flex items-center gap-2"
+                                    >
+                                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                        Guardar
+                                    </button>
+                                </div>
+                            ) : (
                                 <button 
-                                    onClick={() => {
-                                        setIsEditing(false);
-                                        setEditForm({ title: user.title || '', avatar: user.avatar || '', championId: '', banner: user.banner || '' }); 
-                                    }}
-                                    className="p-2 rounded bg-gray-800 text-gray-400 hover:text-white"
+                                    onClick={() => setIsEditing(true)}
+                                    className="p-2 rounded-full bg-[#0a1428]/30 border border-white/10 text-gray-300 hover:text-white hover:border-[#c8aa6e] transition-all m-4 sm:m-0 backdrop-blur-sm shadow-lg"
                                 >
-                                    Cancelar
+                                    <PenLine className="w-5 h-5" />
                                 </button>
-                                <button 
-                                    onClick={handleSave}
-                                    disabled={isSaving}
-                                    className="px-4 py-2 rounded bg-[#c8aa6e] text-[#0a1428] font-bold hover:bg-[#e0c285] flex items-center gap-2"
-                                >
-                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                    Guardar
-                                </button>
-                            </div>
-                        ) : (
-                            <button 
-                                onClick={() => setIsEditing(true)}
-                                className="p-2 rounded-full bg-[#0a1428]/30 border border-white/10 text-gray-300 hover:text-white hover:border-[#c8aa6e] transition-all m-4 sm:m-0 backdrop-blur-sm shadow-lg"
-                            >
-                                <PenLine className="w-5 h-5" />
-                            </button>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -669,12 +696,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                         <Gift className="w-5 h-5 text-[#c8aa6e]" />
                         Senda de Leyenda
                     </h3>
-                    <div className="flex items-center gap-2">
-                        <div className="text-xs font-bold text-gray-400 uppercase mr-2 hidden sm:block">Tu Progreso</div>
-                        <div className="h-2 w-24 sm:w-32 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
-                            <div className="h-full bg-gradient-to-r from-blue-500 to-[#c8aa6e]" style={{ width: `${Math.min((level / 50) * 100, 100)}%` }}></div>
+                    <div className="flex items-center gap-4">
+                        {/* XP Multiplier Badge */}
+                        <div className="flex items-center gap-1 bg-yellow-900/30 text-yellow-400 text-[10px] font-bold px-2 py-1 rounded border border-yellow-500/30 uppercase tracking-wider animate-pulse-slow">
+                            <Zap className="w-3 h-3 fill-current" />
+                            XP x{XP_MULTIPLIER}
                         </div>
-                        <span className="text-xs font-bold text-[#c8aa6e] ml-1">{level}/50</span>
+
+                        <div className="flex items-center gap-2">
+                            <div className="text-xs font-bold text-gray-400 uppercase mr-2 hidden sm:block">Tu Progreso</div>
+                            <div className="h-2 w-24 sm:w-32 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+                                <div className="h-full bg-gradient-to-r from-blue-500 to-[#c8aa6e]" style={{ width: `${Math.min((level / 50) * 100, 100)}%` }}></div>
+                            </div>
+                            <span className="text-xs font-bold text-[#c8aa6e] ml-1">{level}/50</span>
+                        </div>
                     </div>
                 </div>
 
@@ -779,8 +814,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                                 </span>
                                             )}
                                             
-                                            {/* Action Button */}
-                                            {isUnlocked ? (
+                                            {/* Action Button (Only if Own Profile) */}
+                                            {isOwnProfile && isUnlocked ? (
                                                 <button
                                                     onClick={() => handleEquipReward(reward)}
                                                     disabled={isEquipped}
@@ -795,8 +830,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                                     {isEquipped ? 'EQUIPADO' : 'EQUIPAR'}
                                                 </button>
                                             ) : (
-                                                <div className="bg-black/50 text-red-400/80 text-[7px] font-bold px-2 py-0.5 rounded border border-red-900/30 uppercase whitespace-nowrap">
-                                                    BLOQUEADO
+                                                <div className={`
+                                                    text-[7px] font-bold px-2 py-0.5 rounded border uppercase whitespace-nowrap
+                                                    ${isUnlocked ? 'bg-blue-900/20 text-blue-400 border-blue-500/30' : 'bg-black/50 text-red-400/80 border-red-900/30'}
+                                                `}>
+                                                    {isUnlocked ? 'DESBLOQUEADO' : 'BLOQUEADO'}
                                                 </div>
                                             )}
                                         </div>
@@ -840,14 +878,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                         return (
                             <button
                                 key={id} 
-                                onClick={() => isUnlocked && toggleBadgeEquip(id)}
-                                disabled={!isUnlocked}
+                                onClick={() => isOwnProfile && isUnlocked && toggleBadgeEquip(id)}
+                                disabled={!isUnlocked || !isOwnProfile}
                                 className={`
                                     flex flex-col gap-2 p-3 rounded-xl border transition-all relative overflow-hidden group text-left h-full
                                     ${isEquipped 
                                         ? `bg-[#0f1d36] border-[#c8aa6e] ring-1 ring-[#c8aa6e]/50 shadow-[0_0_15px_rgba(200,170,110,0.15)]` 
                                         : isUnlocked 
-                                            ? `bg-[#0f1d36] border-gray-700 hover:border-gray-500 hover:bg-[#1a2c4e]` 
+                                            ? `bg-[#0f1d36] border-gray-700 ${isOwnProfile ? 'hover:border-gray-500 hover:bg-[#1a2c4e]' : ''}` 
                                             : 'bg-[#050a14] border-gray-800 opacity-70 grayscale-[0.8] cursor-not-allowed'
                                     }
                                 `}
@@ -884,7 +922,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUserId }) => {
                                         <span className="text-[8px] font-bold uppercase bg-[#c8aa6e] text-[#0a1428] px-1.5 py-0.5 rounded">Equipado</span>
                                     </div>
                                 )}
-                                {!isEquipped && isUnlocked && (
+                                {isOwnProfile && !isEquipped && isUnlocked && (
                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <CheckCircle2 className="w-3 h-3 text-gray-500" />
                                     </div>

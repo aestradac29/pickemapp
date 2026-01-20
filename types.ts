@@ -19,12 +19,15 @@ export enum ViewState {
   ADMIN = 'ADMIN', // New Admin View
   DB_MANAGER = 'DB_MANAGER', // New Database Editor View
   RANKING = 'RANKING', // Clasificación Winter 2026
+  OFFICIAL_STANDINGS = 'OFFICIAL_STANDINGS', // NEW: Real LEC Standings
   PLAYOFFS = 'PLAYOFFS', // Playoffs
   MATCHDAY = 'MATCHDAY', // Jornada (Regular Season)
   CRYSTAL_BALL = 'CRYSTAL_BALL', // Bola de cristal
   FANTASY = 'FANTASY', // Fantasy Team
   RESULTS = 'RESULTS', // Resultados jornada
-  PROFILE = 'PROFILE' // New Profile View
+  PROFILE = 'PROFILE', // New Profile View
+  TEAMS = 'TEAMS', // New Teams View
+  HALL_OF_FAME = 'HALL_OF_FAME' // New Hall of Fame View
 }
 
 export enum Role {
@@ -50,9 +53,50 @@ export interface Player {
   role: Role;
   teamId: string;
   photo?: string; // Optional real photo URL
-  cost: number; // Fantasy cost
+  cost: number; // Fantasy cost (CURRENT Market Value)
   averagePoints: number; // Average points per game
-  kda: number; // Kill Death Assist Ratio
+  totalPoints?: number; // New: Sum of all points
+  kda: number; // Kill Death Assist Ratio (Season Cumulative)
+  // New Fantasy Fields
+  nextOpponentId?: string; // Calculated dynamically based on schedule
+  priceChange?: number; // e.g. +20, -10 (Trend)
+  isHot?: boolean; // If they are on a streak
+  highlight?: string; // New: Statistical Highlight (e.g., "MVP", "Penta")
+}
+
+// Estructura de estadísticas para un jugador en un partido específico
+export interface PlayerGameStats {
+    playerId: string;
+    kills: number;
+    deaths: number;
+    assists: number;
+    cs: number;
+    
+    // General Bonuses
+    isMvp: boolean;
+    firstBlood: boolean; 
+    
+    // Multikills
+    doubleKills: number;
+    tripleKills: number;
+    quadraKills: number;
+    pentaKills: number;
+
+    // Role Specific Inputs
+    teamDamagePercentage: number; // 0-100 (Top/Mid)
+    dragonsKilled: number;        // (Jungle)
+    baronsKilled: number;         // (Jungle)
+    damagePerMinute: number;      // (ADC)
+    visionScore: number;          // (Support)
+    firstDragon: boolean;         // (Support)
+
+    totalPoints: number; // Calculated
+}
+
+export interface MatchGame {
+    id: number; // 1, 2, 3, 4, 5
+    winnerId: string | null;
+    stats: Record<string, PlayerGameStats>;
 }
 
 export interface Match {
@@ -66,11 +110,24 @@ export interface Match {
   day?: number | null; // Optional day number for filtering
   bestOf?: number; // BO1, BO3, BO5
   bracketStage?: 'winners' | 'losers'; // Nuevo campo para Playoffs
+  stats?: Record<string, PlayerGameStats>; // Mapa playerId -> stats (AGGREGATED/AVERAGE for backward compatibility)
+  games?: MatchGame[]; // DETAILED stats per game
 }
 
 export interface UserPrediction {
   matchId: string;
   predictedWinnerId: string;
+}
+
+export interface FantasySlot {
+    playerId: string | null;
+    purchaseCost?: number; // Coste al momento de compra (para reglas de presupuesto)
+}
+
+export interface FantasyTeamState {
+    team: Record<Role, FantasySlot>;
+    captain: string | null;
+    score?: number; // Score for this specific round
 }
 
 export interface User {
@@ -93,8 +150,9 @@ export interface User {
   };
   rank: number;
   pointsHistory: { day: string; points: number }[]; // Global History
-  fantasyHistory: { day: string; points: number }[]; // Fantasy History (12 rounds)
-  fantasyTeam?: Record<Role, string | null>; // The user's saved lineup
+  fantasyHistory: { day: string; points: number }[]; // Fantasy History (7 Rounds)
+  fantasyTeam?: Record<Role, string | null>; // LEGACY - The user's saved lineup (migration might be needed)
+  fantasyCaptain?: string | null; // LEGACY
 }
 
 export interface AiAnalysisResult {

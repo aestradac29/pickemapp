@@ -11,6 +11,17 @@ export const ROLE_ICONS: Record<Role, string> = {
   [Role.SUPPORT]: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/svg/position-utility.svg"
 };
 
+// Fantasy Schedule Definition
+export const FANTASY_SCHEDULE = [
+    { id: 1, label: 'Jornada 1', matchdays: [1, 2, 3], stage: Stage.GROUPS },
+    { id: 2, label: 'Jornada 2', matchdays: [4, 5, 6], stage: Stage.GROUPS },
+    { id: 3, label: 'Jornada 3', matchdays: [7, 8, 9], stage: Stage.GROUPS },
+    { id: 4, label: 'Jornada 4', matchdays: [10, 11], stage: Stage.GROUPS },
+    { id: 5, label: 'Playoffs R1', matchdays: [1], stage: Stage.PLAYOFFS }, // Generic Playoff Round mapping
+    { id: 6, label: 'Playoffs R2', matchdays: [2], stage: Stage.PLAYOFFS },
+    { id: 7, label: 'Playoffs R3', matchdays: [3], stage: Stage.PLAYOFFS },
+];
+
 // Cosmetic Styles (Frames & Banners)
 export const FRAME_STYLES: Record<string, string> = {
     'frame_bronze': 'border-[#cd7f32] shadow-[0_0_15px_rgba(205,127,50,0.3)]',
@@ -69,7 +80,7 @@ export const BADGE_DEFINITIONS: Record<string, { label: string, icon: any, color
     
     // UPDATED BADGES
     'on_fire': { label: 'En Racha', icon: Flame, color: 'text-red-400 border-red-500/50 bg-red-900/20', description: '3 jornadas seguidas acertando 5 o más partidos.' },
-    'confidence': { label: 'Confianza', icon: Sparkles, color: 'text-green-400 border-green-500/50 bg-green-900/20', description: 'Acierta el resultado de un partido en el que acierte un 10% de usuarios o menos.' }, 
+    'confidence': { label: 'Confianza', icon: Sparkles, color: 'text-green-400 border-green-500/50 bg-green-900/20', description: 'Ser el único usuario en acertar el resultado de un partido.' }, 
     'pro': { label: 'Pro', icon: Zap, color: 'text-blue-400 border-blue-500/50 bg-blue-900/20', description: 'Mantener el Top 1 en la clasificación durante 4 jornadas consecutivas.' },
     'underdog': { label: 'Underdog', icon: Shield, color: 'text-orange-400 border-orange-500/50 bg-orange-900/20', description: 'Acierta tú solo una posición del ranking.' },
     'on_the_limit': { label: 'Al Límite', icon: Clock, color: 'text-cyan-400 border-cyan-500/50 bg-cyan-900/20', description: 'Enviar predicciones 1h antes del cierre.' },

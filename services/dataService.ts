@@ -1,6 +1,7 @@
 
-import { Team, Player, Match, Role, Stage, User } from '../types';
-import { TEAMS, PLAYERS, MATCHES, getMatchesForDay } from '../constants';
+import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame } from '../types';
+import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, FANTASY_SCHEDULE } from '../constants';
+import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 
@@ -17,59 +18,119 @@ export const dataService = {
         playoffVisibleDays: number[], 
         playoffClosedDays: number[],
         playoffRounds?: number, 
-        playoffsAccessible?: boolean 
+        playoffsAccessible?: boolean,
+        fantasyRound?: number, // Current active fantasy round
+        fantasyLocked?: boolean // Is current fantasy round locked?
     }> {
         try {
             const docRef = doc(db, "admin_data", "config");
             const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                return {
-                    visibleDays: data.activeDays || [1],
-                    closedDays: data.closedDays || [],
-                    // Separated config for Playoffs
-                    playoffVisibleDays: data.playoffVisibleDays || [1],
-                    playoffClosedDays: data.playoffClosedDays || [],
-                    playoffRounds: data.playoffRounds || 5, // Default 5 rounds
-                    playoffsAccessible: data.playoffsAccessible || false // Default locked
-                };
-            }
-            return { 
+            
+            // Default Values
+            let config = {
                 visibleDays: [1], closedDays: [], 
                 playoffVisibleDays: [1], playoffClosedDays: [],
-                playoffRounds: 5, playoffsAccessible: false 
+                playoffRounds: 5, playoffsAccessible: false,
+                fantasyRound: 1, fantasyLocked: false
             };
+
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                config = {
+                    visibleDays: data.activeDays || [1],
+                    closedDays: data.closedDays || [],
+                    playoffVisibleDays: data.playoffVisibleDays || [1],
+                    playoffClosedDays: data.playoffClosedDays || [],
+                    playoffRounds: data.playoffRounds || 5, 
+                    playoffsAccessible: data.playoffsAccessible || false,
+                    fantasyRound: data.fantasyRound || 1,
+                    fantasyLocked: data.fantasyLocked || false // Manual Override
+                };
+            }
+
+            // --- AUTOMATIC LOCK LOGIC ---
+            // If manual lock is FALSE, check the time of the first match of the current fantasy round
+            if (!config.fantasyLocked) {
+                const currentRoundDef = FANTASY_SCHEDULE.find(r => r.id === config.fantasyRound);
+                if (currentRoundDef) {
+                    const matches = await this.getMatches();
+                    // Filter matches belonging to this fantasy round
+                    const roundMatches = matches.filter(m => 
+                        (currentRoundDef.stage === Stage.GROUPS ? m.stage === Stage.GROUPS : m.stage !== Stage.GROUPS) &&
+                        currentRoundDef.matchdays.includes(m.day || 0)
+                    );
+                    
+                    if (roundMatches.length > 0) {
+                        // Sort by start time ascending
+                        const sorted = roundMatches.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+                        const firstMatchTime = new Date(sorted[0].startTime);
+                        const now = new Date();
+                        
+                        // If current time is past the first match start time, LOCK IT automatically
+                        if (now >= firstMatchTime) {
+                            config.fantasyLocked = true;
+                        }
+                    }
+                }
+            }
+
+            return config;
         } catch (e) {
             console.error("Error loading config", e);
             return { 
                 visibleDays: [1], closedDays: [], 
                 playoffVisibleDays: [1], playoffClosedDays: [],
-                playoffRounds: 5, playoffsAccessible: false 
+                playoffRounds: 5, playoffsAccessible: false,
+                fantasyRound: 1, fantasyLocked: false
             };
         }
     },
 
-    async updateGlobalConfig(config: { 
-        visibleDays?: number[], 
-        closedDays?: number[], 
-        playoffVisibleDays?: number[], 
-        playoffClosedDays?: number[],
-        playoffRounds?: number, 
-        playoffsAccessible?: boolean 
-    }) {
+    async updateGlobalConfig(config: any) {
         const docRef = doc(db, "admin_data", "config");
-        const payload: any = {};
-        
-        if (config.visibleDays) payload.activeDays = config.visibleDays;
-        if (config.closedDays) payload.closedDays = config.closedDays;
-        
-        if (config.playoffVisibleDays) payload.playoffVisibleDays = config.playoffVisibleDays;
-        if (config.playoffClosedDays) payload.playoffClosedDays = config.playoffClosedDays;
+        await setDoc(docRef, cleanPayload(config), { merge: true });
+    },
 
-        if (config.playoffRounds !== undefined) payload.playoffRounds = config.playoffRounds;
-        if (config.playoffsAccessible !== undefined) payload.playoffsAccessible = config.playoffsAccessible;
+    // NEW: Handle Round Transitions (Price Updates)
+    async processRoundTransition(newRound: number) {
+        // 1. Get current state
+        const currentPlayers = await this.getPlayers();
+        
+        // 2. Calculate new prices based on performance (Last Round vs Average)
+        const updatedPlayers = currentPlayers.map(p => {
+            // Target price based on performance (Multiplier 18-20 is standard for Fantasy LoL budgets ~1500)
+            const targetPrice = p.averagePoints * 18; 
+            let change = 0;
 
-        await setDoc(docRef, payload, { merge: true });
+            if (targetPrice > p.cost) {
+                // Should increase
+                change = Math.min(50, Math.ceil((targetPrice - p.cost) * 0.2)); // Move 20% towards target
+            } else if (targetPrice < p.cost) {
+                // Should decrease
+                change = Math.max(-50, Math.floor((targetPrice - p.cost) * 0.1)); // Move 10% towards target (prices stickier downwards)
+            }
+
+            // Apply Change
+            let newCost = p.cost + change;
+            // Floor at 100, Cap at 500 (Soft limits)
+            newCost = Math.max(100, Math.min(500, newCost));
+
+            return {
+                ...p,
+                cost: newCost,
+                priceChange: change // Store trend for UI
+            };
+        });
+
+        // 3. Save new player list
+        const playersDocRef = doc(db, "admin_data", "players");
+        await setDoc(playersDocRef, { list: cleanPayload(updatedPlayers) }, { merge: true });
+
+        // 4. Update Config to new round & UNLOCK explicitly (admin triggers next round, so it starts open)
+        await this.updateGlobalConfig({ 
+            fantasyRound: newRound,
+            fantasyLocked: false // Reset manual lock if it was set
+        });
     },
 
     async getSplits() {
@@ -112,19 +173,76 @@ export const dataService = {
         await setDoc(docRef, { data: cleanPayload(currentData) }, { merge: true });
     },
 
-    // --- PLAYERS ---
+    // --- PLAYERS & PRICES ---
     async getPlayers(): Promise<Player[]> {
         try {
-            const docRef = doc(db, "admin_data", "players");
-            const docSnap = await getDoc(docRef);
+            const playersDocRef = doc(db, "admin_data", "players");
+            const playersSnap = await getDoc(playersDocRef);
+            let playersList: Player[] = [];
 
-            if (docSnap.exists()) {
-                return docSnap.data().list as Player[];
+            if (playersSnap.exists()) {
+                playersList = playersSnap.data().list as Player[];
             } else {
-                console.log("Seeding Players to Database...");
-                await setDoc(docRef, { list: cleanPayload(PLAYERS) });
-                return PLAYERS;
+                await setDoc(playersDocRef, { list: cleanPayload(PLAYERS) });
+                playersList = PLAYERS;
             }
+
+            const matches = await this.getMatches();
+            
+            const updatedPlayers = playersList.map(player => {
+                let totalKills = 0, totalDeaths = 0, totalAssists = 0, totalPoints = 0, gamesPlayed = 0;
+                let highlight: string | undefined = undefined;
+
+                const sortedMatches = matches.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+
+                for (const match of sortedMatches) {
+                    // IMPORTANT FIX: Only count stats if match is COMPLETED
+                    if (!match.isCompleted) continue;
+
+                    if (match.stats && match.stats[player.id]) {
+                        const s = match.stats[player.id];
+                        totalKills += s.kills;
+                        totalDeaths += s.deaths;
+                        totalAssists += s.assists;
+                        totalPoints += s.totalPoints;
+                        gamesPlayed++;
+
+                        if (!highlight) {
+                            if (s.pentaKills > 0) highlight = "PENTAKILL";
+                            else if (s.quadraKills > 0) highlight = "QUADRA KILL";
+                            else if (s.isMvp) highlight = "MVP";
+                            else if (s.kills >= 10) highlight = "High Kills";
+                            else if (s.firstBlood) highlight = "First Blood";
+                            else if (player.role === Role.SUPPORT && s.assists >= 15) highlight = "Playmaker";
+                            else if (player.role === Role.ADC && s.damagePerMinute > 1000) highlight = "Hypercarry";
+                            else if (player.role === Role.JUNGLE && s.dragonsKilled >= 4) highlight = "Alma Dragón";
+                        }
+                    }
+                }
+
+                const kda = totalDeaths === 0 ? (totalKills + totalAssists) : (totalKills + totalAssists) / totalDeaths;
+                const averagePoints = gamesPlayed > 0 ? (totalPoints / gamesPlayed) : player.averagePoints; 
+
+                let isHot = false;
+                if (gamesPlayed > 0 && matches.length > 0) {
+                     const lastGameStats = matches[0].stats?.[player.id];
+                     if (lastGameStats && lastGameStats.totalPoints > averagePoints) {
+                         isHot = true;
+                     }
+                }
+
+                return {
+                    ...player,
+                    kda: parseFloat(kda.toFixed(2)),
+                    averagePoints: parseFloat(averagePoints.toFixed(1)),
+                    totalPoints: parseFloat(totalPoints.toFixed(1)),
+                    highlight: highlight,
+                    isHot: isHot
+                };
+            });
+
+            return updatedPlayers;
+
         } catch (e) {
             console.error("Error getting players:", e);
             return PLAYERS;
@@ -134,14 +252,10 @@ export const dataService = {
     async updatePlayer(playerId: string, updates: Partial<Player>) {
         const docRef = doc(db, "admin_data", "players");
         const docSnap = await getDoc(docRef);
-
         if (!docSnap.exists()) return;
-
         let currentList: Player[] = docSnap.data().list || [];
         const index = currentList.findIndex(p => p.id === playerId);
-
         if (index === -1) throw new Error("Player not found");
-
         currentList[index] = { ...currentList[index], ...updates };
         await setDoc(docRef, { list: cleanPayload(currentList) }, { merge: true });
     },
@@ -181,7 +295,7 @@ export const dataService = {
                 });
 
             } else {
-                console.log("Seeding Matches (Days 1-11) to Database...");
+                console.log("Seeding Matches...");
                 const seedMatches = [...MATCHES];
                 let generatedMatches: Match[] = [];
                 for (let i = 1; i <= 11; i++) {
@@ -229,13 +343,257 @@ export const dataService = {
             isCompleted: updates.status === 'finished',
             day: updates.day || currentMatch.day || null,
             bestOf: updates.bestOf ?? currentMatch.bestOf ?? 1,
-            bracketStage: updates.bracketStage || currentMatch.bracketStage
+            bracketStage: updates.bracketStage || currentMatch.bracketStage,
+            stats: updates.stats || currentMatch.stats,
+            games: updates.games || currentMatch.games // Maintain games if not updated
         };
 
         allMatches[index] = updatedMatch;
         await setDoc(docRef, { allMatches: cleanPayload(allMatches) }, { merge: true });
     },
 
+    // --- FANTASY SCORING SYSTEM & STORAGE ---
+    
+    async saveFantasyTeam(userId: string, team: Record<Role, FantasySlot>, captain: string | null, round: number) {
+        const roundDocRef = doc(db, "users", userId, "fantasy_rounds", `round_${round}`);
+        await setDoc(roundDocRef, { team: cleanPayload(team), captain, roundId: round, updatedAt: new Date().toISOString() }, { merge: true });
+        
+        const currentRef = doc(db, "users", userId, "fantasy", "winter_2026");
+        await setDoc(currentRef, { team: cleanPayload(team), captain }, { merge: true });
+    },
+
+    async getFantasyTeam(userId: string, round: number): Promise<FantasyTeamState | null> {
+        try {
+            const roundDocRef = doc(db, "users", userId, "fantasy_rounds", `round_${round}`);
+            const roundSnap = await getDoc(roundDocRef);
+            
+            if (roundSnap.exists()) {
+                const data = roundSnap.data();
+                const team: Record<Role, FantasySlot> = {
+                    [Role.TOP]: { playerId: null }, [Role.JUNGLE]: { playerId: null }, [Role.MID]: { playerId: null }, 
+                    [Role.ADC]: { playerId: null }, [Role.SUPPORT]: { playerId: null }
+                };
+                
+                if (data.team) {
+                    Object.keys(data.team).forEach(key => {
+                        const val = data.team[key];
+                        if (typeof val === 'string' || val === null) {
+                            team[key as Role] = { playerId: val }; // Legacy format
+                        } else {
+                            team[key as Role] = val; // New format
+                        }
+                    });
+                }
+
+                return {
+                    team,
+                    captain: data.captain,
+                    score: data.score
+                };
+            } else if (round > 1) {
+                const prevRound = round - 1;
+                const prevDocRef = doc(db, "users", userId, "fantasy_rounds", `round_${prevRound}`);
+                const prevSnap = await getDoc(prevDocRef);
+
+                if (prevSnap.exists()) {
+                    const data = prevSnap.data();
+                    return {
+                        team: data.team, 
+                        captain: data.captain,
+                        score: 0 
+                    };
+                }
+            }
+            return null;
+        } catch (e) { return null; }
+    },
+
+    // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
+    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[]) {
+        // 1. Get Match & Players
+        const [docSnap, players] = await Promise.all([
+            getDoc(doc(db, "admin_data", "matches")),
+            this.getPlayers()
+        ]);
+        if (!docSnap.exists()) return;
+
+        let allMatches: Match[] = docSnap.data().allMatches || [];
+        const index = allMatches.findIndex(m => m.id === matchId);
+        if (index === -1) throw new Error("Match not found");
+
+        const match = allMatches[index];
+
+        // 2. Aggregate Stats Logic (Normalization)
+        // We will sum up all raw stats to store them for posterity, but calculate the "totalPoints" as an AVERAGE.
+        // This effectively replaces the multiplier system.
+        const aggregatedStats: Record<string, PlayerGameStats> = {};
+        
+        // Iterate through all players involved
+        const playersInvolved = players.filter(p => p.teamId === match.teamA.id || p.teamId === match.teamB.id);
+
+        playersInvolved.forEach(player => {
+            let totalScore = 0;
+            let gamesPlayed = 0;
+            
+            // Temporary object to hold summed stats for visual reference
+            const summedStats: PlayerGameStats = {
+                playerId: player.id,
+                kills:0, deaths:0, assists:0, cs:0,
+                isMvp: false, firstBlood: false, 
+                doubleKills:0, tripleKills:0, quadraKills:0, pentaKills:0,
+                teamDamagePercentage:0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false,
+                totalPoints: 0
+            };
+
+            games.forEach(game => {
+                const pStats = game.stats[player.id];
+                if (pStats) {
+                    gamesPlayed++;
+                    // Sum raw stats
+                    summedStats.kills += pStats.kills;
+                    summedStats.deaths += pStats.deaths;
+                    summedStats.assists += pStats.assists;
+                    summedStats.cs += pStats.cs;
+                    summedStats.doubleKills += pStats.doubleKills;
+                    summedStats.tripleKills += pStats.tripleKills;
+                    summedStats.quadraKills += pStats.quadraKills;
+                    summedStats.pentaKills += pStats.pentaKills;
+                    
+                    // Flags: if happened in ANY game
+                    if (pStats.isMvp) summedStats.isMvp = true;
+                    if (pStats.firstBlood) summedStats.firstBlood = true;
+                    if (pStats.firstDragon) summedStats.firstDragon = true;
+
+                    // Role specifics: Average or Sum? Usually Sum for these milestones works best or recalculate.
+                    // For simplicity, we just sum for display, but points are calculated per game below.
+                    summedStats.dragonsKilled += pStats.dragonsKilled;
+                    summedStats.baronsKilled += pStats.baronsKilled;
+                    
+                    // Averages for these metrics
+                    summedStats.teamDamagePercentage += pStats.teamDamagePercentage;
+                    summedStats.damagePerMinute += pStats.damagePerMinute;
+                    summedStats.visionScore += pStats.visionScore;
+
+                    // Calculate score for THIS game specifically
+                    const isGameWinner = game.winnerId === player.teamId;
+                    const gameScore = fantasyService.calculatePoints(
+                        { ...pStats, win: isGameWinner } as any, // Inject win bool
+                        player.role,
+                        false, // isCaptain handled later
+                        match.bracketStage,
+                        match.stage
+                    );
+                    totalScore += gameScore;
+                }
+            });
+
+            if (gamesPlayed > 0) {
+                // Normalize aggregated stats for display
+                summedStats.teamDamagePercentage /= gamesPlayed;
+                summedStats.damagePerMinute /= gamesPlayed;
+                // Vision score is cumulative usually, but let's keep it clean
+                
+                // CRITICAL: Final Score is AVERAGE of games played
+                // This replaces the multiplier. 
+                // E.g. (Game 1 Score + Game 2 Score) / 2
+                summedStats.totalPoints = parseFloat((totalScore / gamesPlayed).toFixed(2));
+                
+                aggregatedStats[player.id] = summedStats;
+            }
+        });
+
+        // 3. Update Match Object
+        // We determine the Series Winner based on game wins
+        const winsA = games.filter(g => g.winnerId === match.teamA.id).length;
+        const winsB = games.filter(g => g.winnerId === match.teamB.id).length;
+        const seriesWinnerId = winsA > winsB ? match.teamA.id : (winsB > winsA ? match.teamB.id : null);
+
+        const updatedMatch = { 
+            ...match, 
+            games: games, 
+            stats: aggregatedStats, 
+            winnerId: seriesWinnerId,
+            isCompleted: true 
+        };
+        allMatches[index] = updatedMatch;
+        
+        await setDoc(doc(db, "admin_data", "matches"), { allMatches: cleanPayload(allMatches) }, { merge: true });
+
+        // 4. Trigger Recalculation
+        await this.recalculateAllFantasyScores(allMatches);
+    },
+
+    async recalculateAllFantasyScores(allMatches: Match[]) {
+        const usersRef = collection(db, "users");
+        const userSnapshot = await getDocs(usersRef);
+        const users = userSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // Map stats by Match ID -> Player ID
+        const matchStatsMap: Record<string, Record<string, number>> = {};
+        allMatches.forEach(m => {
+            if (m.stats) {
+                matchStatsMap[m.id] = {};
+                Object.values(m.stats).forEach(s => {
+                    matchStatsMap[m.id][s.playerId] = s.totalPoints;
+                });
+            }
+        });
+
+        const updates = users.map(async (user: any) => {
+            let totalFantasyScore = 0;
+            
+            for (const roundConfig of FANTASY_SCHEDULE) {
+                const roundId = roundConfig.id;
+                const roundRef = doc(db, "users", user.id, "fantasy_rounds", `round_${roundId}`);
+                const roundSnap = await getDoc(roundRef);
+                
+                if (roundSnap.exists()) {
+                    const data = roundSnap.data();
+                    const team = data.team;
+                    const captain = data.captain;
+                    let roundScore = 0;
+
+                    const relevantMatches = allMatches.filter(m => {
+                        if (roundConfig.stage === Stage.GROUPS) {
+                            return m.stage === Stage.GROUPS && roundConfig.matchdays.includes(m.day || 0);
+                        } else {
+                            return m.stage !== Stage.GROUPS && roundConfig.matchdays.includes(m.day || 0);
+                        }
+                    });
+
+                    Object.values(team).forEach((slot: any) => {
+                        const pid = slot?.playerId || (typeof slot === 'string' ? slot : null);
+                        if (pid) {
+                            let playerRoundPoints = 0;
+                            relevantMatches.forEach(m => {
+                                const points = matchStatsMap[m.id]?.[pid] || 0;
+                                playerRoundPoints += points;
+                            });
+                            
+                            if (pid === captain) playerRoundPoints *= 1.5;
+                            roundScore += playerRoundPoints;
+                        }
+                    });
+
+                    await setDoc(roundRef, { score: parseFloat(roundScore.toFixed(2)) }, { merge: true });
+                    totalFantasyScore += roundScore;
+                }
+            }
+
+            const userDocRef = doc(db, "users", user.id);
+            const userDocSnap = await getDoc(userDocRef);
+            if(userDocSnap.exists()) {
+                const userData = userDocSnap.data();
+                const breakdown = userData.scoreBreakdown || {};
+                breakdown.fantasy = parseFloat(totalFantasyScore.toFixed(2));
+                await setDoc(userDocRef, { scoreBreakdown: breakdown }, { merge: true });
+            }
+        });
+
+        await Promise.all(updates);
+    },
+
+    // ... (rest of methods)
     async createMatch(matchData: any) {
         const docRef = doc(db, "admin_data", "matches");
         const docSnap = await getDoc(docRef);
@@ -272,339 +630,209 @@ export const dataService = {
         }
     },
 
-    // --- USERS & LEADERBOARD ---
     async getAllUsers(): Promise<User[]> {
         try {
-            // 1. Obtener datos maestros
-            const [matches, adminRanking, config, adminCrystalBall] = await Promise.all([
+            const [allMatches, adminRanking, config, adminCrystalBall] = await Promise.all([
                 this.getMatches(),
                 this.getAdminRanking(),
                 this.getDaysConfig(),
                 this.getAdminCrystalBallResults()
             ]);
-            
-            const maxPlayoffRounds = config.playoffRounds || 5;
-            
-            // PRE-CALCULATION PLAYOFFS
-            const playoffMatches = matches.filter(m => m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS)
-                                          .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-            
-            let grandFinal = playoffMatches.find(m => m.stage === Stage.FINALS);
-            let winnersMatches = playoffMatches.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
-            if (!grandFinal && winnersMatches.length > 7) {
-                grandFinal = winnersMatches[winnersMatches.length - 1];
-                winnersMatches = winnersMatches.slice(0, winnersMatches.length - 1);
-            }
-            const losersMatches = playoffMatches.filter(m => m.bracketStage === 'losers' && m.stage !== Stage.FINALS);
 
-            const matchPointsMap = new Map<string, number>();
-            if (grandFinal) matchPointsMap.set(grandFinal.id, 10);
-            winnersMatches.forEach((m, idx) => {
-                if (idx < 4) matchPointsMap.set(m.id, 3);
-                else if (idx < 6) matchPointsMap.set(m.id, 4);
-                else matchPointsMap.set(m.id, 8);
-            });
-            losersMatches.forEach((m, idx) => {
-                if (idx < 2) matchPointsMap.set(m.id, 3);
-                else if (idx < 4) matchPointsMap.set(m.id, 4);
-                else if (idx === 4) matchPointsMap.set(m.id, 6);
-                else matchPointsMap.set(m.id, 8);
-            });
-
-            const matchMap = new Map<string, { winnerId: string | null, day: number, stage: Stage, pointsValue: number }>();
-            matches.forEach(m => {
-                matchMap.set(m.id, { 
-                    winnerId: m.winnerId || null, 
-                    day: m.day || 0,
-                    stage: m.stage,
-                    pointsValue: matchPointsMap.get(m.id) || 1
-                });
-            });
-
-            // 2. Obtener Usuarios
             const usersRef = collection(db, "users");
             const q = query(usersRef, orderBy("username"), limit(50));
             const snapshot = await getDocs(q);
 
-            // PHASE 1: Pre-calculate raw scores for everyone
-            const processedUsers = await Promise.all(snapshot.docs.map(async (userDoc) => {
-                const data = userDoc.data();
+            const users: User[] = await Promise.all(snapshot.docs.map(async (userDoc) => {
+                const userData = userDoc.data();
                 const userId = userDoc.id;
 
-                // A. PREDICCIONES MATCHDAY & PLAYOFFS
-                const picksRef = doc(db, "users", userId, "picks", "winter_2026");
-                const picksSnap = await getDoc(picksRef);
-                const userPicks = picksSnap.exists() ? (picksSnap.data().list || []) : [];
+                const [picksSnap, rankingSnap, crystalSnap] = await Promise.all([
+                    getDoc(doc(db, "users", userId, "picks", "winter_2026")),
+                    getDoc(doc(db, "users", userId, "picks", "winter_2026_ranking")),
+                    getDoc(doc(db, "users", userId, "picks", "winter_2026_crystal"))
+                ]);
 
-                const regularSeasonPointsPerDay = new Array(12).fill(0);
-                const playoffPointsPerRound = new Array(maxPlayoffRounds + 1).fill(0);
-                let playoffsScoreTotal = 0;
+                const userPredictions = picksSnap.exists() ? picksSnap.data().list || [] : [];
+                const userRanking = rankingSnap.exists() ? rankingSnap.data().order || [] : [];
+                const userCrystalBall = crystalSnap.exists() ? crystalSnap.data().selections || {} : {};
 
-                userPicks.forEach((pick: any) => {
-                    const info = matchMap.get(pick.matchId);
-                    if (info && info.winnerId && pick.predictedWinnerId === info.winnerId) {
-                        if (info.stage === Stage.GROUPS) {
-                            if (info.day >= 1 && info.day <= 11) {
-                                regularSeasonPointsPerDay[info.day] += 1;
-                            }
-                        } else {
-                            playoffsScoreTotal += info.pointsValue;
-                            if (info.day >= 1 && info.day <= maxPlayoffRounds) {
-                                playoffPointsPerRound[info.day] += info.pointsValue;
-                            }
+                let matchdayScore = 0;
+                const regularMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.winnerId);
+                
+                regularMatches.forEach(m => {
+                    const pick = userPredictions.find((p: any) => p.matchId === m.id);
+                    if (pick && pick.predictedWinnerId === m.winnerId) {
+                        matchdayScore += 1;
+                    }
+                });
+
+                let playoffsScore = 0;
+                const playoffMatches = allMatches.filter(m => (m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS) && m.winnerId);
+                const pointsPerRound: Record<number, number> = { 1: 3, 2: 4, 3: 6, 4: 8, 5: 10 };
+                
+                playoffMatches.forEach(m => {
+                    const pick = userPredictions.find((p: any) => p.matchId === m.id);
+                    if (pick && pick.predictedWinnerId === m.winnerId) {
+                        playoffsScore += (pointsPerRound[m.day || 1] || 3);
+                    }
+                });
+
+                let rankingScore = 0;
+                if (adminRanking && adminRanking.length > 0 && userRanking.length > 0) {
+                    userRanking.forEach((teamId: string, index: number) => {
+                        const actualIndex = adminRanking.indexOf(teamId);
+                        if (actualIndex !== -1) {
+                            const diff = Math.abs(index - actualIndex);
+                            if (diff === 0) rankingScore += 6;
+                            else if (diff === 1) rankingScore += 3;
+                        }
+                    });
+                }
+
+                let crystalScore = 0;
+                if (adminCrystalBall) {
+                    const singles = ['winter_champ', 'mvp', 'rookie', 'best_top', 'best_jng', 'best_mid', 'best_adc', 'best_sup', 'total_pentakills'];
+                    singles.forEach(key => {
+                        if (userCrystalBall[key] && userCrystalBall[key] === adminCrystalBall[key]) {
+                            crystalScore += (['winter_champ', 'mvp', 'rookie'].includes(key) ? 10 : 5);
+                        }
+                    });
+                    const rankedCats = ['fastest_win_team', 'longest_win_team', 'highest_kda', 'most_picked', 'most_banned', 'highest_wr', 'lowest_wr', 'most_kills'];
+                    rankedCats.forEach(cat => {
+                        const userVal = userCrystalBall[cat];
+                        if (userVal) {
+                            if (userVal === adminCrystalBall[`${cat}_1`]) crystalScore += 5;
+                            else if (userVal === adminCrystalBall[`${cat}_2`]) crystalScore += 3;
+                            else if (userVal === adminCrystalBall[`${cat}_3`]) crystalScore += 1;
+                        }
+                    });
+                }
+
+                let fantasyTotal = 0;
+                const fantasyHistory = [];
+                for(let r=1; r<=7; r++) {
+                    const roundRef = doc(db, "users", userId, "fantasy_rounds", `round_${r}`);
+                    const roundSnap = await getDoc(roundRef);
+                    const points = roundSnap.exists() ? (roundSnap.data().score || 0) : 0;
+                    
+                    const label = r <= 4 ? `J${FANTASY_SCHEDULE[r-1].matchdays.join('-')}` : `PO R${r-4}`;
+                    fantasyHistory.push({ day: label, points: points });
+                    fantasyTotal += points;
+                }
+
+                const pointsHistory: { day: string; points: number }[] = [];
+                let currentCumulative = 0;
+
+                for (let d = 1; d <= 11; d++) {
+                    const dayMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.day === d && m.winnerId);
+                    let dayPoints = 0;
+                    dayMatches.forEach(m => {
+                        const pick = userPredictions.find((p: any) => p.matchId === m.id);
+                        if (pick && pick.predictedWinnerId === m.winnerId) {
+                            dayPoints += 1;
+                        }
+                    });
+                    currentCumulative += dayPoints;
+                    pointsHistory.push({ day: `J${d}`, points: currentCumulative });
+                }
+
+                currentCumulative += rankingScore;
+                pointsHistory.push({ day: 'Rank', points: currentCumulative });
+
+                for (let d = 1; d <= 3; d++) {
+                     let dayPoints = 0;
+                     const targetRounds = (d === 3) ? [3, 4, 5] : [d];
+                     const matchesInStep = playoffMatches.filter(m => targetRounds.includes(m.day || 0) && m.winnerId);
+                     
+                     matchesInStep.forEach(m => {
+                        const pick = userPredictions.find((p: any) => p.matchId === m.id);
+                        if (pick && pick.predictedWinnerId === m.winnerId) {
+                            dayPoints += (pointsPerRound[m.day || 1] || 3);
+                        }
+                     });
+
+                     currentCumulative += dayPoints;
+                     pointsHistory.push({ day: `PO${d}`, points: currentCumulative });
+                }
+
+                const breakdown = {
+                    matchday: matchdayScore,
+                    ranking: rankingScore,
+                    playoffs: playoffsScore,
+                    crystalBall: crystalScore,
+                    fantasy: parseFloat(fantasyTotal.toFixed(2))
+                };
+
+                const globalScore = breakdown.matchday + breakdown.ranking + breakdown.playoffs;
+
+                // --- BADGE LOGIC: ORACLE (VIDENTE) ---
+                // Verifica si el usuario acertó TODOS los partidos de alguna jornada COMPLETA.
+                const completedDaysMap: Record<number, Match[]> = {};
+                
+                // Agrupamos partidos de fase regular por jornada
+                const allGroupMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.day);
+                allGroupMatches.forEach(m => {
+                    if (!completedDaysMap[m.day!]) completedDaysMap[m.day!] = [];
+                    completedDaysMap[m.day!].push(m);
+                });
+
+                let earnedOracle = false;
+
+                Object.entries(completedDaysMap).forEach(([dayStr, dayMatches]) => {
+                    // Una jornada solo cuenta si TODOS sus partidos tienen ganador (están terminados)
+                    const isDayComplete = dayMatches.every(m => Boolean(m.winnerId));
+                    
+                    // Doble verificación: asegurarnos de que no hay partidos "pendientes" en esa jornada 
+                    // que no hayamos cargado en 'dayMatches' (aunque el filtro inicial ya coge todos).
+                    // Para seguridad:
+                    const pendingMatches = allGroupMatches.filter(m => m.day === Number(dayStr) && !m.winnerId);
+
+                    if (isDayComplete && pendingMatches.length === 0 && dayMatches.length >= 2) {
+                        const correctCount = dayMatches.filter(m => {
+                            const pick = userPredictions.find((p: any) => p.matchId === m.id);
+                            return pick && pick.predictedWinnerId === m.winnerId;
+                        }).length;
+
+                        // Si acertó todos los partidos de esa jornada completa
+                        if (correctCount === dayMatches.length) {
+                            earnedOracle = true;
                         }
                     }
                 });
 
-                // B. PUNTUACIÓN DE RANKING
-                let rankingScore = 0;
-                const rankingRef = doc(db, "users", userId, "picks", "winter_2026_ranking");
-                const rankingSnap = await getDoc(rankingRef);
-                const userRankingIds = rankingSnap.exists() ? rankingSnap.data().order || [] : [];
+                const currentBadges = new Set<string>(userData.badges || []);
+                let hasBadgeChanges = false;
 
-                if (adminRanking.length > 0 && userRankingIds.length > 0) {
-                    userRankingIds.forEach((teamId: string, userIndex: number) => {
-                         const adminIndex = adminRanking.indexOf(teamId);
-                         if (adminIndex !== -1) {
-                             const diff = Math.abs(userIndex - adminIndex);
-                             if (diff === 0) rankingScore += 6;
-                             else if (diff === 1) rankingScore += 3;
-                         }
-                    });
+                if (earnedOracle && !currentBadges.has('oracle')) {
+                    currentBadges.add('oracle');
+                    hasBadgeChanges = true;
                 }
 
-                // C. PUNTUACIÓN DE BOLA DE CRISTAL
-                let crystalBallScore = 0;
-                const crystalBallRef = doc(db, "users", userId, "picks", "winter_2026_crystal");
-                const crystalBallSnap = await getDoc(crystalBallRef);
-                const userCrystalBall = crystalBallSnap.exists() ? crystalBallSnap.data().selections : {};
-
-                if (Object.keys(adminCrystalBall).length > 0 && Object.keys(userCrystalBall).length > 0) {
-                    const MAJOR_TITLES = ['winter_champ', 'mvp', 'rookie']; // 10 pts
-                    const STANDARD_CATEGORIES = ['best_top', 'best_jng', 'best_mid', 'best_adc', 'best_sup', 'total_pentakills']; // 5 pts
-                    const RANKED_CATEGORIES = [
-                        'fastest_win_team', 'longest_win_team',
-                        'highest_kda',
-                        'most_picked', 'most_banned', 'highest_wr', 'lowest_wr', 'most_kills'
-                    ];
-
-                    MAJOR_TITLES.forEach(key => {
-                        if (userCrystalBall[key] && userCrystalBall[key] === adminCrystalBall[key]) crystalBallScore += 10;
-                    });
-                    STANDARD_CATEGORIES.forEach(key => {
-                        if (userCrystalBall[key] && userCrystalBall[key] === adminCrystalBall[key]) crystalBallScore += 5;
-                    });
-                    RANKED_CATEGORIES.forEach(key => {
-                        const userVal = userCrystalBall[key];
-                        if (userVal) {
-                            if (userVal === adminCrystalBall[`${key}_1`]) crystalBallScore += 5;
-                            else if (userVal === adminCrystalBall[`${key}_2`]) crystalBallScore += 3;
-                            else if (userVal === adminCrystalBall[`${key}_3`]) crystalBallScore += 1;
-                        }
-                    });
+                // Si encontramos nuevos logros, guardarlos en segundo plano para persistencia
+                if (hasBadgeChanges) {
+                    await this.updateUserProfile(userId, { badges: Array.from(currentBadges) });
                 }
 
                 return {
                     id: userId,
-                    data,
-                    regularSeasonPointsPerDay,
-                    playoffPointsPerRound,
-                    playoffsScoreTotal,
-                    rankingScore,
-                    crystalBallScore,
-                    userRankingIds,
-                    userCrystalBall
-                };
-            }));
-
-            // PHASE 2: Determine Historical Ranking Leaders (For Pro Badge Streak)
-            // We calculate the cumulative score for each day (1-11) for all users
-            // and identify who was Rank 1 (highest score) at the end of each day.
-            const dailyLeaders = new Array(12).fill(null).map(() => new Set<string>()); // index 1-11 used
-            
-            for (let day = 1; day <= 11; day++) {
-                // Calculate cumulative score up to this day for everyone
-                const dayScores = processedUsers.map(u => {
-                    let sum = 0;
-                    // Sum matchday points up to current day loop
-                    for(let d = 1; d <= day; d++) sum += u.regularSeasonPointsPerDay[d];
-                    return { id: u.id, score: sum };
-                });
-
-                const maxScore = Math.max(...dayScores.map(s => s.score));
-                
-                // If there is a valid score > 0, find leaders
-                if (maxScore > 0) {
-                    dayScores.filter(s => s.score === maxScore).forEach(s => dailyLeaders[day].add(s.id));
-                }
-            }
-
-            // PHASE 3: Construct Final User Objects with Badges
-            const users: User[] = processedUsers.map((u) => {
-                const { 
-                    id, data, regularSeasonPointsPerDay, playoffPointsPerRound, 
-                    playoffsScoreTotal, rankingScore, crystalBallScore, 
-                    userRankingIds, userCrystalBall 
-                } = u;
-
-                // Construct History
-                const pointsHistory = [];
-                let cumulative = 0;
-                for (let i = 1; i <= 11; i++) {
-                    cumulative += regularSeasonPointsPerDay[i];
-                    pointsHistory.push({ day: `J${i}`, points: cumulative });
-                }
-                
-                let midSeasonBoost = rankingScore + crystalBallScore;
-                if (midSeasonBoost > 0) {
-                    cumulative += midSeasonBoost;
-                    pointsHistory.push({ day: 'Bonus', points: cumulative });
-                }
-
-                for (let i = 1; i <= maxPlayoffRounds; i++) {
-                    cumulative += playoffPointsPerRound[i];
-                    pointsHistory.push({ day: `PO${i}`, points: cumulative });
-                }
-
-                let matchdayTotal = 0;
-                for(let i=1; i<=11; i++) matchdayTotal += regularSeasonPointsPerDay[i];
-
-                const breakdown = data.scoreBreakdown || { crystalBall: 0, fantasy: 0 };
-                breakdown.matchday = matchdayTotal;
-                breakdown.playoffs = playoffsScoreTotal;
-                breakdown.ranking = rankingScore;
-                breakdown.crystalBall = crystalBallScore;
-
-                const globalScore = matchdayTotal + playoffsScoreTotal + rankingScore + crystalBallScore;
-
-                // Mock Fantasy
-                const fantasyTotal = breakdown.fantasy || 0;
-                const fantasyHistory = Array.from({ length: 12 }, (_, i) => {
-                    const label = i === 11 ? 'Playoffs' : `J${i + 1}`;
-                    const points = Math.floor((fantasyTotal / 12) * (i + 1));
-                    return { day: label, points: points }; 
-                });
-
-                // BADGES LOGIC
-                const badges: string[] = [];
-                const badgeProgress: Record<string, { current: number, target: number }> = {};
-
-                // 1. Veteran
-                if (globalScore > 100) badges.push('veteran');
-                badgeProgress['veteran'] = { current: globalScore, target: 100 };
-
-                // 2. Oracle
-                const maxDailyHits = Math.max(...regularSeasonPointsPerDay);
-                if (maxDailyHits >= 6) badges.push('oracle');
-                badgeProgress['oracle'] = { current: maxDailyHits, target: 6 };
-
-                // 3. Strategist
-                let correctRankingCount = 0;
-                if (adminRanking.length >= 3 && userRankingIds.length >= 3) {
-                    if (adminRanking[0] === userRankingIds[0]) correctRankingCount++;
-                    if (adminRanking[1] === userRankingIds[1]) correctRankingCount++;
-                    if (adminRanking[2] === userRankingIds[2]) correctRankingCount++;
-                }
-                if (correctRankingCount === 3) badges.push('strategist');
-                badgeProgress['strategist'] = { current: correctRankingCount, target: 3 };
-
-                // 4. Analyst
-                const hasCorrectMVP = adminCrystalBall?.mvp && userCrystalBall?.mvp === adminCrystalBall.mvp;
-                if (hasCorrectMVP) badges.push('analyst');
-                badgeProgress['analyst'] = { current: hasCorrectMVP ? 1 : 0, target: 1 };
-
-                // 5. On Fire
-                let consecutiveHighScores = 0;
-                let maxConsecutive = 0;
-                for (let i = 1; i <= 11; i++) {
-                    if (regularSeasonPointsPerDay[i] >= 5) {
-                        consecutiveHighScores++;
-                    } else {
-                        consecutiveHighScores = 0;
-                    }
-                    if (consecutiveHighScores > maxConsecutive) maxConsecutive = consecutiveHighScores;
-                }
-                if (maxConsecutive >= 3) badges.push('on_fire');
-                badgeProgress['on_fire'] = { current: maxConsecutive, target: 3 };
-
-                // 6. Collector
-                const level = Math.floor(globalScore / 50) + 1;
-                const unlockedRewards = level; 
-                if (unlockedRewards >= 10) badges.push('collector');
-                badgeProgress['collector'] = { current: unlockedRewards, target: 10 };
-
-                // 7. Pro (Consecutive Rank 1 Logic)
-                let maxStreak = 0;
-                let currentStreak = 0;
-                // Check streaks in days 1-11
-                for (let d = 1; d <= 11; d++) {
-                    if (dailyLeaders[d].has(id)) {
-                        currentStreak++;
-                    } else {
-                        currentStreak = 0;
-                    }
-                    if (currentStreak > maxStreak) maxStreak = currentStreak;
-                }
-                if (maxStreak >= 4) badges.push('pro');
-                badgeProgress['pro'] = { current: maxStreak, target: 4 };
-
-                let equippedBadges = data.equippedBadges || [];
-
-                return {
-                    id: id,
-                    name: data.username || 'Invocador',
-                    avatar: data.avatar_url || `https://ui-avatars.com/api/?name=${data.username || 'User'}&background=random`,
-                    title: data.title || '',
-                    frame: data.frame || '', 
-                    banner: data.banner || '', 
-                    badges: badges,
-                    badgeProgress: badgeProgress,
-                    equippedBadges: equippedBadges,
+                    name: userData.username || 'Invocador',
+                    avatar: userData.avatar_url || `https://ui-avatars.com/api/?name=${userData.username}&background=random`,
+                    title: userData.title || '',
+                    frame: userData.frame || '', 
+                    banner: userData.banner || '', 
+                    badges: Array.from(currentBadges), // Usar la lista actualizada
+                    badgeProgress: userData.badgeProgress || {},
+                    equippedBadges: userData.equippedBadges || [],
                     score: globalScore,
                     scoreBreakdown: breakdown,
                     rank: 0, 
                     pointsHistory: pointsHistory, 
                     fantasyHistory: fantasyHistory
                 };
-            });
+            }));
             
-            // --- POST-PROCESSING SORT & RELATIVE BADGES ---
-
-            // A. Sort by Score
-            const sortedUsers = users.sort((a, b) => {
-                if (b.score !== a.score) {
-                    return b.score - a.score;
-                }
-                return b.scoreBreakdown.matchday - a.scoreBreakdown.matchday;
-            });
-            
-            // B. Calculate Max Fantasy in League for MVP Badge
-            const maxFantasyScore = Math.max(...sortedUsers.map(u => u.scoreBreakdown.fantasy));
-
-            // C. Assign Ranks & Finalize Badges
-            let currentRank = 1;
-            sortedUsers.forEach((u, i) => {
-                if (i > 0) {
-                    const prev = sortedUsers[i-1];
-                    const isTied = prev.score === u.score && prev.scoreBreakdown.matchday === u.scoreBreakdown.matchday;
-                    if (isTied) {
-                        // Share rank (keep currentRank)
-                    } else {
-                        currentRank = i + 1;
-                    }
-                } else {
-                    currentRank = 1;
-                }
-                
-                u.rank = currentRank;
-
-                // BADGE: MANAGER MVP (Highest Fantasy Score & > 0)
-                if (u.scoreBreakdown.fantasy === maxFantasyScore && maxFantasyScore > 0) {
-                    u.badges?.push('mvp_fantasy');
-                }
-            });
-            
-            return sortedUsers;
+            return users.sort((a, b) => b.score - a.score);
 
         } catch (e) {
             console.error("Error fetching all users:", e);
@@ -612,8 +840,7 @@ export const dataService = {
         }
     },
 
-    // --- OTHER METHODS ---
-    async updateUserProfile(userId: string, updates: { avatar_url?: string, title?: string, frame?: string, banner?: string }) {
+    async updateUserProfile(userId: string, updates: any) {
         const docRef = doc(db, "users", userId);
         await setDoc(docRef, cleanPayload(updates), { merge: true });
     },
@@ -637,9 +864,6 @@ export const dataService = {
             else currentPreds.push({ matchId: newP.match_id, predictedWinnerId: newP.predicted_winner_id });
         });
         await setDoc(docRef, { list: cleanPayload(currentPreds) }, { merge: true });
-    },
-    async clearAllUserPredictions(userId: string) {
-        await deleteDoc(doc(db, "users", userId, "picks", "winter_2026"));
     },
     async getUserRanking(userId: string) {
         try {
@@ -676,14 +900,5 @@ export const dataService = {
     },
     async saveAdminCrystalBallResults(selections: any) {
         await setDoc(doc(db, "admin_data", "results"), { winter_2026_crystal: cleanPayload(selections) }, { merge: true });
-    },
-    async getFantasyTeam(userId: string) {
-        try {
-            const snap = await getDoc(doc(db, "users", userId, "fantasy", "winter_2026"));
-            return snap.exists() ? snap.data().team : null;
-        } catch (e) { return null; }
-    },
-    async saveFantasyTeam(userId: string, team: any) {
-        await setDoc(doc(db, "users", userId, "fantasy", "winter_2026"), { team: cleanPayload(team) }, { merge: true });
     }
 };

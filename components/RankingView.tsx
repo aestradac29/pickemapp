@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Team } from '../types';
-import { GripVertical, Save, Trophy, AlertOctagon, Loader2, CheckCircle2, AlertCircle, Settings, Lock, XCircle } from 'lucide-react';
+import { Team, User } from '../types';
+import { GripVertical, Save, Trophy, AlertOctagon, Loader2, CheckCircle2, AlertCircle, Settings, Lock, XCircle, Eye } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
 interface RankingViewProps {
@@ -17,14 +17,37 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isLocked, setIsLocked] = useState(false);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
 
   // Admin Mode Toggle: "prediction" (default for users) vs "official_result" (only for admin)
   const [mode, setMode] = useState<'prediction' | 'official_result'>('prediction');
 
+  // Viewing State (For checking other users)
+  const [viewingUserId, setViewingUserId] = useState<string | null>(currentUserId || null);
+
+  useEffect(() => {
+      // Set initial viewing user
+      if (currentUserId && !viewingUserId) {
+          setViewingUserId(currentUserId);
+      }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+        try {
+            const users = await dataService.getAllUsers();
+            setAllUsers(users);
+        } catch (e) {
+            console.error("Error loading users", e);
+        }
+    };
+    loadUsers();
+  }, []);
+
   useEffect(() => {
     loadTeamsAndRanking();
     checkLockStatus();
-  }, [mode, currentUserId]); // Reload when mode switches or user changes
+  }, [mode, viewingUserId, isAdmin]); // Reload when mode switches or user changes
 
   const checkLockStatus = async () => {
       // Official result editing is never locked for admin (needed for scoring)
@@ -67,11 +90,12 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
         
         let orderedIds: string[] = [];
 
-        // 2. Determinar qué lista mostrar (Usuario vs Admin Editor)
+        // 2. Determinar qué lista mostrar (Usuario Seleccionado vs Admin Editor)
         if (isAdmin && mode === 'official_result') {
             orderedIds = adminRankingIds;
-        } else if (currentUserId) {
-            orderedIds = await dataService.getUserRanking(currentUserId);
+        } else if (viewingUserId) {
+            // Cargar ranking del usuario que estamos VIENDO (viewingUserId)
+            orderedIds = await dataService.getUserRanking(viewingUserId);
         }
 
         // Apply order if exists
@@ -95,15 +119,22 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
     }
   };
 
+  // Determine if viewing another user
+  const isViewingOther = viewingUserId !== currentUserId;
+  const viewingUser = allUsers.find(u => u.id === viewingUserId);
+
+  // Drag logic needs to check if locked OR if viewing someone else
+  const canDrag = !isLocked && !isViewingOther && mode === 'prediction';
+
   const handleDragStart = (e: React.DragEvent, index: number) => {
-    if (isLocked) return;
+    if (!canDrag) return;
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    if (isLocked) return;
+    if (!canDrag) return;
     if (draggedIndex === null || draggedIndex === index) return;
 
     const newOrder = [...rankedTeams];
@@ -121,7 +152,8 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   };
 
   const handleSave = async () => {
-      if (isLocked && mode === 'prediction') return;
+      // Bloquear guardado si está bloqueado o viendo a otro
+      if ((isLocked && mode === 'prediction') || isViewingOther) return;
 
       if (!currentUserId && !isAdmin) {
           alert("Debes iniciar sesión.");
@@ -178,42 +210,82 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   // Determinar si hay resultados oficiales publicados para mostrar feedback
   const hasOfficialResults = officialRanking.length > 0 && mode === 'prediction';
 
+  // Should we show the user selector? Yes if locked (season started) or admin
+  const showUserSelector = (isLocked || isAdmin) && mode === 'prediction';
+
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 mb-20">
       
-      {/* Admin Mode Toggle */}
-      {isAdmin && (
-          <div className="flex justify-end mb-4">
-              <div className="bg-[#0f1d36] border border-gray-700 p-1 rounded-lg flex items-center gap-1">
-                  <button 
-                    onClick={() => setMode('prediction')}
-                    className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-colors ${mode === 'prediction' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
-                  >
-                      Mis Predicciones
-                  </button>
-                  <button 
-                    onClick={() => setMode('official_result')}
-                    className={`px-3 py-1.5 rounded text-xs font-bold uppercase flex items-center gap-2 transition-colors ${mode === 'official_result' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                  >
-                      <Settings className="w-3 h-3" />
-                      Resultado Oficial
-                  </button>
-              </div>
+      {/* Header Area with Admin & User Select */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <h2 className={`text-2xl font-bold uppercase ${mode === 'official_result' ? 'text-red-500' : 'text-[#c8aa6e]'}`}>
+                {mode === 'official_result' ? 'ADMIN: RESULTADO REAL' : 'Clasificación Winter 2026'}
+            </h2>
+            <p className="text-gray-400 text-sm">
+                {mode === 'official_result' 
+                    ? 'Establece el orden REAL para calcular puntuaciones.' 
+                    : 'Predicción del orden final de la Fase Regular.'}
+            </p>
           </div>
+
+          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+             {/* User Selector (Only visible if Locked/Started) */}
+             {showUserSelector && (
+                <div className="flex items-center gap-2 bg-[#0f1923] p-1 pr-3 rounded-lg border border-gray-700">
+                    <div className="w-8 h-8 rounded bg-black flex items-center justify-center overflow-hidden border border-gray-600">
+                        <img 
+                            src={viewingUser?.avatar || `https://ui-avatars.com/api/?name=${viewingUser?.name || '?'}&background=random`} 
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+                    <select 
+                        value={viewingUserId || ''}
+                        onChange={(e) => setViewingUserId(e.target.value)}
+                        className="bg-transparent text-white text-sm outline-none font-bold min-w-[120px] max-w-[180px]"
+                    >
+                        <option value={currentUserId || ''} className="bg-black text-[#c8aa6e]">Mi Ranking</option>
+                        {allUsers.filter(u => u.id !== currentUserId).map(u => (
+                            <option key={u.id} value={u.id} className="bg-black">{u.name}</option>
+                        ))}
+                    </select>
+                </div>
+             )}
+
+             {/* Admin Mode Toggle */}
+             {isAdmin && (
+                  <div className="bg-[#0f1d36] border border-gray-700 p-1 rounded-lg flex items-center gap-1">
+                      <button 
+                        onClick={() => { setMode('prediction'); setViewingUserId(currentUserId); }}
+                        className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-colors ${mode === 'prediction' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                      >
+                          Ver
+                      </button>
+                      <button 
+                        onClick={() => { setMode('official_result'); setViewingUserId(currentUserId); }}
+                        className={`px-3 py-1.5 rounded text-xs font-bold uppercase flex items-center gap-2 transition-colors ${mode === 'official_result' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                      >
+                          <Settings className="w-3 h-3" />
+                          Admin
+                      </button>
+                  </div>
+             )}
+          </div>
+      </div>
+
+      {/* View Other User Banner */}
+      {isViewingOther && (
+        <div className="mb-6 bg-[#c8aa6e]/10 border border-[#c8aa6e]/30 p-3 rounded-lg flex items-center gap-3 animate-in slide-in-from-top-2">
+            <Eye className="w-5 h-5 text-[#c8aa6e]" />
+            <div>
+                <p className="text-sm font-bold text-[#f0e6d2] uppercase">Modo Espectador</p>
+                <p className="text-xs text-gray-400">Estás viendo el ranking de <span className="font-bold text-white">{viewingUser?.name}</span>.</p>
+            </div>
+        </div>
       )}
 
-      <div className="text-center mb-6">
-        <h2 className={`text-2xl font-bold uppercase ${mode === 'official_result' ? 'text-red-500' : 'text-[#c8aa6e]'}`}>
-            {mode === 'official_result' ? 'ADMIN: RESULTADO REAL' : 'Tu Clasificación Winter 2026'}
-        </h2>
-        <p className="text-gray-400 text-sm">
-            {mode === 'official_result' 
-                ? 'Establece el orden REAL para calcular puntuaciones.' 
-                : 'Arrastra los equipos para predecir el orden final del Split.'}
-        </p>
-
-        {/* SCORING LEGEND */}
-        <div className="flex items-center justify-center gap-3 mt-4 animate-in fade-in slide-in-from-bottom-2">
+      {/* SCORING LEGEND */}
+      <div className="flex items-center justify-center gap-3 mb-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-green-500/30 bg-green-900/10 backdrop-blur-sm">
                 <CheckCircle2 className="w-3 h-3 text-green-400" />
                 <span className="text-[10px] font-bold text-green-200 uppercase tracking-wider">Posición Exacta: <span className="text-white ml-1">+6 Pts</span></span>
@@ -222,21 +294,22 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
                 <AlertCircle className="w-3 h-3 text-yellow-400" />
                 <span className="text-[10px] font-bold text-yellow-200 uppercase tracking-wider">Error por 1 posición: <span className="text-white ml-1">+3 Pts</span></span>
             </div>
-        </div>
-
-        {/* Total Score Badge if Results Exist */}
-        {hasOfficialResults && (
-            <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#c8aa6e]/20 to-[#c8aa6e]/5 border border-[#c8aa6e] rounded-full animate-in zoom-in">
-                <Trophy className="w-4 h-4 text-[#c8aa6e]" />
-                <span className="text-sm font-bold text-[#f0e6d2]">Puntos Totales: <span className="text-[#c8aa6e] text-lg">{totalPoints}</span></span>
-            </div>
-        )}
       </div>
+
+      {/* Total Score Badge if Results Exist */}
+      {hasOfficialResults && (
+            <div className="flex justify-center mb-6">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#c8aa6e]/20 to-[#c8aa6e]/5 border border-[#c8aa6e] rounded-full animate-in zoom-in">
+                    <Trophy className="w-4 h-4 text-[#c8aa6e]" />
+                    <span className="text-sm font-bold text-[#f0e6d2]">Puntos Totales: <span className="text-[#c8aa6e] text-lg">{totalPoints}</span></span>
+                </div>
+            </div>
+      )}
       
-      {isLocked && mode === 'prediction' && (
+      {isLocked && mode === 'prediction' && !isViewingOther && (
         <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center justify-center gap-2 text-red-300 mb-6 animate-in slide-in-from-top-2 font-bold uppercase tracking-widest text-sm max-w-lg mx-auto">
             <Lock className="w-4 h-4" />
-            <span>Predicciones Cerradas (El Split ha comenzado)</span>
+            <span>Ranking Cerrado (El Split ha comenzado)</span>
         </div>
       )}
 
@@ -305,23 +378,23 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
               )}
 
               <div 
-                draggable={!isLocked}
+                draggable={canDrag}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
                 className={`
                   flex items-center gap-4 p-3 rounded 
                   border transition-all select-none
-                  ${!isLocked ? 'cursor-move group' : 'cursor-default'}
+                  ${canDrag ? 'cursor-move group' : 'cursor-default'}
                   ${draggedIndex === index ? 'opacity-50 ring-2 ring-[#c8aa6e] bg-[#1a2c4e] z-10' : ''}
                   ${isEliminated 
                     ? 'bg-[#050a14] border-red-900/20 grayscale-[0.5] hover:grayscale-0' 
                     : diffClass || 'bg-[#0a1428] border-gray-800 hover:border-[#c8aa6e]/50 shadow-sm'
                   }
-                  ${isLocked ? 'opacity-90' : ''}
+                  ${!canDrag ? 'opacity-90' : ''}
                 `}
               >
-                {!isLocked && (
+                {canDrag && (
                     <div className={`transition-colors ${isEliminated ? 'text-gray-700' : 'text-gray-500 group-hover:text-[#c8aa6e]'}`}>
                         <GripVertical className="w-5 h-5" />
                     </div>
@@ -375,38 +448,41 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
         })}
       </div>
 
-      <div className="mt-6 flex justify-center sticky bottom-8 z-20 pointer-events-none">
-        <button 
-            onClick={handleSave}
-            disabled={isSaving || (isLocked && mode === 'prediction')}
-            className={`
-                pointer-events-auto flex items-center gap-2 px-8 py-3 rounded-full font-bold transition-all shadow-xl transform border
-                ${isLocked && mode === 'prediction'
-                    ? 'bg-gray-800 border-gray-600 text-gray-500 cursor-not-allowed opacity-80'
-                    : mode === 'official_result' 
-                        ? 'bg-red-600 border-red-400 text-white hover:bg-red-700 hover:scale-105'
-                        : 'bg-[#c8aa6e] border-yellow-500 text-[#0a1428] hover:bg-[#d6bb82] hover:scale-105'
-                }
-                ${saveStatus === 'success' ? 'ring-4 ring-green-500/50' : ''}
-                ${saveStatus === 'error' ? 'ring-4 ring-red-500/50' : ''}
-            `}
-        >
-          {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 
-           isLocked && mode === 'prediction' ? <Lock className="w-5 h-5" /> :
-           saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> : 
-           saveStatus === 'error' ? <AlertCircle className="w-5 h-5" /> :
-           <Save className="w-5 h-5" />}
-          
-          {isLocked && mode === 'prediction' 
-            ? 'Predicciones Cerradas' 
-            : saveStatus === 'success' 
-                ? '¡Guardado!' 
-                : saveStatus === 'error' 
-                    ? 'Error al guardar' 
-                    : (mode === 'official_result' ? 'PUBLICAR RESULTADO OFICIAL' : 'Guardar Predicción')
-          }
-        </button>
-      </div>
+      {/* Footer Actions (Only show Save if NOT viewing other) */}
+      {!isViewingOther && (
+        <div className="mt-6 flex justify-center sticky bottom-8 z-20 pointer-events-none">
+            <button 
+                onClick={handleSave}
+                disabled={isSaving || (isLocked && mode === 'prediction')}
+                className={`
+                    pointer-events-auto flex items-center gap-2 px-8 py-3 rounded-full font-bold transition-all shadow-xl transform border
+                    ${isLocked && mode === 'prediction'
+                        ? 'bg-gray-800 border-gray-600 text-gray-500 cursor-not-allowed opacity-80'
+                        : mode === 'official_result' 
+                            ? 'bg-red-600 border-red-400 text-white hover:bg-red-700 hover:scale-105'
+                            : 'bg-[#c8aa6e] border-yellow-500 text-[#0a1428] hover:bg-[#d6bb82] hover:scale-105'
+                    }
+                    ${saveStatus === 'success' ? 'ring-4 ring-green-500/50' : ''}
+                    ${saveStatus === 'error' ? 'ring-4 ring-red-500/50' : ''}
+                `}
+            >
+            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+            isLocked && mode === 'prediction' ? <Lock className="w-5 h-5" /> :
+            saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> : 
+            saveStatus === 'error' ? <AlertCircle className="w-5 h-5" /> :
+            <Save className="w-5 h-5" />}
+            
+            {isLocked && mode === 'prediction' 
+                ? 'Predicciones Cerradas' 
+                : saveStatus === 'success' 
+                    ? '¡Guardado!' 
+                    : saveStatus === 'error' 
+                        ? 'Error al guardar' 
+                        : (mode === 'official_result' ? 'PUBLICAR RESULTADO OFICIAL' : 'Guardar Predicción')
+            }
+            </button>
+        </div>
+      )}
     </div>
   );
 };

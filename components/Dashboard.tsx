@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { ViewState } from '../types';
-import { Trophy, ListOrdered, Sparkles, CalendarCheck, Swords, UserPlus, Lock, Unlock, Database } from 'lucide-react';
+import { Trophy, ListOrdered, Sparkles, CalendarCheck, Swords, UserPlus, Lock, Unlock, Database, Users, Table2, Crown } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
 interface DashboardProps {
@@ -47,8 +48,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
     },
     {
       id: ViewState.RANKING,
-      title: 'Clasificación 2026',
-      subtitle: 'Ordena los 12 equipos',
+      title: 'Tu Ranking',
+      subtitle: 'Predicción Top 12',
       icon: ListOrdered,
       color: 'text-gray-300',
       border: 'hover:border-gray-300',
@@ -83,6 +84,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       bg: 'hover:bg-[#0ac8b9]/10'
     },
     {
+      id: ViewState.TEAMS,
+      title: 'Equipos',
+      subtitle: 'Rosters y Estadísticas',
+      icon: Users,
+      color: 'text-orange-400',
+      border: 'hover:border-orange-400',
+      bg: 'hover:bg-orange-400/10'
+    },
+    {
       id: ViewState.RESULTS,
       title: 'Resultados',
       subtitle: 'Historial y puntos',
@@ -90,6 +100,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-green-400',
       border: 'hover:border-green-400',
       bg: 'hover:bg-green-400/10'
+    },
+    {
+      id: ViewState.OFFICIAL_STANDINGS,
+      title: 'Clasificación Oficial',
+      subtitle: 'Tabla real LEC Winter',
+      icon: Table2,
+      color: 'text-amber-400',
+      border: 'hover:border-amber-400',
+      bg: 'hover:bg-amber-400/10'
+    },
+    {
+      id: ViewState.HALL_OF_FAME,
+      title: 'Hall of Fame',
+      subtitle: 'MVPs y LVPs',
+      icon: Crown,
+      color: 'text-yellow-400',
+      border: 'hover:border-yellow-400',
+      bg: 'hover:bg-yellow-400/10'
     }
   ];
 

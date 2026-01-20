@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { ROLE_ICONS } from '../constants';
-import { Sparkles, RefreshCw, Trophy, User, Sword, Shield, Hash, Loader2, Save, CheckCircle2, AlertCircle, Settings, Medal, Star, HelpCircle, XCircle, Lock } from 'lucide-react';
+import { Sparkles, RefreshCw, Trophy, User, Sword, Shield, Hash, Loader2, Save, CheckCircle2, AlertCircle, Settings, Medal, Star, HelpCircle, XCircle, Lock, Eye, EyeOff } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { getChampions } from '../services/riotService';
 import { dataService } from '../services/dataService';
-import { Role, Player, Team } from '../types';
+import { Role, Player, Team, User as UserType } from '../types';
 
 interface CrystalBallProps {
     currentUserId?: string | null;
@@ -206,6 +206,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
   const [championOptions, setChampionOptions] = useState<Option[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [allUsers, setAllUsers] = useState<UserType[]>([]);
   
   const [loadingChamps, setLoadingChamps] = useState(true);
   const [loadingData, setLoadingData] = useState(true);
@@ -216,17 +217,22 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
 
   const [mode, setMode] = useState<'prediction' | 'official_result'>('prediction');
   const [isLocked, setIsLocked] = useState(false);
+  
+  // Viewing State (For checking other users)
+  const [viewingUserId, setViewingUserId] = useState<string | null>(currentUserId || null);
 
   useEffect(() => {
     const loadData = async () => {
         setLoadingData(true);
         try {
-            const [playersList, teamsMap] = await Promise.all([
+            const [playersList, teamsMap, usersList] = await Promise.all([
                 dataService.getPlayers(),
-                dataService.getTeams()
+                dataService.getTeams(),
+                dataService.getAllUsers()
             ]);
             setPlayers(playersList);
             setTeams(Object.values(teamsMap));
+            setAllUsers(usersList);
         } catch (err) {
             console.error(err);
         } finally {
@@ -235,6 +241,13 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
     };
     loadData();
   }, []);
+
+  useEffect(() => {
+      // Set initial viewing user
+      if (currentUserId && !viewingUserId) {
+          setViewingUserId(currentUserId);
+      }
+  }, [currentUserId]);
 
   useEffect(() => {
     const checkLockStatus = async () => {
@@ -263,8 +276,9 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
         }
     };
     checkLockStatus();
-  }, [mode]); // Re-check when mode changes
+  }, [mode]); 
 
+  // Load Selections whenever viewingUserId changes
   useEffect(() => {
     const loadSelections = async () => {
         try {
@@ -273,8 +287,8 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
 
             if (isAdmin && mode === 'official_result') {
                  setSelections(adminRes || {});
-            } else if (currentUserId) {
-                 const userRes = await dataService.getCrystalBall(currentUserId);
+            } else if (viewingUserId) {
+                 const userRes = await dataService.getCrystalBall(viewingUserId);
                  setSelections(userRes || {});
             }
         } catch (e) {
@@ -282,7 +296,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
         }
     };
     loadSelections();
-  }, [currentUserId, mode, isAdmin]);
+  }, [viewingUserId, mode, isAdmin]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -301,13 +315,13 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
   }, []);
 
   const handleSelectionChange = (key: string, value: string) => {
-    if (isLocked && mode === 'prediction') return;
+    if ((isLocked && mode === 'prediction') || viewingUserId !== currentUserId) return;
     setSelections(prev => ({ ...prev, [key]: value }));
     setSaveStatus('idle');
   };
 
   const handleSave = async () => {
-      if (isLocked && mode === 'prediction') return;
+      if ((isLocked && mode === 'prediction') || viewingUserId !== currentUserId) return;
 
       if (!currentUserId && !isAdmin) {
           alert("Debes iniciar sesión.");
@@ -365,6 +379,16 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(mapToOption);
 
+  // Filter Rookies
+  const rookieNames = [
+    "Empyros", "Lospa", "Tao", "Hazel", "Prime", "Baus", "Velja",
+    "Fleshy", "Stend", "Serin", "Tracyn", "Jopa", "Maynter", "Rhilech",
+  ];
+
+  const rookieOptions: Option[] = allPlayerOptions.filter(p => 
+    rookieNames.includes(p.label)
+  );
+
   const getPlayerOptionsByRole = (role: Role): Option[] => {
     return players
       .filter(p => p.role === role)
@@ -388,11 +412,9 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
       );
   }
 
-  // Calculate Total Score for display if in user mode
+  // Calculate Total Score for display
   let totalUserScore = 0;
   if (mode === 'prediction' && officialResults) {
-      // Re-calculate locally for quick feedback display
-      // (This duplicates logic but is purely visual for this component)
       SINGLE_CATEGORIES.forEach(k => {
           if (selections[k] && selections[k] === officialResults[k]) {
               totalUserScore += (['winter_champ', 'mvp', 'rookie'].includes(k) ? 10 : 5);
@@ -403,55 +425,100 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
       });
   }
 
-  const effectiveDisabled = isLocked && mode === 'prediction';
+  // Determine if viewing another user
+  const isViewingOther = viewingUserId !== currentUserId;
+  const viewingUser = allUsers.find(u => u.id === viewingUserId);
+
+  // Controls should be disabled if: locked AND prediction mode, OR viewing someone else
+  const effectiveDisabled = (isLocked && mode === 'prediction') || isViewingOther;
+
+  // Should we show the user selector? Yes if locked (season started) or admin
+  const showUserSelector = (isLocked || isAdmin) && mode === 'prediction';
 
   return (
       <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 mb-24">
         
-        {/* Admin Mode Toggle */}
-        {isAdmin && (
-            <div className="flex justify-end mb-4">
-                <div className="bg-[#0f1d36] border border-gray-700 p-1 rounded-lg flex items-center gap-1">
-                    <button 
-                        onClick={() => setMode('prediction')}
-                        className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-colors ${mode === 'prediction' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        Mis Predicciones
-                    </button>
-                    <button 
-                        onClick={() => setMode('official_result')}
-                        className={`px-3 py-1.5 rounded text-xs font-bold uppercase flex items-center gap-2 transition-colors ${mode === 'official_result' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        <Settings className="w-3 h-3" />
-                        Resultado Oficial
-                    </button>
+        {/* Header Area with Admin & User Select */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+                <h2 className={`text-3xl font-bold uppercase tracking-wider mb-1 text-transparent bg-clip-text ${mode === 'official_result' ? 'bg-gradient-to-r from-red-400 to-red-600' : 'bg-gradient-to-r from-purple-300 to-purple-600'}`}>
+                    {mode === 'official_result' ? 'ADMIN: RESULTADOS' : 'Bola de Cristal'}
+                </h2>
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    <span className="text-purple-300/80 text-sm">
+                        {mode === 'official_result' 
+                            ? 'Introduce los resultados oficiales.' 
+                            : 'Predicciones del Split.'}
+                    </span>
+                </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                {/* User Selector (Only visible if Locked/Started) */}
+                {showUserSelector && (
+                    <div className="flex items-center gap-2 bg-[#0f1923] p-1 pr-3 rounded-lg border border-gray-700">
+                        <div className="w-8 h-8 rounded bg-black flex items-center justify-center overflow-hidden border border-gray-600">
+                            <img 
+                                src={viewingUser?.avatar || `https://ui-avatars.com/api/?name=${viewingUser?.name || '?'}&background=random`} 
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                        <select 
+                            value={viewingUserId || ''}
+                            onChange={(e) => setViewingUserId(e.target.value)}
+                            className="bg-transparent text-white text-sm outline-none font-bold min-w-[120px] max-w-[200px]"
+                        >
+                            <option value={currentUserId || ''} className="bg-black text-purple-400">Mis Predicciones</option>
+                            {allUsers.filter(u => u.id !== currentUserId).map(u => (
+                                <option key={u.id} value={u.id} className="bg-black">{u.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {/* Admin Toggle */}
+                {isAdmin && (
+                    <div className="bg-[#0f1d36] border border-gray-700 p-1 rounded-lg flex items-center gap-1">
+                        <button 
+                            onClick={() => { setMode('prediction'); setViewingUserId(currentUserId); }}
+                            className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-colors ${mode === 'prediction' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            Ver
+                        </button>
+                        <button 
+                            onClick={() => { setMode('official_result'); setViewingUserId(currentUserId); }}
+                            className={`px-3 py-1.5 rounded text-xs font-bold uppercase flex items-center gap-2 transition-colors ${mode === 'official_result' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            <Settings className="w-3 h-3" />
+                            Admin
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {/* View Other User Banner */}
+        {isViewingOther && (
+            <div className="mb-6 bg-purple-900/20 border border-purple-500/30 p-3 rounded-lg flex items-center gap-3 animate-in slide-in-from-top-2">
+                <Eye className="w-5 h-5 text-purple-400" />
+                <div>
+                    <p className="text-sm font-bold text-purple-200 uppercase">Modo Espectador</p>
+                    <p className="text-xs text-purple-300/70">Estás viendo la Bola de Cristal de <span className="font-bold text-white">{viewingUser?.name}</span>.</p>
                 </div>
             </div>
         )}
 
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-block p-4 rounded-full bg-purple-900/20 mb-4 border border-purple-500/30 shadow-[0_0_30px_rgba(147,51,234,0.2)]">
-              <Sparkles className="w-10 h-10 text-purple-400" />
-          </div>
-          <h2 className={`text-3xl font-bold uppercase tracking-wider mb-2 text-transparent bg-clip-text ${mode === 'official_result' ? 'bg-gradient-to-r from-red-400 to-red-600' : 'bg-gradient-to-r from-purple-300 to-purple-600'}`}>
-              {mode === 'official_result' ? 'ADMIN: RESULTADOS' : 'Bola de Cristal'}
-          </h2>
-          <p className="text-purple-300/80 text-sm max-w-md mx-auto">
-              {mode === 'official_result' 
-                ? 'Introduce los resultados oficiales.' 
-                : 'Predice el futuro del Split. Las selecciones se bloquearán al inicio.'}
-          </p>
-          
-          {totalUserScore > 0 && mode === 'prediction' && (
-              <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-900/50 to-purple-600/20 border border-purple-500 rounded-full animate-in zoom-in">
-                  <Sparkles className="w-4 h-4 text-purple-300" />
-                  <span className="text-white font-bold">Puntos Obtenidos: <span className="text-purple-300 text-lg">{totalUserScore}</span></span>
-              </div>
-          )}
-        </div>
+        {totalUserScore > 0 && mode === 'prediction' && (
+            <div className="mb-8 flex justify-center">
+                <div className="inline-flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-purple-900/50 to-purple-600/20 border border-purple-500 rounded-full animate-in zoom-in shadow-[0_0_20px_rgba(147,51,234,0.3)]">
+                    <Sparkles className="w-5 h-5 text-purple-300" />
+                    <span className="text-white font-bold text-lg">Puntos: <span className="text-purple-300 text-xl">{totalUserScore}</span></span>
+                </div>
+            </div>
+        )}
 
-        {isLocked && mode === 'prediction' && (
+        {isLocked && mode === 'prediction' && !isViewingOther && (
             <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center justify-center gap-2 text-red-300 mb-6 animate-in slide-in-from-top-2 font-bold uppercase tracking-widest text-sm max-w-lg mx-auto">
                 <Lock className="w-4 h-4" />
                 <span>Predicciones Cerradas (El Split ha comenzado)</span>
@@ -459,20 +526,22 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
         )}
 
         {/* SCORING LEGEND */}
-        <div className="flex flex-wrap justify-center gap-4 mb-10 text-xs font-bold text-gray-400">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-900/20 border border-yellow-500/30 shadow-lg">
-                <Trophy className="w-4 h-4 text-yellow-500" />
-                <span>Campeón, MVP, Rookie: <span className="text-yellow-400 text-sm ml-1">10 Pts</span></span>
+        {!isViewingOther && (
+            <div className="flex flex-wrap justify-center gap-4 mb-10 text-xs font-bold text-gray-400">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-900/20 border border-yellow-500/30 shadow-lg">
+                    <Trophy className="w-4 h-4 text-yellow-500" />
+                    <span>Campeón, MVP, Rookie: <span className="text-yellow-400 text-sm ml-1">10 Pts</span></span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-900/20 border border-blue-500/30 shadow-lg">
+                    <Medal className="w-4 h-4 text-blue-400" />
+                    <span>Rankings (1º/2º/3º): <span className="text-blue-300 text-sm ml-1">5 / 3 / 1 Pts</span></span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-purple-900/20 border border-purple-500/30 shadow-lg">
+                    <Star className="w-4 h-4 text-purple-400" />
+                    <span>Team of Split / Pentas: <span className="text-purple-300 text-sm ml-1">5 Pts</span></span>
+                </div>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-900/20 border border-blue-500/30 shadow-lg">
-                <Medal className="w-4 h-4 text-blue-400" />
-                <span>Rankings (1º/2º/3º): <span className="text-blue-300 text-sm ml-1">5 / 3 / 1 Pts</span></span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-purple-900/20 border border-purple-500/30 shadow-lg">
-                <Star className="w-4 h-4 text-purple-400" />
-                <span>Team of Split / Pentas: <span className="text-purple-300 text-sm ml-1">5 Pts</span></span>
-            </div>
-        </div>
+        )}
 
         <div className={`space-y-12 transition-all ${mode === 'official_result' ? 'border-l-4 border-red-500 pl-4 bg-red-950/10 py-4 rounded-r-xl' : ''}`}>
           
@@ -487,7 +556,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <ScoredSelect label="Campeón del Split" categoryKey="winter_champ" options={teamOptions} selections={selections} onChange={handleSelectionChange} officialResults={officialResults} points={10} mode={mode} disabled={effectiveDisabled} />
                 <ScoredSelect label="MVP del Split" categoryKey="mvp" options={allPlayerOptions} selections={selections} onChange={handleSelectionChange} placeholder="Buscar jugador..." officialResults={officialResults} points={10} mode={mode} disabled={effectiveDisabled} />
-                <ScoredSelect label="Rookie del Split" categoryKey="rookie" options={allPlayerOptions} selections={selections} onChange={handleSelectionChange} placeholder="Buscar jugador..." officialResults={officialResults} points={10} mode={mode} disabled={effectiveDisabled} />
+                <ScoredSelect label="Rookie del Split" categoryKey="rookie" options={rookieOptions} selections={selections} onChange={handleSelectionChange} placeholder="Buscar rookie..." officialResults={officialResults} points={10} mode={mode} disabled={effectiveDisabled} />
             </div>
           </section>
 
@@ -566,47 +635,50 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
 
         </div>
         
-        <div className="mt-12 text-center pb-8 sticky bottom-8 z-30 pointer-events-none">
-          <button 
-             onClick={handleSave}
-             disabled={isSaving || !isFormComplete || effectiveDisabled}
-             className={`
-                pointer-events-auto bg-gradient-to-r text-white font-bold py-4 px-10 rounded-xl shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all transform border flex items-center gap-3 mx-auto
-                ${effectiveDisabled 
-                    ? 'from-gray-700 to-gray-800 border-gray-600 opacity-80 cursor-not-allowed grayscale' 
-                    : !isFormComplete
-                        ? 'from-gray-700 to-gray-800 border-gray-600 opacity-80 cursor-not-allowed grayscale'
-                        : mode === 'official_result'
-                            ? 'from-red-700 to-red-900 border-red-500/50 hover:scale-105'
-                            : 'from-purple-700 to-purple-900 border-purple-500/50 hover:scale-105'
+        {/* Footer Actions (Only show Save if current user and editable) */}
+        {!isViewingOther && (
+            <div className="mt-12 text-center pb-8 sticky bottom-8 z-30 pointer-events-none">
+            <button 
+                onClick={handleSave}
+                disabled={isSaving || !isFormComplete || effectiveDisabled}
+                className={`
+                    pointer-events-auto bg-gradient-to-r text-white font-bold py-4 px-10 rounded-xl shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all transform border flex items-center gap-3 mx-auto
+                    ${effectiveDisabled 
+                        ? 'from-gray-700 to-gray-800 border-gray-600 opacity-80 cursor-not-allowed grayscale' 
+                        : !isFormComplete
+                            ? 'from-gray-700 to-gray-800 border-gray-600 opacity-80 cursor-not-allowed grayscale'
+                            : mode === 'official_result'
+                                ? 'from-red-700 to-red-900 border-red-500/50 hover:scale-105'
+                                : 'from-purple-700 to-purple-900 border-purple-500/50 hover:scale-105'
+                    }
+                `}
+                title={effectiveDisabled ? 'La Bola de Cristal está cerrada' : !isFormComplete ? 'Rellena todos los campos para guardar' : ''}
+            >
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+                effectiveDisabled ? <Lock className="w-5 h-5" /> :
+                saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> :
+                saveStatus === 'error' ? <AlertCircle className="w-5 h-5" /> :
+                <Save className="w-5 h-5" />
                 }
-             `}
-             title={effectiveDisabled ? 'La Bola de Cristal está cerrada' : !isFormComplete ? 'Rellena todos los campos para guardar' : ''}
-          >
-              {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 
-               effectiveDisabled ? <Lock className="w-5 h-5" /> :
-               saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> :
-               saveStatus === 'error' ? <AlertCircle className="w-5 h-5" /> :
-               <Save className="w-5 h-5" />
-              }
-              
-              <span>
-                  {saveStatus === 'success' 
-                    ? '¡Guardado!' 
-                    : saveStatus === 'error'
-                        ? 'Error al guardar'
-                        : effectiveDisabled 
-                            ? 'PREDICCIONES CERRADAS'
-                            : !isFormComplete 
-                                ? 'Completa todos los campos'
-                                : (mode === 'official_result' ? 'PUBLICAR RESULTADOS OFICIALES' : 'GUARDAR PREDICCIONES')}
-              </span>
-          </button>
-          
-          <p className="mt-4 text-xs text-gray-500 bg-black/50 inline-block px-3 py-1 rounded-full border border-gray-800">
-              {Object.keys(selections).filter(k => selections[k]).length} de {getRequiredKeys(mode).length} selecciones completadas
-          </p>
-        </div>
+                
+                <span>
+                    {saveStatus === 'success' 
+                        ? '¡Guardado!' 
+                        : saveStatus === 'error'
+                            ? 'Error al guardar'
+                            : effectiveDisabled 
+                                ? 'PREDICCIONES CERRADAS'
+                                : !isFormComplete 
+                                    ? 'Completa todos los campos'
+                                    : (mode === 'official_result' ? 'PUBLICAR RESULTADOS OFICIALES' : 'GUARDAR PREDICCIONES')}
+                </span>
+            </button>
+            
+            <p className="mt-4 text-xs text-gray-500 bg-black/50 inline-block px-3 py-1 rounded-full border border-gray-800">
+                {Object.keys(selections).filter(k => selections[k]).length} de {getRequiredKeys(mode).length} selecciones completadas
+            </p>
+            </div>
+        )}
       </div>
   );
 };

@@ -1,11 +1,14 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
 import { PlayoffBracket } from './PlayoffBracket';
 import { DaySelector } from './DaySelector';
-import { UserPrediction, Match, Team, Stage } from '../types';
+import { UserPrediction, Match, Team, Stage, Player } from '../types';
 import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, Trash, CirclePlus, GitMerge, List } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { TEAMS } from '../constants';
+import { StatsEntryModal } from './StatsEntryModal';
+import { StatsViewerModal } from './StatsViewerModal';
 
 interface PlayoffsViewProps {
     currentUserId: string | null;
@@ -43,6 +46,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
   // Data
   const [allMatches, setAllMatches] = useState<Match[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
 
   // Predictions
@@ -58,6 +62,13 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
   const [newMatch, setNewMatch] = useState<Match | null>(null);
   const [viewMode, setViewMode] = useState<'bracket' | 'list'>('bracket'); 
 
+  // Stats Modal State (Admin)
+  const [statsMatch, setStatsMatch] = useState<Match | null>(null);
+  const [isSavingStats, setIsSavingStats] = useState(false);
+
+  // Stats Viewer (User)
+  const [viewStatsMatch, setViewStatsMatch] = useState<Match | null>(null);
+
   // Sync state with props
   useEffect(() => {
     setPredictions(initialPredictions);
@@ -69,14 +80,16 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
         setIsLoadingMatches(true);
         setNewMatch(null); 
         try {
-            const [fetchedMatches, teamsMap, config] = await Promise.all([
+            const [fetchedMatches, teamsMap, config, playersList] = await Promise.all([
                 dataService.getMatches(), 
                 dataService.getTeams(),
-                dataService.getDaysConfig()
+                dataService.getDaysConfig(),
+                dataService.getPlayers()
             ]);
             
             setAllMatches(fetchedMatches);
             setAllTeams(Object.values(teamsMap));
+            setAllPlayers(playersList);
             
             // Use specific Playoff keys
             setVisibleDays(config.playoffVisibleDays);
@@ -302,6 +315,23 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       if (currentDay > newTotal) setCurrentDay(newTotal);
       // Update rounds only
       await dataService.updateGlobalConfig({ playoffRounds: newTotal });
+  };
+
+  const handleSaveStats = async (stats: any) => {
+      if (!statsMatch) return;
+      setIsSavingStats(true);
+      try {
+          await dataService.saveMatchStatsAndCalculate(statsMatch.id, stats);
+          setStatsMatch(null); // Close modal
+          // Refresh matches to show updated state (e.g. green button?)
+          const updated = await dataService.getMatches();
+          setAllMatches(updated);
+      } catch (e) {
+          console.error(e);
+          alert("Error guardando estadísticas");
+      } finally {
+          setIsSavingStats(false);
+      }
   };
 
   const handleBatchSave = async () => {
@@ -592,6 +622,8 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                                     customTitle={getBracketLabel(match)} 
                                     onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
                                     onDelete={() => handleAdminDelete(match.id)}
+                                    onEditStats={(m) => setStatsMatch(m)}
+                                    onViewStats={(m) => setViewStatsMatch(m)}
                                 />
                             ))
                         )}
@@ -670,6 +702,30 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                 </div>
             </button>
           </div>
+      )}
+
+      {/* STATS ENTRY MODAL (ADMIN) */}
+      {statsMatch && (
+          <StatsEntryModal 
+              match={statsMatch}
+              teamA={statsMatch.teamA}
+              teamB={statsMatch.teamB}
+              allPlayers={allPlayers}
+              onClose={() => setStatsMatch(null)}
+              onSave={handleSaveStats}
+              isSaving={isSavingStats}
+          />
+      )}
+
+      {/* STATS VIEWER MODAL (USER) */}
+      {viewStatsMatch && (
+          <StatsViewerModal 
+              match={viewStatsMatch}
+              teamA={viewStatsMatch.teamA}
+              teamB={viewStatsMatch.teamB}
+              allPlayers={allPlayers}
+              onClose={() => setViewStatsMatch(null)}
+          />
       )}
     </div>
   );

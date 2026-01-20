@@ -1,10 +1,13 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
 import { DaySelector } from './DaySelector';
-import { UserPrediction, Match, Team, Stage } from '../types';
+import { UserPrediction, Match, Team, Stage, Player } from '../types';
 import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { TEAMS } from '../constants';
+import { StatsEntryModal } from './StatsEntryModal';
+import { StatsViewerModal } from './StatsViewerModal';
 
 interface MatchdayViewProps {
     currentUserId: string | null;
@@ -26,6 +29,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   // State for ALL matches loaded from DB
   const [allMatches, setAllMatches] = useState<Match[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [allPlayers, setAllPlayers] = useState<Player[]>([]); // Need players for stats
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
 
   const [predictions, setPredictions] = useState<UserPrediction[]>(initialPredictions);
@@ -38,27 +42,36 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   // Admin Mode State
   const [isEditMode, setIsEditMode] = useState(false);
   const [newMatch, setNewMatch] = useState<Match | null>(null);
+  
+  // Stats Modal State (Admin)
+  const [statsMatch, setStatsMatch] = useState<Match | null>(null);
+  const [isSavingStats, setIsSavingStats] = useState(false);
+
+  // Stats View State (User)
+  const [viewStatsMatch, setViewStatsMatch] = useState<Match | null>(null);
 
   // Sync state with props (Cloud Data)
   useEffect(() => {
     setPredictions(initialPredictions);
   }, [initialPredictions]);
 
-  // Initial Data Load (All Matches)
+  // Initial Data Load (All Matches + Players)
   useEffect(() => {
     const loadData = async () => {
         setIsLoadingMatches(true);
         setNewMatch(null); 
         try {
             // Cargar TODOS los partidos de una vez para poder calcular cambios en cualquier jornada
-            const [fetchedMatches, teamsMap, config] = await Promise.all([
+            const [fetchedMatches, teamsMap, config, playersList] = await Promise.all([
                 dataService.getMatches(), 
                 dataService.getTeams(),
-                dataService.getDaysConfig()
+                dataService.getDaysConfig(),
+                dataService.getPlayers()
             ]);
             
             setAllMatches(fetchedMatches);
             setAllTeams(Object.values(teamsMap));
+            setAllPlayers(playersList);
             
             setVisibleDays(config.visibleDays);
             setClosedDays(config.closedDays);
@@ -72,7 +85,6 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   }, []);
 
   // Derive matches for current day from allMatches state
-  // CRITICAL FIX: Filter by Stage.GROUPS to avoid showing Playoff matches (which also have days 1, 2...)
   const matches = useMemo(() => {
       return allMatches
         .filter(m => m.day === currentDay && m.stage === Stage.GROUPS)
@@ -219,6 +231,23 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       
       setClosedDays(newClosedDays);
       await dataService.updateGlobalConfig({ visibleDays, closedDays: newClosedDays });
+  };
+
+  const handleSaveStats = async (games: any) => {
+      if (!statsMatch) return;
+      setIsSavingStats(true);
+      try {
+          await dataService.saveMatchStatsAndCalculate(statsMatch.id, games);
+          setStatsMatch(null); // Close modal
+          // Refresh matches to show updated state (e.g. green button?)
+          const updated = await dataService.getMatches();
+          setAllMatches(updated);
+      } catch (e) {
+          console.error(e);
+          alert("Error guardando estadísticas");
+      } finally {
+          setIsSavingStats(false);
+      }
   };
 
   const handleBatchSave = async () => {
@@ -439,6 +468,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                             isDayLocked={isLockedForUser} 
                             onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
                             onDelete={() => handleAdminDelete(match.id)}
+                            onEditStats={(m) => setStatsMatch(m)}
+                            onViewStats={(m) => setViewStatsMatch(m)}
                         />
                     ))
                 )}
@@ -517,6 +548,30 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                 </div>
             </button>
           </div>
+      )}
+
+      {/* STATS ENTRY MODAL (ADMIN) */}
+      {statsMatch && (
+          <StatsEntryModal 
+              match={statsMatch}
+              teamA={statsMatch.teamA}
+              teamB={statsMatch.teamB}
+              allPlayers={allPlayers}
+              onClose={() => setStatsMatch(null)}
+              onSave={handleSaveStats}
+              isSaving={isSavingStats}
+          />
+      )}
+
+      {/* STATS VIEWER MODAL (USER) */}
+      {viewStatsMatch && (
+          <StatsViewerModal 
+              match={viewStatsMatch}
+              teamA={viewStatsMatch.teamA}
+              teamB={viewStatsMatch.teamB}
+              allPlayers={allPlayers}
+              onClose={() => setViewStatsMatch(null)}
+          />
       )}
     </div>
   );

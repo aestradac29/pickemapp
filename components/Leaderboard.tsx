@@ -1,17 +1,18 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, Team } from '../types';
-import { Trophy, Medal, TrendingUp, Swords, ListOrdered, Sparkles, UserPlus, Globe } from 'lucide-react';
-import { ResponsiveContainer, LineChart, Line, XAxis, Tooltip, CartesianGrid } from 'recharts';
-import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS } from '../constants';
+import { Trophy, Medal, TrendingUp, Swords, ListOrdered, Sparkles, UserPlus, Globe, Eye } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, XAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
+import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS, FANTASY_SCHEDULE } from '../constants';
 
 interface LeaderboardProps {
   users: User[];
+  onViewProfile?: (userId: string) => void;
 }
 
 type LeaderboardCategory = 'global' | 'matchday' | 'ranking' | 'playoffs' | 'crystalBall' | 'fantasy';
 
-export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
+export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }) => {
   const [activeCategory, setActiveCategory] = useState<LeaderboardCategory>('global');
 
   if (!users || users.length === 0) {
@@ -102,18 +103,46 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
     return point;
   });
 
-  // Prepare data for FANTASY chart
-  const fantasyChartData = users[0].fantasyHistory ? users[0].fantasyHistory.map((h, index) => {
-      const point: any = { name: h.day };
+  // Prepare data for FANTASY chart (Use FANTASY_SCHEDULE labels)
+  const fantasyChartData = FANTASY_SCHEDULE.map((round, index) => {
+      const point: any = { name: `F${round.id}` }; // F1, F2...
+      
       users.forEach(user => {
-          if (user.fantasyHistory && user.fantasyHistory[index]) {
-              point[user.name] = user.fantasyHistory[index].points;
+          // Assuming user.fantasyHistory has mapped correctly in dataService
+          // We need cumulative sum for the chart usually, or per round?
+          // Let's do cumulative sum for "Race Chart" effect
+          let score = 0;
+          if (user.fantasyHistory) {
+              // Sum up to current index
+              for (let i = 0; i <= index; i++) {
+                  if (user.fantasyHistory[i]) {
+                      score += user.fantasyHistory[i].points;
+                  }
+              }
           }
+          point[user.name] = score;
       });
       return point;
-  }) : [];
+  });
 
-  const colors = ['#c8aa6e', '#0ac8b9', '#f0e6d2', '#e4002b', '#a855f7', '#3b82f6'];
+  // Expanded color palette
+  const colors = [
+    '#c8aa6e', // Gold
+    '#0ac8b9', // Cyan
+    '#f0e6d2', // Light
+    '#e4002b', // Red
+    '#a855f7', // Purple
+    '#3b82f6', // Blue
+    '#22c55e', // Green
+    '#f97316', // Orange
+    '#ec4899', // Pink
+    '#6366f1', // Indigo
+    '#14b8a6', // Teal
+    '#d946ef', // Fuchsia
+    '#84cc16', // Lime
+    '#eab308', // Yellow
+    '#94a3b8'  // Slate
+  ];
 
   return (
     <div className="space-y-6 pb-20">
@@ -224,7 +253,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
             return (
                 <div 
                 key={user.id}
-                className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 relative overflow-hidden ${rowClass}`}
+                onClick={() => onViewProfile && onViewProfile(user.id)}
+                className={`group cursor-pointer flex items-center justify-between p-4 rounded-xl border transition-all duration-300 relative overflow-hidden ${rowClass} hover:scale-[1.01]`}
                 style={rowStyle}
                 >
                 {/* Dynamic Banner Visuals (Gradients + Watermark) */}
@@ -254,6 +284,14 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                 {/* Overlay to ensure text readability on bright banners */}
                 {specificBannerClass && <div className="absolute inset-0 bg-black/10 pointer-events-none z-0"></div>}
                 
+                {/* Hover Reveal Effect - View Profile */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20 backdrop-blur-sm">
+                    <div className="flex items-center gap-2 text-white font-bold uppercase tracking-wider transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                        <Eye className="w-5 h-5" />
+                        Ver Perfil
+                    </div>
+                </div>
+
                 <div className="flex items-center gap-4 relative z-10">
                     <div className="w-8 flex justify-center font-bold text-xl">
                     {rank === 1 ? <span className="text-yellow-400 drop-shadow-lg">1º</span> : 
@@ -330,7 +368,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                 <TrendingUp className="w-5 h-5 text-[#0ac8b9]" />
                 Progreso Global
             </h3>
-            <div className="h-64 w-full">
+            <div className="h-96 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={globalChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
@@ -347,6 +385,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                             contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f3f4f6', borderRadius: '0.5rem' }}
                             itemStyle={{ color: '#f3f4f6' }}
                             cursor={{ stroke: '#334155', strokeWidth: 1 }}
+                        />
+                        <Legend 
+                            wrapperStyle={{ paddingTop: '10px' }}
+                            formatter={(value) => <span style={{ color: '#cbd5e1', fontSize: '12px', fontWeight: 'bold' }}>{value}</span>}
                         />
                         {users.map((user, i) => (
                             <Line 
@@ -365,14 +407,14 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
         </div>
       )}
 
-      {/* Stats Chart - Fantasy Tab (12 Rounds) */}
-      {activeCategory === 'fantasy' && users[0]?.fantasyHistory && (
+      {/* Stats Chart - Fantasy Tab (7 Rounds) */}
+      {activeCategory === 'fantasy' && (
         <div className="bg-[#091428]/80 backdrop-blur-sm rounded-xl border border-gray-800 p-6 shadow-xl animate-in slide-in-from-bottom-4">
             <h3 className="text-lg font-bold text-[#0ac8b9] mb-4 flex items-center gap-2 uppercase tracking-wide">
                 <TrendingUp className="w-5 h-5" />
-                Liga Fantasy
+                Liga Fantasy (Acumulado)
             </h3>
-            <div className="h-64 w-full">
+            <div className="h-96 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={fantasyChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
@@ -383,12 +425,16 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                             tickLine={false} 
                             axisLine={false}
                             tickMargin={10}
-                            interval={0} // Show all ticks
+                            interval={0} 
                         />
                         <Tooltip 
                             contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f3f4f6', borderRadius: '0.5rem' }}
                             itemStyle={{ color: '#f3f4f6' }}
                             cursor={{ stroke: '#334155', strokeWidth: 1 }}
+                        />
+                        <Legend 
+                            wrapperStyle={{ paddingTop: '10px' }}
+                            formatter={(value) => <span style={{ color: '#cbd5e1', fontSize: '12px', fontWeight: 'bold' }}>{value}</span>}
                         />
                         {users.map((user, i) => (
                             <Line 

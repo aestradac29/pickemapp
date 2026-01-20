@@ -12,8 +12,11 @@ import { MatchdayView } from './components/MatchdayView';
 import { PlayoffsView } from './components/PlayoffsView';
 import { SplitSelection } from './components/SplitSelection';
 import { PasswordResetModal } from './components/PasswordResetModal';
-import { DatabaseManager } from './components/DatabaseManager'; // Import nuevo
-import { ProfileView } from './components/ProfileView'; // Import nuevo
+import { DatabaseManager } from './components/DatabaseManager'; 
+import { ProfileView } from './components/ProfileView'; 
+import { TeamsView } from './components/TeamsView';
+import { OfficialStandings } from './components/OfficialStandings';
+import { HallOfFame } from './components/HallOfFame'; // Import nuevo
 import { ViewState, UserPrediction, User } from './types';
 import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft } from 'lucide-react';
 import { authService } from './services/authService';
@@ -29,6 +32,9 @@ const App: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null); // New state for live avatar update
   const [userRole, setUserRole] = useState<string>('user'); // Nuevo estado para el rol
+  
+  // Navigation State
+  const [viewingProfileId, setViewingProfileId] = useState<string | null>(null); // ID of the profile being viewed
   
   const [selectedSplit, setSelectedSplit] = useState<string | null>(() => {
     return localStorage.getItem('selectedSplit');
@@ -66,6 +72,7 @@ const App: React.FC = () => {
             setCurrentUser(null);
             setCurrentUserId(null);
             setCurrentUserAvatar(null);
+            setViewingProfileId(null);
             setUserRole('user');
             setPredictions([]);
             setView(ViewState.LOGIN);
@@ -162,6 +169,11 @@ const App: React.FC = () => {
       setShowPasswordResetModal(false);
   };
 
+  const handleViewProfile = (userId: string) => {
+      setViewingProfileId(userId);
+      setView(ViewState.PROFILE);
+  };
+
   const handleSelectWinner = async (matchId: string, teamId: string) => {
     setPredictions(prev => {
       const existing = prev.find(p => p.matchId === matchId);
@@ -186,8 +198,19 @@ const App: React.FC = () => {
         return <CrystalBall currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.FANTASY:
         return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} />;
+      case ViewState.OFFICIAL_STANDINGS:
+        return <OfficialStandings />;
       case ViewState.PROFILE:
-        return <ProfileView currentUserId={currentUserId} />;
+        return (
+            <ProfileView 
+                viewingUserId={viewingProfileId || currentUserId} 
+                sessionUserId={currentUserId}
+            />
+        );
+      case ViewState.TEAMS:
+        return <TeamsView />;
+      case ViewState.HALL_OF_FAME: // Nuevo caso
+        return <HallOfFame />;
       case ViewState.DB_MANAGER:
          // Protect route
          if (!isAdmin) return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
@@ -219,7 +242,10 @@ const App: React.FC = () => {
                      <Loader2 className="w-10 h-10 text-[#c8aa6e] animate-spin" />
                  </div>
              ) : (
-                 <Leaderboard users={leaderboardUsers} />
+                 <Leaderboard 
+                    users={leaderboardUsers} 
+                    onViewProfile={handleViewProfile}
+                 />
              )}
            </div>
         );
@@ -282,7 +308,7 @@ const App: React.FC = () => {
                 
                 {/* Profile Clickable Area */}
                 <button 
-                    onClick={() => setView(ViewState.PROFILE)}
+                    onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); }}
                     className="flex items-center gap-3 hover:bg-gray-800/50 p-1 pr-3 rounded-full transition-colors group"
                 >
                     <img 
@@ -334,7 +360,7 @@ const App: React.FC = () => {
              <div className="md:hidden bg-[#091428] border-b border-gray-800 animate-in slide-in-from-top-2">
                 <div className="px-4 py-2 space-y-1">
                     <button 
-                        onClick={() => { setView(ViewState.PROFILE); setIsMenuOpen(false); }}
+                        onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); setIsMenuOpen(false); }}
                         className="w-full px-3 py-3 text-sm font-bold border-b border-gray-800 mb-2 flex items-center gap-3 hover:bg-gray-800 rounded transition-colors"
                     >
                         <img 

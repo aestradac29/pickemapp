@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ROLE_ICONS } from '../constants';
-import { Role, Player, Team, User } from '../types';
-import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Settings, PenLine } from 'lucide-react';
+import { ROLE_ICONS, FANTASY_SCHEDULE } from '../constants';
+import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User } from '../types';
+import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, TrendingDown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { dataService } from '../services/dataService';
 
@@ -11,23 +11,25 @@ const MAX_BUDGET = 1500;
 
 interface PlayerCardProps {
   role: Role;
-  playerId: string | null;
+  slot: FantasySlot | null;
   onSelect: (role: Role, playerId: string | null) => void;
+  onSetCaptain: (playerId: string) => void;
+  isCaptain: boolean;
   readOnly?: boolean;
   players: Player[];
   teams: Record<string, Team>;
+  opponents: Team[]; 
+  locked: boolean;
 }
 
-const PlayerCard: React.FC<PlayerCardProps> = ({ role, playerId, onSelect, readOnly = false, players, teams }) => {
+const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCaptain, isCaptain, readOnly = false, players, teams, opponents, locked }) => {
+  const playerId = slot?.playerId;
   const player = players.find(p => p.id === playerId);
   const teamInfo = player ? teams[player.teamId] : null;
   const teamColor = teamInfo?.color || '#0ac8b9';
   const [imgError, setImgError] = useState(false);
   
-  // Reset error state when player changes
-  React.useEffect(() => {
-      setImgError(false);
-  }, [playerId]);
+  React.useEffect(() => { setImgError(false); }, [playerId]);
 
   const options: Option[] = useMemo(() => {
       return players.filter(p => p.role === role).map(p => {
@@ -42,148 +44,177 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, playerId, onSelect, readO
       });
   }, [role, players, teams]);
 
+  // Determine display price (Purchase Price if owned, Current if not)
+  const displayCost = slot?.purchaseCost || player?.cost || 0;
+  const currentMarketCost = player?.cost || 0;
+  const isValueProtected = slot?.purchaseCost && slot.purchaseCost < currentMarketCost;
+
+  // Price Trend
+  const priceChange = player?.priceChange || 0;
+  const isPriceUp = priceChange >= 0;
+
   return (
     <div className="relative group perspective-1000 hover:z-50 h-full w-full">
       <div className={`
-        relative rounded-2xl border-2 transition-all duration-500 min-h-[440px] flex flex-col h-full
+        relative rounded-2xl border-2 transition-all duration-500 min-h-[500px] flex flex-col h-full
         ${playerId 
-          ? 'overflow-hidden border-transparent bg-[#0a1428] shadow-[0_0_20px_rgba(0,0,0,0.5)]' 
+          ? `overflow-hidden border-transparent bg-[#0a1428] shadow-[0_0_20px_rgba(0,0,0,0.5)] ${isCaptain ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-[#0a1428] shadow-[0_0_30px_rgba(234,179,8,0.3)]' : ''}` 
           : 'border-dashed border-gray-700 bg-[#091428]/50'
         }
-        ${!readOnly && !playerId ? 'hover:border-[#0ac8b9]/50' : ''}
+        ${!readOnly && !playerId && !locked ? 'hover:border-[#0ac8b9]/50' : ''}
       `}
-      style={playerId ? { borderColor: teamColor, boxShadow: `0 0 15px ${teamColor}40` } : {}}
+      style={playerId ? { borderColor: isCaptain ? '#facc15' : teamColor } : {}}
       >
-        {/* Header Icon (Always visible) */}
-        <div className="absolute top-4 right-4 z-20">
-           <img src={ROLE_ICONS[role]} alt={role} className="w-7 h-7 opacity-50 drop-shadow-md" />
+        {/* Role Icon */}
+        <div className="absolute top-3 right-3 z-20 p-1.5 bg-black/40 rounded-full border border-white/10 backdrop-blur-sm">
+           <img src={ROLE_ICONS[role]} alt={role} className="w-5 h-5 opacity-80" />
         </div>
 
+        {/* Captain Button */}
+        {playerId && !readOnly && !locked && (
+            <button 
+                onClick={(e) => { e.stopPropagation(); onSetCaptain(playerId); }}
+                className={`absolute top-3 left-3 z-30 p-2 rounded-full transition-all duration-300 transform hover:scale-110 ${isCaptain ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.6)]' : 'bg-black/40 text-gray-500 border border-gray-600 hover:text-yellow-400 hover:border-yellow-400'}`}
+                title="Hacer Capitán"
+            >
+                <Crown className={`w-4 h-4 ${isCaptain ? 'fill-current' : ''}`} />
+            </button>
+        )}
+        
+        {/* Read-only Captain Badge */}
+        {playerId && (readOnly || locked) && isCaptain && (
+             <div className="absolute top-3 left-3 z-30 bg-yellow-500 text-black px-2 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 shadow-[0_0_15px_rgba(234,179,8,0.6)]">
+                 <Crown className="w-3 h-3 fill-current" />
+                 <span>Capi</span>
+             </div>
+        )}
+
         {playerId && player && teamInfo ? (
-          // --- STATE: PLAYER SELECTED ---
           <>
             {/* Background Glow */}
-            <div 
-              className="absolute inset-0 opacity-20 bg-gradient-to-b from-transparent to-black"
-              style={{ backgroundColor: teamColor }} 
-            />
+            <div className="absolute inset-0 opacity-20 bg-gradient-to-b from-transparent to-black" style={{ backgroundColor: teamColor }} />
             
-            {/* Team Logo Background Watermark */}
-            <div className="absolute -right-10 top-10 opacity-10 rotate-12 pointer-events-none">
-               {teamInfo.logo ? (
-                  <img 
-                    src={teamInfo.logo} 
-                    alt="" 
-                    className={`w-48 h-48 opacity-30 grayscale`}
-                    onError={(e) => {
-                       // Hide watermark if load fails to avoid ugly broken icon
-                       (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-               ) : null}
+            {/* Team Logo Background */}
+            <div className="absolute -right-10 top-20 opacity-10 rotate-12 pointer-events-none transform scale-150">
+               {teamInfo.logo && <img src={teamInfo.logo} alt="" className="w-48 h-48 opacity-50 grayscale" />}
             </div>
 
             {/* Content */}
             <div className="relative z-10 flex flex-col items-center flex-1 w-full px-3 pt-8 pb-3">
+               
+               {/* Player Image */}
                <div className="relative mb-3 group-hover:scale-105 transition-transform duration-300">
                   <div className="absolute inset-0 rounded-full blur-md opacity-50" style={{ backgroundColor: teamColor }}></div>
-                  
-                  {/* Main Image with Fallback */}
                   <img 
-                      key={player.id}
                       src={imgError ? ROLE_ICONS[role] : (player.photo || ROLE_ICONS[role])} 
                       alt={player.name}
                       onError={() => setImgError(true)}
                       className={`w-24 h-24 rounded-full border-4 shadow-xl relative z-10 object-cover bg-gray-900 ${!player.photo || imgError ? 'p-4 bg-black/50' : ''}`}
                       style={{ borderColor: teamColor }}
                   />
-                  
-                  <div className="absolute -bottom-2 -right-2 bg-black rounded-full p-1 border border-gray-600 z-20">
-                      {teamInfo.logo ? (
-                           <img 
-                              src={teamInfo.logo} 
-                              alt="" 
-                              className={`w-6 h-6 rounded-full object-contain`}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${teamInfo.shortName}&background=${teamInfo.color.replace('#','')}&color=fff&size=32`;
-                              }}
-                           />
-                      ) : (
-                          <div className="w-6 h-6 rounded-full" style={{ backgroundColor: teamColor }}></div>
-                      )}
+                  <div className="absolute -bottom-1 -right-1 bg-[#0a1428] rounded-full p-1 border border-gray-600 z-20 shadow-lg">
+                      {teamInfo.logo ? <img src={teamInfo.logo} alt="" className="w-6 h-6 rounded-full object-contain" /> : <div className="w-6 h-6 rounded-full" style={{ backgroundColor: teamColor }}></div>}
                   </div>
                </div>
 
-               <div className="flex flex-col items-center justify-center flex-grow w-full">
-                   <h3 className="text-xl font-bold text-white mb-0.5 tracking-wide text-center leading-tight drop-shadow-md truncate max-w-full px-1">{player.name}</h3>
-                   <span className="text-[10px] uppercase font-bold tracking-widest px-3 py-0.5 rounded bg-black/60 text-gray-300 border border-gray-600/50 mb-4 backdrop-blur-sm">
-                      {teamInfo.shortName}
-                   </span>
+               {/* Name & Team */}
+               <div className="flex flex-col items-center justify-center w-full mb-2">
+                   <h3 className="text-xl font-black text-white tracking-tight text-center leading-none drop-shadow-md truncate max-w-full px-1 italic">{player.name}</h3>
+                   <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">{teamInfo.name}</span>
+               </div>
 
-                   {/* Stats Stack */}
-                   <div className="w-full flex flex-col gap-2 mt-auto">
-                      
-                      {/* Cost Row */}
-                      <div className="bg-[#0f1923] px-3 py-2 rounded border border-gray-600/50 shadow-inner flex items-center justify-between relative overflow-hidden group/stat w-full hover:border-[#0ac8b9]/50 transition-colors">
-                          <div className="absolute inset-0 bg-[#0ac8b9]/5 opacity-0 group-hover/stat:opacity-100 transition-opacity"></div>
-                          <div className="flex items-center gap-2 relative z-10">
-                              <Coins className="w-4 h-4 text-[#0ac8b9] flex-shrink-0" />
+               {/* VS MATCHUPS ROW */}
+               <div className="w-full flex justify-center gap-1 mb-3 flex-wrap">
+                   {opponents.length > 0 ? (
+                       opponents.map((opp, idx) => (
+                           <div key={idx} className="bg-black/60 border border-gray-700 p-1 rounded backdrop-blur-sm" title={`vs ${opp.name}`}>
+                               {opp.logo ? <img src={opp.logo} className="w-4 h-4 object-contain" /> : <div className="w-4 h-4 rounded-full" style={{backgroundColor: opp.color}}></div>}
+                           </div>
+                       ))
+                   ) : (
+                       <div className="px-2 py-1 rounded border border-gray-800 bg-gray-900/50 text-[9px] text-gray-600 uppercase font-bold">Sin Partidos</div>
+                   )}
+               </div>
+
+               {/* STATS GRID */}
+               <div className="w-full mt-auto space-y-1.5">
+                  <div className="grid grid-cols-2 gap-1.5">
+                      {/* Price Box */}
+                      <div className="bg-[#0f1923] p-1.5 rounded border border-gray-700 flex flex-col items-center justify-center relative overflow-hidden h-[50px]">
+                          <span className="text-[8px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Precio</span>
+                          <div className="flex items-center gap-1">
+                              <span className={`text-sm font-bold ${isValueProtected ? 'text-green-400' : 'text-[#0ac8b9]'}`}>${displayCost}</span>
+                              {!locked && (
+                                  <div className={`flex flex-col items-center text-[8px] leading-none font-bold ${isPriceUp ? 'text-green-400' : 'text-red-400'}`}>
+                                      {isPriceUp ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                                      <span>{priceChange}</span>
+                                  </div>
+                              )}
                           </div>
-                          <span className="font-bold text-lg text-white tracking-tight leading-none relative z-10">${player.cost}</span>
                       </div>
 
-                      {/* Average Row */}
-                      <div className="bg-[#0f1923] px-3 py-2 rounded border border-gray-600/50 shadow-inner flex items-center justify-between relative overflow-hidden group/stat w-full hover:border-[#c8aa6e]/50 transition-colors">
-                          <div className="absolute inset-0 bg-[#c8aa6e]/5 opacity-0 group-hover/stat:opacity-100 transition-opacity"></div>
-                          <div className="flex items-center gap-2 relative z-10">
-                              <TrendingUp className="w-4 h-4 text-[#c8aa6e] flex-shrink-0" />
+                      {/* Total Points */}
+                      <div className="bg-[#0f1923] p-1.5 rounded border border-gray-700 flex flex-col items-center justify-center h-[50px]">
+                          <span className="text-[8px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Total Pts</span>
+                          <div className="flex items-center gap-1">
+                              <span className="text-sm font-bold text-[#c8aa6e]">{player.totalPoints?.toFixed(1) || '0.0'}</span>
+                              {isCaptain && <span className="text-[8px] text-yellow-500 bg-yellow-900/20 px-1 rounded border border-yellow-700/50">x1.5</span>}
                           </div>
-                          <span className="font-bold text-lg text-white tracking-tight leading-none relative z-10">{player.averagePoints}</span>
                       </div>
 
-                      {/* KDA Row */}
-                      <div className="bg-[#0f1923] px-3 py-2 rounded border border-gray-600/50 shadow-inner flex items-center justify-between relative overflow-hidden group/stat w-full hover:border-red-400/50 transition-colors">
-                          <div className="absolute inset-0 bg-red-400/5 opacity-0 group-hover/stat:opacity-100 transition-opacity"></div>
-                          <div className="flex items-center gap-2 relative z-10">
-                              <Swords className="w-4 h-4 text-red-400 flex-shrink-0" />
-                          </div>
-                          <span className="font-bold text-lg text-white tracking-tight leading-none relative z-10">{player.kda.toFixed(2)}</span>
+                      {/* KDA Box */}
+                      <div className="bg-[#0f1923] p-1.5 rounded border border-gray-700 flex flex-col items-center justify-center h-[50px]">
+                          <span className="text-[8px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">KDA</span>
+                          <span className="text-sm font-bold text-red-400">
+                              {player.kda?.toFixed(2) || '0.00'}
+                          </span>
                       </div>
 
-                   </div>
+                      {/* Highlights Box */}
+                      <div className="bg-[#0f1923] p-1.5 rounded border border-gray-700 flex flex-col items-center justify-center h-[50px] overflow-hidden">
+                          <span className="text-[8px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Destacado</span>
+                          {player.highlight ? (
+                              <span className="text-[9px] font-bold text-purple-300 bg-purple-900/30 px-1.5 py-0.5 rounded border border-purple-500/30 truncate max-w-full">
+                                  {player.highlight}
+                              </span>
+                          ) : (
+                              <span className="text-xs text-gray-600">-</span>
+                          )}
+                      </div>
+                  </div>
                </div>
             </div>
 
-            {/* Remove Button (Only if NOT read-only) */}
-            {!readOnly && (
+            {/* Remove Button */}
+            {!readOnly && !locked && (
               <button 
-                onClick={() => onSelect(role, null)}
-                className="absolute top-2 left-2 p-2 text-gray-400 hover:text-white hover:bg-red-500/20 rounded-full transition-colors z-30"
-                title="Cambiar jugador"
+                onClick={(e) => { e.stopPropagation(); onSelect(role, null); }}
+                className="absolute top-2 right-10 p-2 text-gray-500 hover:text-red-400 hover:bg-red-900/20 rounded-full transition-colors z-20"
+                title="Vender jugador"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             )}
           </>
         ) : (
-          // --- STATE: EMPTY SLOT ---
+          // EMPTY SLOT
           <div className="flex-1 flex flex-col items-center justify-center p-4">
-             <div className="w-16 h-16 rounded-full bg-[#0a1428] border border-gray-700 flex items-center justify-center mb-6 shadow-inner group-hover:border-[#0ac8b9] transition-colors">
+             <div className="w-20 h-20 rounded-full bg-[#0a1428] border-2 border-dashed border-gray-700 flex items-center justify-center mb-4 shadow-inner group-hover:border-[#0ac8b9] transition-colors">
                <Shield className="w-8 h-8 text-gray-700 group-hover:text-[#0ac8b9] transition-colors" />
              </div>
              <h4 className="text-[#0ac8b9] text-lg font-bold uppercase tracking-widest mb-1">{role}</h4>
              <p className="text-gray-500 text-xs text-center mb-6">
-                {readOnly ? 'Sin selección' : 'Selecciona un jugador'}
+                {readOnly || locked ? 'Sin selección' : 'Selecciona un jugador'}
              </p>
              
-             {!readOnly && (
+             {!readOnly && !locked && (
                <div className="w-full relative z-30">
                  <SearchableSelect 
                     label="" 
                     options={options}
                     value=""
                     onChange={(val) => onSelect(role, val)}
-                    placeholder="Buscar..."
+                    placeholder="Fichar..."
                     className="w-full"
                  />
                </div>
@@ -195,311 +226,166 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, playerId, onSelect, readO
   );
 };
 
-// --- USER SEARCH MODAL ---
-interface UserSummary {
-    id: string;
-    name: string;
-    avatar: string;
+// --- RANKING ROW COMPONENT ---
+interface RankingRowProps {
+    user: User;
+    rank: number;
+    score: number;
+    isMe: boolean;
+    isViewing: boolean;
+    onClick: () => void;
 }
 
-const UserSearchModal = ({ isOpen, onClose, onSelect }: { isOpen: boolean; onClose: () => void; onSelect: (user: UserSummary) => void }) => {
-    const [searchTerm, setSearchTerm] = useState("");
-    const [users, setUsers] = useState<UserSummary[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+const RankingRow: React.FC<RankingRowProps> = ({ user, rank, score, isMe, isViewing, onClick }) => (
+    <div 
+        onClick={onClick}
+        className={`
+            flex items-center p-3 border-b border-gray-800 transition-all cursor-pointer relative group
+            ${isViewing ? 'bg-[#0ac8b9]/10' : 'hover:bg-[#0f1d36]'}
+            ${isMe ? 'bg-gradient-to-r from-[#0ac8b9]/5 to-transparent' : ''}
+        `}
+    >
+        {/* Viewing Indicator Bar */}
+        {isViewing && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#0ac8b9]"></div>}
 
-    useEffect(() => {
-        if (isOpen) {
-            const fetchUsers = async () => {
-                setIsLoading(true);
-                try {
-                    // Fetch real users from DB
-                    const realUsers = await dataService.getAllUsers();
-                    setUsers(realUsers.map(u => ({ id: u.id, name: u.name, avatar: u.avatar })));
-                } catch (e) {
-                    console.error(e);
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-            fetchUsers();
-        }
-    }, [isOpen]);
-    
-    // Filter users based on search
-    const filteredUsers = users.filter(u => 
-        u.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+        {/* Rank */}
+        <div className="w-8 text-center font-bold text-sm mr-2">
+            {rank === 1 ? <span className="text-yellow-400 drop-shadow-md">1º</span> :
+             rank === 2 ? <span className="text-gray-300">2º</span> :
+             rank === 3 ? <span className="text-amber-700">3º</span> :
+             <span className="text-gray-600">{rank}</span>}
+        </div>
 
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="w-full max-w-lg bg-[#091428] border-2 border-[#0ac8b9] rounded-xl overflow-hidden shadow-[0_0_50px_rgba(10,200,185,0.2)] animate-in zoom-in-95">
-                <div className="p-4 border-b border-gray-700 flex items-center justify-between bg-[#0f1923]">
-                    <h3 className="text-lg font-bold text-white uppercase flex items-center gap-2">
-                        <Search className="w-5 h-5 text-[#0ac8b9]" />
-                        Explorar Rivales
-                    </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white">
-                        <X className="w-6 h-6" />
-                    </button>
-                </div>
-                
-                <div className="p-4 bg-[#0a1428]">
-                    <div className="relative mb-4">
-                        <input 
-                            type="text" 
-                            placeholder="Buscar invocador..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            autoFocus
-                            className="w-full bg-[#1e293b] text-white rounded-lg pl-10 pr-4 py-3 border border-gray-600 focus:border-[#0ac8b9] focus:outline-none"
-                        />
-                        <Search className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
-                    </div>
-
-                    <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                        {isLoading ? (
-                            <div className="flex justify-center py-8">
-                                <Loader2 className="w-8 h-8 animate-spin text-[#0ac8b9]" />
-                            </div>
-                        ) : filteredUsers.length > 0 ? (
-                            filteredUsers.map(user => (
-                                <button 
-                                    key={user.id} 
-                                    onClick={() => onSelect(user)}
-                                    className="w-full flex items-center justify-between p-3 rounded-lg bg-[#0f1923] border border-gray-700 hover:border-[#0ac8b9] hover:bg-[#162236] transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full border border-gray-600 group-hover:border-[#0ac8b9]" />
-                                        <div className="text-left">
-                                            <div className="font-bold text-gray-200 group-hover:text-white">{user.name}</div>
-                                        </div>
-                                    </div>
-                                    <ArrowLeft className="w-4 h-4 text-gray-600 group-hover:text-[#0ac8b9] rotate-180" />
-                                </button>
-                            ))
-                        ) : (
-                            <div className="text-center py-8 text-gray-500">
-                                No se encontraron usuarios
-                            </div>
-                        )}
-                    </div>
+        {/* Avatar & Name */}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className={`w-8 h-8 rounded-full overflow-hidden border ${rank === 1 ? 'border-yellow-400' : 'border-gray-700'} flex-shrink-0`}>
+                <img src={user.avatar} className="w-full h-full object-cover" />
+            </div>
+            <div className="truncate">
+                <div className={`font-bold text-sm truncate ${isMe ? 'text-[#0ac8b9]' : 'text-gray-200'}`}>
+                    {user.name} {isMe && <span className="text-[9px] text-[#0ac8b9] border border-[#0ac8b9] px-1 rounded ml-1">TU</span>}
                 </div>
             </div>
         </div>
-    );
-};
 
-// --- PLAYER EDITOR (ADMIN) ---
-const PlayerEditor = ({ players, teams, onUpdate }: { players: Player[], teams: Record<string, Team>, onUpdate: () => void }) => {
-    const [search, setSearch] = useState("");
-    const [roleFilter, setRoleFilter] = useState<Role | 'ALL'>('ALL');
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editForm, setEditForm] = useState<Partial<Player>>({});
-    const [isSaving, setIsSaving] = useState(false);
-
-    const filtered = players.filter(p => {
-        const matchesRole = roleFilter === 'ALL' || p.role === roleFilter;
-        const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-        return matchesRole && matchesSearch;
-    });
-
-    const startEdit = (player: Player) => {
-        setEditingId(player.id);
-        setEditForm({
-            cost: player.cost,
-            averagePoints: player.averagePoints,
-            kda: player.kda
-        });
-    };
-
-    const saveEdit = async (playerId: string) => {
-        setIsSaving(true);
-        try {
-            await dataService.updatePlayer(playerId, editForm);
-            setEditingId(null);
-            onUpdate(); // Refresh parent data
-        } catch (e) {
-            console.error(e);
-            alert("Error al guardar");
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    return (
-        <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden mt-6 animate-in slide-in-from-bottom-8">
-            <div className="p-4 bg-red-900/20 border-b border-red-900/50 flex flex-col md:flex-row items-center justify-between gap-4">
-                 <div className="flex items-center gap-2 text-red-400 font-bold uppercase tracking-widest">
-                    <Settings className="w-5 h-5" />
-                    Editor de Jugadores (Admin)
-                 </div>
-                 
-                 <div className="flex items-center gap-2 w-full md:w-auto">
-                     <select 
-                        value={roleFilter}
-                        onChange={(e) => setRoleFilter(e.target.value as Role | 'ALL')}
-                        className="bg-[#050a14] text-white text-xs rounded border border-gray-700 p-2"
-                     >
-                         <option value="ALL">Todos los Roles</option>
-                         {Object.values(Role).map(r => <option key={r} value={r}>{r}</option>)}
-                     </select>
-                     <div className="relative flex-1">
-                         <input 
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Buscar jugador..."
-                            className="w-full bg-[#050a14] text-white text-xs rounded pl-8 pr-2 py-2 border border-gray-700"
-                         />
-                         <Search className="w-3 h-3 text-gray-500 absolute left-2.5 top-2.5" />
-                     </div>
-                 </div>
-            </div>
-
-            <div className="max-h-[500px] overflow-y-auto">
-                <table className="w-full text-left text-sm text-gray-400">
-                    <thead className="bg-[#0f1923] text-gray-500 uppercase font-bold text-xs sticky top-0 z-10">
-                        <tr>
-                            <th className="p-3">Jugador</th>
-                            <th className="p-3">Coste ($)</th>
-                            <th className="p-3">Media Pts</th>
-                            <th className="p-3">KDA</th>
-                            <th className="p-3 text-right">Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                        {filtered.map(player => {
-                            const isEditing = editingId === player.id;
-                            const team = teams[player.teamId];
-
-                            return (
-                                <tr key={player.id} className="hover:bg-white/5 transition-colors">
-                                    <td className="p-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="relative">
-                                                <img src={player.photo || ROLE_ICONS[player.role]} alt="" className="w-8 h-8 rounded-full bg-gray-800 object-cover" />
-                                                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black border border-gray-600 flex items-center justify-center">
-                                                    <img src={team?.logo} className="w-3 h-3 object-contain" />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-white">{player.name}</div>
-                                                <div className="text-[10px] uppercase">{player.role}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="p-3">
-                                        {isEditing ? (
-                                            <input 
-                                                type="number" 
-                                                value={editForm.cost} 
-                                                onChange={e => setEditForm({...editForm, cost: Number(e.target.value)})}
-                                                className="w-16 bg-black border border-gray-600 rounded p-1 text-white"
-                                            />
-                                        ) : (
-                                            <span className="text-[#0ac8b9] font-bold">${player.cost}</span>
-                                        )}
-                                    </td>
-                                    <td className="p-3">
-                                        {isEditing ? (
-                                            <input 
-                                                type="number" 
-                                                value={editForm.averagePoints} 
-                                                onChange={e => setEditForm({...editForm, averagePoints: Number(e.target.value)})}
-                                                className="w-16 bg-black border border-gray-600 rounded p-1 text-white"
-                                            />
-                                        ) : (
-                                            <span className="text-[#c8aa6e] font-bold">{player.averagePoints}</span>
-                                        )}
-                                    </td>
-                                    <td className="p-3">
-                                        {isEditing ? (
-                                            <input 
-                                                type="number" 
-                                                value={editForm.kda} 
-                                                onChange={e => setEditForm({...editForm, kda: Number(e.target.value)})}
-                                                className="w-16 bg-black border border-gray-600 rounded p-1 text-white"
-                                            />
-                                        ) : (
-                                            <span className="text-red-400 font-bold">{player.kda?.toFixed(2)}</span>
-                                        )}
-                                    </td>
-                                    <td className="p-3 text-right">
-                                        {isEditing ? (
-                                            <div className="flex justify-end gap-2">
-                                                <button onClick={() => saveEdit(player.id)} disabled={isSaving} className="text-green-400 hover:text-green-300">
-                                                    <Save className="w-4 h-4" />
-                                                </button>
-                                                <button onClick={() => setEditingId(null)} className="text-red-400 hover:text-red-300">
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button onClick={() => startEdit(player)} className="text-gray-500 hover:text-white transition-colors">
-                                                <PenLine className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+        {/* Points */}
+        <div className="text-right">
+            <div className="text-sm font-bold text-white">{score.toFixed(1)}</div>
         </div>
-    );
-};
+    </div>
+);
 
-interface FantasyViewProps {
-    currentUserId?: string | null;
-    isAdmin?: boolean;
-}
-
-export const FantasyView: React.FC<FantasyViewProps> = ({ currentUserId, isAdmin }) => {
+export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: boolean }> = ({ currentUserId, isAdmin }) => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Record<string, Team>>({});
+  const [allMatches, setAllMatches] = useState<Match[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isTeamLoading, setIsTeamLoading] = useState(false); // NEW: Specific loading state for team switches
 
-  // Admin Mode
-  const [isEditMode, setIsEditMode] = useState(false);
+  // Round Logic
+  const [activeConfigRound, setActiveConfigRound] = useState(1); // The "Real" active round from DB
+  const [viewRoundId, setViewRoundId] = useState(1); // The round the user is looking at
+  const [roundLocked, setRoundLocked] = useState(false);
 
-  // Local state for "My Team"
-  const [myTeam, setMyTeam] = useState<Record<Role, string | null>>({
-    [Role.TOP]: null,
-    [Role.JUNGLE]: null,
-    [Role.MID]: null,
-    [Role.ADC]: null,
-    [Role.SUPPORT]: null,
+  // UI State
+  const [activeTab, setActiveTab] = useState<'lineup' | 'history'>('lineup');
+  const [viewingUserId, setViewingUserId] = useState<string | null>(currentUserId || null);
+  const [isAdminSaving, setIsAdminSaving] = useState(false);
+  const [pendingRoundChange, setPendingRoundChange] = useState<number | null>(null); // New state for modal
+  const [showRules, setShowRules] = useState(false); // New State for Rules Modal
+
+  // Teams
+  const [myTeam, setMyTeam] = useState<Record<Role, FantasySlot>>({
+    [Role.TOP]: {playerId:null}, [Role.JUNGLE]: {playerId:null}, [Role.MID]: {playerId:null}, [Role.ADC]: {playerId:null}, [Role.SUPPORT]: {playerId:null}
   });
-
-  // State for "Other User's Team" (loaded dynamically)
-  const [otherTeam, setOtherTeam] = useState<Record<Role, string | null> | null>(null);
+  const [myCaptain, setMyCaptain] = useState<string | null>(null);
+  
+  // History State
+  const [historyScores, setHistoryScores] = useState<any[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  // Load Players, Teams and Saved Fantasy Team on mount
   useEffect(() => {
     loadData();
   }, [currentUserId]);
 
+  useEffect(() => {
+      // Initialize viewing user when currentUserId changes or is set initially
+      if (currentUserId && !viewingUserId) {
+          setViewingUserId(currentUserId);
+      }
+  }, [currentUserId]);
+
+  // Reload team when switching view rounds OR switching users
+  useEffect(() => {
+      // Added isLoadingData to dependencies to ensure it runs after initial load completes
+      if (viewingUserId && !isLoadingData) {
+          const fetchTeam = async () => {
+              setIsTeamLoading(true); // Lock UI
+              
+              // Security clear: Wipe data immediately so the old data never shows
+              setMyTeam({
+                  [Role.TOP]: {playerId:null}, 
+                  [Role.JUNGLE]: {playerId:null}, 
+                  [Role.MID]: {playerId:null}, 
+                  [Role.ADC]: {playerId:null}, 
+                  [Role.SUPPORT]: {playerId:null}
+              });
+              setMyCaptain(null);
+
+              try {
+                  await loadFantasyTeam(viewRoundId, viewingUserId);
+              } catch (e) {
+                  console.error(e);
+              } finally {
+                  setIsTeamLoading(false); // Unlock UI
+              }
+          }
+          fetchTeam();
+      }
+  }, [viewRoundId, viewingUserId, isLoadingData]);
+
+  const loadFantasyTeam = async (round: number, userId: string) => {
+      const savedData = await dataService.getFantasyTeam(userId, round);
+      if (savedData) {
+          setMyTeam(savedData.team);
+          setMyCaptain(savedData.captain || null);
+      } else {
+          // Reset if no data for this round
+          setMyTeam({[Role.TOP]: {playerId:null}, [Role.JUNGLE]: {playerId:null}, [Role.MID]: {playerId:null}, [Role.ADC]: {playerId:null}, [Role.SUPPORT]: {playerId:null}});
+          setMyCaptain(null);
+      }
+  };
+
   const loadData = async () => {
     setIsLoadingData(true);
     try {
-        const [fetchedPlayers, fetchedTeams] = await Promise.all([
+        const [fetchedPlayers, fetchedTeams, fetchedMatches, config, fetchedUsers] = await Promise.all([
             dataService.getPlayers(),
-            dataService.getTeams()
+            dataService.getTeams(),
+            dataService.getMatches(),
+            dataService.getDaysConfig(),
+            dataService.getAllUsers()
         ]);
         
         setPlayers(fetchedPlayers);
         setTeams(fetchedTeams);
+        setAllMatches(fetchedMatches);
+        setAllUsers(fetchedUsers);
+        
+        const currentRound = config.fantasyRound || 1;
+        setActiveConfigRound(currentRound);
+        setViewRoundId(currentRound); // Default view to current
+        setRoundLocked(config.fantasyLocked || false);
 
         if (currentUserId) {
-            const savedTeam = await dataService.getFantasyTeam(currentUserId);
-            if (savedTeam) {
-                setMyTeam(savedTeam);
-            }
+            setViewingUserId(currentUserId);
+            // loadFantasyTeam is called by the effect when viewingUserId sets
+            
+            // Load history for summary (for CURRENT user initially)
+            await loadHistory(currentUserId);
         }
     } catch (err) {
         console.error(err);
@@ -508,276 +394,760 @@ export const FantasyView: React.FC<FantasyViewProps> = ({ currentUserId, isAdmin
     }
   };
 
-  // State for which user's team we are viewing (null = me)
-  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
-  const [viewingUser, setViewingUser] = useState<UserSummary | null>(null);
-  
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const isReadOnly = !!viewingUserId;
+  const loadHistory = async (userId: string) => {
+      const history = [];
+      for (let i = 1; i <= 7; i++) {
+          const rData = await dataService.getFantasyTeam(userId, i);
+          if (rData) history.push({ round: i, score: rData.score || 0, team: rData.team });
+          else history.push({ round: i, score: 0, team: null });
+      }
+      setHistoryScores(history);
+  };
 
-  // Effect: Load opponent's team when viewingUserId changes
+  // Reload history when changing viewing user
   useEffect(() => {
-    const loadOpponentTeam = async () => {
-        if (viewingUserId) {
-            setIsLoadingData(true);
-            try {
-                const team = await dataService.getFantasyTeam(viewingUserId);
-                setOtherTeam(team || {
-                    [Role.TOP]: null,
-                    [Role.JUNGLE]: null,
-                    [Role.MID]: null,
-                    [Role.ADC]: null,
-                    [Role.SUPPORT]: null,
-                });
-            } catch (e) {
-                console.error("Error loading opponent team", e);
-            } finally {
-                setIsLoadingData(false);
-            }
-        } else {
-            setOtherTeam(null);
-        }
-    };
-    loadOpponentTeam();
-  }, [viewingUserId]);
-
-  const displayTeam = isReadOnly && otherTeam ? otherTeam : myTeam;
+      if(viewingUserId && activeTab === 'history') {
+          loadHistory(viewingUserId);
+      }
+  }, [viewingUserId, activeTab]);
 
   const handleSelect = (role: Role, playerId: string | null) => {
-    if (!isReadOnly && !isEditMode) {
-        setMyTeam(prev => ({ ...prev, [role]: playerId }));
-        setSaveStatus('idle'); 
+    // Only allow edit if viewing OWN team and round is open
+    if (viewingUserId !== currentUserId || roundLocked || viewRoundId !== activeConfigRound) return;
+    
+    const player = players.find(p => p.id === playerId);
+    setMyTeam(prev => ({ 
+        ...prev, 
+        [role]: { 
+            playerId, 
+            purchaseCost: player ? player.cost : 0 
+        } 
+    }));
+
+    if (!playerId && myCaptain && myTeam[role].playerId === myCaptain) {
+        setMyCaptain(null);
     }
+    setSaveStatus('idle'); 
+  };
+
+  const handleSetCaptain = (playerId: string) => {
+      if (viewingUserId === currentUserId && !roundLocked && viewRoundId === activeConfigRound) {
+          setMyCaptain(playerId);
+          setSaveStatus('idle');
+      }
   };
 
   const handleSave = async () => {
-    if (!currentUserId) return;
+    if (!currentUserId || viewingUserId !== currentUserId || roundLocked || viewRoundId !== activeConfigRound) return;
+    
+    let currentTotalCost = 0;
+    (Object.values(myTeam) as FantasySlot[]).forEach(slot => {
+        if (slot.playerId) {
+            const cost = slot.purchaseCost || players.find(p => p.id === slot.playerId)?.cost || 0;
+            currentTotalCost += cost;
+        }
+    });
+
+    if (currentTotalCost > MAX_BUDGET) {
+        alert("Presupuesto excedido. No se puede guardar.");
+        return;
+    }
+
     setIsSaving(true);
     setSaveStatus('idle');
     try {
-        await dataService.saveFantasyTeam(currentUserId, myTeam);
+        await dataService.saveFantasyTeam(currentUserId, myTeam, myCaptain, activeConfigRound);
         setSaveStatus('success');
         setTimeout(() => setSaveStatus('idle'), 3000);
+        
+        // Refresh history
+        const rData = await dataService.getFantasyTeam(currentUserId, activeConfigRound);
+        setHistoryScores(prev => prev.map(h => h.round === activeConfigRound ? { ...h, score: rData?.score || 0, team: rData?.team } : h));
+
     } catch (e) {
-        console.error(e);
         setSaveStatus('error');
     } finally {
         setIsSaving(false);
     }
   };
 
-  // Calculate totals
+  // --- ADMIN ACTIONS ---
+  const handleToggleLock = async () => {
+      if (!isAdmin) return;
+      const newStatus = !roundLocked;
+      setRoundLocked(newStatus);
+      await dataService.updateGlobalConfig({ fantasyLocked: newStatus });
+  };
+
+  const handleChangeActiveRound = (newRound: number) => {
+      if (!isAdmin) return;
+      // Trigger Modal instead of window.confirm
+      setPendingRoundChange(newRound);
+  };
+
+  // Execute actual change logic (Called by Modal)
+  const executeRoundChange = async () => {
+      if (pendingRoundChange === null) return;
+      const newRound = pendingRoundChange;
+      setPendingRoundChange(null); // Close modal
+
+      setIsAdminSaving(true);
+      try {
+        // Trigger complex transition logic (Price updates + Round switch)
+        await dataService.processRoundTransition(newRound);
+        
+        // Immediate UI update
+        setActiveConfigRound(newRound);
+        setViewRoundId(newRound);
+        setRoundLocked(false);
+        
+        // Reload all data to reflect new prices
+        await loadData();
+        
+      } catch (error) {
+        console.error("Error updating active round", error);
+        alert("Error al cambiar de jornada.");
+      } finally {
+        setIsAdminSaving(false);
+      }
+  };
+
+  // Calculate Totals
   const { totalCost, totalPoints } = useMemo(() => {
     let cost = 0;
     let points = 0;
     
-    // Safely iterate over displayTeam values, checking if it exists
-    if (displayTeam) {
-        Object.values(displayTeam).forEach(playerId => {
-        if (playerId) {
-            const player = players.find(p => p.id === playerId);
+    (Object.values(myTeam) as FantasySlot[]).forEach(slot => {
+        if (slot.playerId) {
+            cost += slot.purchaseCost || 0; 
+            const player = players.find(p => p.id === slot.playerId);
             if (player) {
-            cost += player.cost;
-            points += player.averagePoints;
+                const isCap = slot.playerId === myCaptain;
+                points += player.averagePoints * (isCap ? 1.5 : 1);
             }
         }
-        });
-    }
+    });
     return { totalCost: cost, totalPoints: points };
-  }, [displayTeam, players]);
+  }, [myTeam, players, myCaptain]);
 
   const remainingBudget = MAX_BUDGET - totalCost;
   const isOverBudget = remainingBudget < 0;
-  const isFullTeam = displayTeam ? Object.values(displayTeam).every(v => v !== null) : false;
+  
+  // Get Opponents for VIEWED FANTASY ROUND
+  const getOpponentsForPlayer = (playerId: string | null): Team[] => {
+      if (!playerId) return [];
+      const player = players.find(p => p.id === playerId);
+      if (!player) return [];
 
-  if (isLoadingData && !isSearchOpen) {
-      return (
-          <div className="w-full h-[60vh] flex flex-col items-center justify-center text-[#0ac8b9]">
-              <Loader2 className="w-12 h-12 animate-spin mb-4" />
-              <p>Cargando datos...</p>
-          </div>
+      const currentRoundConfig = FANTASY_SCHEDULE.find(r => r.id === viewRoundId);
+      if (!currentRoundConfig) return [];
+
+      const roundMatches = allMatches.filter(m => 
+          (currentRoundConfig.stage === Stage.GROUPS ? m.stage === Stage.GROUPS : m.stage !== Stage.GROUPS) &&
+          currentRoundConfig.matchdays.includes(m.day || 0) &&
+          (m.teamA.id === player.teamId || m.teamB.id === player.teamId)
       );
-  }
+
+      return roundMatches.map(m => {
+          const oppId = m.teamA.id === player.teamId ? m.teamB.id : m.teamA.id;
+          return teams[oppId];
+      }).filter(Boolean);
+  };
+
+  // --- LEADERBOARD CALCULATIONS ---
+  
+  // 1. Total Leaderboard
+  const totalLeaderboard = useMemo(() => {
+      return [...allUsers]
+          .sort((a, b) => (b.scoreBreakdown.fantasy || 0) - (a.scoreBreakdown.fantasy || 0))
+          .map((u, i) => ({ ...u, rank: i + 1 }));
+  }, [allUsers]);
+
+  // 2. Round Specific Leaderboard
+  const roundLeaderboard = useMemo(() => {
+      return allUsers.map(user => {
+          // Determine score for the CURRENTLY VIEWED round
+          // fantasyHistory is array [Round 1, Round 2, ...]. Index corresponds to RoundId - 1.
+          // Note: fantasyHistory needs to be populated. Assuming loadData -> getAllUsers populates it.
+          const roundData = user.fantasyHistory?.[viewRoundId - 1];
+          return {
+              ...user,
+              roundScore: roundData ? roundData.points : 0
+          };
+      })
+      .sort((a, b) => b.roundScore - a.roundScore)
+      .map((u, i) => ({ ...u, roundRank: i + 1 }));
+  }, [allUsers, viewRoundId]);
+
+  if (isLoadingData || isTeamLoading) return <div className="p-20 text-center text-[#0ac8b9]"><Loader2 className="w-10 h-10 animate-spin mx-auto"/></div>;
+
+  // Determine if viewing a locked/past round OR viewing another user
+  const isOwnTeam = viewingUserId === currentUserId;
+  const isViewLocked = roundLocked || viewRoundId !== activeConfigRound || !isOwnTeam;
+  
+  const viewingUser = allUsers.find(u => u.id === viewingUserId);
+
+  // LOGICA DE VISIBILIDAD (NIEBLA DE GUERRA)
+  // 1. Si es mi equipo: Siempre visible
+  // 2. Si es otro: Visible SOLO si (La jornada ya pasó) O (La jornada es la actual Y está bloqueada/comenzada)
+  const isRoundStartedOrPast = viewRoundId < activeConfigRound || (viewRoundId === activeConfigRound && roundLocked);
+  const canViewTeam = isOwnTeam || isRoundStartedOrPast;
 
   return (
-    <div className="w-[98%] max-w-[2400px] mx-auto animate-in fade-in slide-in-from-bottom-4 pb-20 pt-4">
+    <div className="w-[98%] max-w-[2400px] mx-auto animate-in fade-in pb-20 pt-4 relative">
       
-      {/* Top Navigation */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 px-2">
-        <div className="w-full md:w-auto flex items-center gap-4">
-            {isReadOnly && viewingUser ? (
-                <div className="flex items-center gap-3 bg-[#0f1923] border border-[#c8aa6e]/50 p-2 pr-6 rounded-full animate-in slide-in-from-left-4">
+      {/* --- CONFIRMATION MODAL (ROUND CHANGE) --- */}
+      {pendingRoundChange !== null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-[#0f1d36] border-2 border-red-500 rounded-xl p-6 max-w-md w-full shadow-[0_0_50px_rgba(239,68,68,0.2)] relative animate-in zoom-in-95">
+                <div className="flex items-center gap-3 mb-4 text-red-400 border-b border-red-500/30 pb-3">
+                    <AlertTriangle className="w-8 h-8" />
+                    <h3 className="text-xl font-bold uppercase tracking-wide">Zona de Peligro</h3>
+                </div>
+                
+                <p className="text-white mb-4 text-sm leading-relaxed">
+                    ¿Estás seguro de que quieres activar la <span className="font-bold text-[#c8aa6e] text-base">Jornada {pendingRoundChange}</span>?
+                </p>
+                
+                <div className="bg-black/30 p-3 rounded-lg border border-gray-700 mb-6">
+                    <ul className="text-xs text-gray-300 list-disc list-inside space-y-2">
+                        <li>Se <span className="text-green-400 font-bold">actualizarán los precios</span> de mercado basados en el rendimiento anterior.</li>
+                        <li>Se <span className="text-blue-400 font-bold">abrirá el mercado</span> para la nueva jornada.</li>
+                        <li>Los usuarios podrán editar sus alineaciones para la <span className="text-white font-bold">Jornada {pendingRoundChange}</span>.</li>
+                    </ul>
+                </div>
+
+                <div className="flex justify-end gap-3">
                     <button 
-                        onClick={() => {
-                            setViewingUserId(null);
-                            setViewingUser(null);
-                        }}
-                        className="w-10 h-10 rounded-full bg-[#0a1428] border border-gray-600 flex items-center justify-center hover:bg-gray-800 hover:text-[#c8aa6e] transition-colors"
-                        title="Volver a mi equipo"
+                        onClick={() => setPendingRoundChange(null)}
+                        className="px-4 py-2.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 font-bold text-xs uppercase tracking-wide border border-gray-600 transition-colors"
                     >
-                        <ArrowLeft className="w-5 h-5" />
+                        Cancelar
                     </button>
-                    <img src={viewingUser.avatar} alt={viewingUser.name} className="w-10 h-10 rounded-full object-cover border border-[#c8aa6e]" />
-                    <div className="flex flex-col">
-                        <span className="text-[10px] uppercase font-bold text-[#c8aa6e] tracking-widest leading-none mb-0.5">Viendo a</span>
-                        <span className="font-bold text-white text-lg leading-none">{viewingUser.name}</span>
-                    </div>
-                </div>
-            ) : (
-                <div className="flex items-center gap-3 p-2">
-                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#0ac8b9] to-[#0a7e78] flex items-center justify-center shadow-[0_0_15px_rgba(10,200,185,0.3)]">
-                        <UserIcon className="w-6 h-6 text-[#0a1428]" />
-                     </div>
-                     <div className="flex flex-col">
-                        <span className="text-[10px] uppercase font-bold text-[#0ac8b9] tracking-widest leading-none mb-0.5">Modo Edición</span>
-                        <h1 className="font-bold text-2xl text-white leading-none">Tu Equipo</h1>
-                     </div>
-                </div>
-            )}
-        </div>
-
-        <div className="flex items-center gap-2">
-            {isAdmin && (
-                <button 
-                    onClick={() => setIsEditMode(!isEditMode)}
-                    className={`
-                        flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all
-                        ${isEditMode 
-                            ? 'bg-red-600 border-red-400 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)]' 
-                            : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white hover:border-gray-400'
-                        }
-                    `}
-                >
-                    <Settings className={`w-4 h-4 ${isEditMode ? 'animate-spin-slow' : ''}`} />
-                    {isEditMode ? 'Salir Admin' : 'Admin'}
-                </button>
-            )}
-
-            <button 
-                onClick={() => setIsSearchOpen(true)}
-                className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-[#2d3b55] text-white px-6 py-2 rounded-xl border border-gray-600 hover:border-[#c8aa6e] transition-all shadow-lg group"
-            >
-                <Search className="w-5 h-5 text-gray-400 group-hover:text-[#c8aa6e] transition-colors" />
-                <span className="font-bold text-sm tracking-wide">Explorar Rivales</span>
-            </button>
-        </div>
-      </div>
-
-      {isEditMode ? (
-          <PlayerEditor players={players} teams={teams} onUpdate={loadData} />
-      ) : (
-          <>
-            {/* Header Stats Bar */}
-            <div className="sticky top-[70px] z-40 bg-[#091428]/95 backdrop-blur-md border-y border-gray-700 shadow-xl mb-6 -mx-4 px-4 py-3 sm:rounded-xl sm:border sm:mx-4 sm:top-4 transition-colors duration-500">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-5xl mx-auto">
-                    <div className="hidden lg:flex items-center gap-3">
-                        <span className={`text-sm font-bold uppercase tracking-widest ${isReadOnly ? 'text-[#c8aa6e]' : 'text-[#0ac8b9]'}`}>
-                            {isReadOnly ? `Alineación de ${viewingUser?.name}` : 'Resumen de Alineación'}
-                        </span>
-                    </div>
-                    <div className="flex-1 w-full sm:w-auto">
-                        <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1.5">
-                            <span className="flex items-center gap-2 text-gray-300">
-                                <Coins className="w-4 h-4 text-[#0ac8b9]" />
-                                {isReadOnly ? 'Coste Total' : 'Presupuesto'}
-                            </span>
-                            <span className={`${isOverBudget ? 'text-red-500' : 'text-[#0ac8b9]'}`}>
-                                ${totalCost} / ${MAX_BUDGET}
-                            </span>
-                        </div>
-                        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
-                            <div 
-                                className={`h-full transition-all duration-500 ${isOverBudget ? 'bg-red-500' : 'bg-gradient-to-r from-[#0a7e78] to-[#0ac8b9]'}`}
-                                style={{ width: `${Math.min((totalCost / MAX_BUDGET) * 100, 100)}%` }}
-                            ></div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-4 bg-black/30 px-4 py-2 rounded-lg border border-gray-700">
-                        <div className="flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5 text-[#c8aa6e]" />
-                            <div className="flex flex-col leading-none">
-                                <span className="text-xl font-bold text-white">{totalPoints.toFixed(1)}</span>
-                                <span className="text-[10px] text-gray-500 uppercase">Puntos/Jornada</span>
-                            </div>
-                        </div>
-                    </div>
+                    <button 
+                        onClick={executeRoundChange}
+                        className="px-6 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 font-bold text-xs uppercase tracking-wide flex items-center gap-2 shadow-lg transition-colors border border-red-500"
+                    >
+                        <CheckCircle2 className="w-4 h-4" />
+                        Confirmar Cambio
+                    </button>
                 </div>
             </div>
-
-            {/* Main Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 px-2">
-                {Object.values(Role).map((role) => (
-                <PlayerCard 
-                    key={role} 
-                    role={role} 
-                    playerId={displayTeam ? displayTeam[role] : null} 
-                    onSelect={handleSelect} 
-                    readOnly={isReadOnly}
-                    players={players}
-                    teams={teams}
-                />
-                ))}
-            </div>
-
-            {/* Actions Footer */}
-            {!isReadOnly && (
-                <div className="mt-12 flex flex-col items-center justify-center gap-6 animate-in fade-in slide-in-from-bottom-2">
-                    <div className="space-y-2 text-center">
-                        {isOverBudget && (
-                            <div className="animate-in zoom-in bg-red-900/20 border border-red-500 text-red-400 px-6 py-2 rounded-full flex items-center gap-2 text-sm font-bold">
-                                <AlertTriangle className="w-4 h-4" />
-                                Presupuesto Excedido
-                            </div>
-                        )}
-                        {isFullTeam && !isOverBudget && (
-                            <div className="animate-in zoom-in duration-300 bg-[#0ac8b9]/10 border border-[#0ac8b9] px-6 py-2 rounded-full flex items-center gap-2">
-                                <Zap className="w-4 h-4 text-[#0ac8b9] fill-current" />
-                                <span className="text-[#0ac8b9] font-bold uppercase tracking-widest text-sm">Equipo Completo</span>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex gap-4">
-                        <button 
-                            onClick={() => setMyTeam({ [Role.TOP]: null, [Role.JUNGLE]: null, [Role.MID]: null, [Role.ADC]: null, [Role.SUPPORT]: null })}
-                            className="px-6 py-3 rounded-xl border border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white transition-all flex items-center gap-2"
-                        >
-                            <RefreshCw className="w-4 h-4" />
-                            <span className="hidden sm:inline">Reiniciar</span>
-                        </button>
-                        
-                        <button 
-                            onClick={handleSave}
-                            disabled={isSaving || isOverBudget}
-                            className={`
-                            font-bold px-10 py-3 rounded-xl shadow-lg transition-all transform hover:scale-105 flex items-center gap-2
-                            ${isFullTeam && !isOverBudget
-                                ? 'bg-gradient-to-r from-[#0ac8b9] to-[#0a7e78] text-black shadow-[0_0_20px_rgba(10,200,185,0.4)]' 
-                                : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'
-                            }
-                        `}>
-                        {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 
-                        saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> : 
-                        <Save className="w-5 h-5" />}
-                        
-                        {saveStatus === 'success' ? '¡Guardado!' : 'Guardar Alineación'}
-                        </button>
-                    </div>
-                </div>
-            )}
-          </>
+        </div>
       )}
 
-      {/* User Search Modal */}
-      <UserSearchModal 
-          isOpen={isSearchOpen} 
-          onClose={() => setIsSearchOpen(false)}
-          onSelect={(user) => {
-              setViewingUserId(user.id);
-              setViewingUser(user);
-              setIsSearchOpen(false);
-          }}
-      />
+      {/* --- RULES MODAL --- */}
+      {showRules && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-[#0f1d36] border-2 border-[#0ac8b9] rounded-xl p-6 max-w-3xl w-full shadow-2xl relative overflow-y-auto max-h-[90vh] animate-in zoom-in-95">
+                {/* Close Button */}
+                <button onClick={() => setShowRules(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white p-1 hover:bg-white/10 rounded-full transition-colors">
+                    <X className="w-6 h-6" />
+                </button>
+
+                <div className="text-center mb-6">
+                    <div className="w-12 h-12 bg-[#0ac8b9]/20 rounded-full flex items-center justify-center mx-auto mb-2 border border-[#0ac8b9]/50">
+                        <Info className="w-6 h-6 text-[#0ac8b9]" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white uppercase tracking-wide">Sistema de Puntuación</h3>
+                    <p className="text-gray-400 text-xs">Reglas Fantasy Winter 2026</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Basic Stats */}
+                    <div className="bg-black/20 rounded-lg p-4 border border-gray-700/50">
+                        <h4 className="text-[#0ac8b9] font-bold uppercase text-xs mb-3 border-b border-gray-700 pb-2 flex items-center gap-2">
+                            <Swords className="w-3 h-3" /> Estadísticas Base
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between text-gray-300"><span>Kill</span> <span className="font-bold text-green-400">+1.5</span></div>
+                            <div className="flex justify-between text-gray-300"><span>Assist</span> <span className="font-bold text-blue-400">+1</span></div>
+                            <div className="flex justify-between text-gray-300"><span>Death</span> <span className="font-bold text-red-400">-1</span></div>
+                            <div className="flex justify-between text-gray-300"><span>CS (Súbditos)</span> <span className="font-bold text-gray-400">+0.01</span></div>
+                            <div className="flex justify-between text-gray-300"><span>Victoria</span> <span className="font-bold text-yellow-400">+1</span></div>
+                        </div>
+                    </div>
+
+                    {/* Multi-Kills */}
+                    <div className="bg-black/20 rounded-lg p-4 border border-gray-700/50">
+                        <h4 className="text-red-400 font-bold uppercase text-xs mb-3 border-b border-gray-700 pb-2 flex items-center gap-2">
+                            <Target className="w-3 h-3" /> Multikills
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between text-gray-300"><span>Double Kill</span> <span className="font-bold text-gray-400">+1</span></div>
+                            <div className="flex justify-between text-gray-300"><span>Triple Kill</span> <span className="font-bold text-yellow-200">+2</span></div>
+                            <div className="flex justify-between text-gray-300"><span>Quadra Kill</span> <span className="font-bold text-orange-400">+3</span></div>
+                            <div className="flex justify-between text-gray-300"><span>PENTA KILL</span> <span className="font-bold text-red-500">+4</span></div>
+                        </div>
+                    </div>
+
+                    {/* Global Bonuses */}
+                    <div className="bg-black/20 rounded-lg p-4 border border-gray-700/50 md:col-span-2">
+                        <h4 className="text-yellow-400 font-bold uppercase text-xs mb-3 border-b border-gray-700 pb-2 flex items-center gap-2">
+                            <Trophy className="w-3 h-3" /> Bonus Globales
+                        </h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                            <div className="bg-[#0f1d36] p-2 rounded text-center border border-gray-700">
+                                <div className="text-xs text-gray-400 uppercase font-bold mb-1">MVP</div>
+                                <div className="text-yellow-400 font-bold text-lg">+3</div>
+                            </div>
+                            <div className="bg-[#0f1d36] p-2 rounded text-center border border-gray-700">
+                                <div className="text-xs text-gray-400 uppercase font-bold mb-1">First Blood</div>
+                                <div className="text-red-400 font-bold text-lg">+1</div>
+                            </div>
+                            <div className="bg-[#0f1d36] p-2 rounded text-center border border-gray-700">
+                                <div className="text-xs text-gray-400 uppercase font-bold mb-1">10+ Kills</div>
+                                <div className="text-purple-400 font-bold text-lg">+3</div>
+                            </div>
+                            <div className="bg-[#0f1d36] p-2 rounded text-center border border-gray-700">
+                                <div className="text-xs text-gray-400 uppercase font-bold mb-1">Perfect KDA</div>
+                                <div className="text-cyan-400 font-bold text-lg">+3</div>
+                                <div className="text-[9px] text-gray-500">0 muertes & KDA &ge; 5</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Role Specifics */}
+                    <div className="bg-black/20 rounded-lg p-4 border border-gray-700/50 md:col-span-2">
+                        <h4 className="text-purple-300 font-bold uppercase text-xs mb-3 border-b border-gray-700 pb-2 flex items-center gap-2">
+                            <Zap className="w-3 h-3" /> Bonus de Rol
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                            <div className="flex justify-between items-center p-2 rounded bg-[#0f1d36] border border-gray-700">
+                                <div>
+                                    <span className="text-orange-300 font-bold block">TOP</span>
+                                    <span className="text-gray-400">Daño Equipo &ge; 25%</span>
+                                </div>
+                                <span className="text-green-400 font-bold text-lg">+3</span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 rounded bg-[#0f1d36] border border-gray-700">
+                                <div>
+                                    <span className="text-purple-300 font-bold block">MID</span>
+                                    <span className="text-gray-400">Daño Equipo &ge; 30%</span>
+                                </div>
+                                <span className="text-green-400 font-bold text-lg">+3</span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 rounded bg-[#0f1d36] border border-gray-700">
+                                <div>
+                                    <span className="text-green-300 font-bold block">JUNGLE</span>
+                                    <span className="text-gray-400">Alma Dragón (4+) / Barón</span>
+                                </div>
+                                <span className="text-green-400 font-bold text-lg">+1.5 / +2</span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 rounded bg-[#0f1d36] border border-gray-700">
+                                <div>
+                                    <span className="text-blue-300 font-bold block">ADC</span>
+                                    <span className="text-gray-400">Daño/Min &ge; 1000</span>
+                                </div>
+                                <span className="text-green-400 font-bold text-lg">+3</span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 rounded bg-[#0f1d36] border border-gray-700 col-span-1 sm:col-span-2">
+                                <div>
+                                    <span className="text-cyan-300 font-bold block">SUPPORT</span>
+                                    <span className="text-gray-400">10+ Asist / 1er Dragón / Vision x0.03</span>
+                                </div>
+                                <span className="text-green-400 font-bold text-lg">+2 / +1 / Var</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Playoff Bracket Bonus */}
+                    <div className="bg-black/20 rounded-lg p-4 border border-gray-700/50 md:col-span-2">
+                        <h4 className="text-[#c8aa6e] font-bold uppercase text-xs mb-3 border-b border-gray-700 pb-2 flex items-center gap-2">
+                            <Crown className="w-3 h-3" /> Bonus de Bracket (Importancia del partido)
+                        </h4>
+                        <div className="grid grid-cols-1 gap-2 text-xs">
+                            <div className="flex justify-between items-center p-2 rounded bg-[#0f1d36] border border-gray-700">
+                                <div>
+                                    <span className="text-yellow-400 font-bold block">Winners Bracket</span>
+                                    <span className="text-gray-400">Por mantenerse en la zona noble</span>
+                                </div>
+                                <span className="text-yellow-400 font-bold text-lg">x1.15 (+15%)</span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 rounded bg-[#0f1d36] border border-gray-700">
+                                <div>
+                                    <span className="text-gray-400 font-bold block">Losers Bracket</span>
+                                    <span className="text-gray-500">Puntuación estándar</span>
+                                </div>
+                                <span className="text-gray-400 font-bold text-lg">x1.0</span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 rounded bg-[#0f1d36] border border-gray-700">
+                                <div>
+                                    <span className="text-purple-400 font-bold block">Gran Final</span>
+                                    <span className="text-gray-400">Por ser el partido decisivo</span>
+                                </div>
+                                <span className="text-purple-400 font-bold text-lg">x1.25 (+25%)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* HEADER BAR */}
+      <div className="flex flex-col gap-6 mb-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-[#0ac8b9]/10 border border-[#0ac8b9]/30">
+                    <UserIcon className="w-6 h-6 text-[#0ac8b9]" />
+                </div>
+                <div>
+                    <h1 className="text-2xl font-bold text-white uppercase leading-none">Fantasy League</h1>
+                    <p className="text-gray-500 text-xs font-bold uppercase tracking-wide mt-1">
+                        Jornada Activa: <span className="text-[#0ac8b9]">#{activeConfigRound}</span> {roundLocked ? '(Bloqueada)' : '(Abierta)'}
+                    </p>
+                </div>
+            </div>
+
+            {/* ADMIN CONTROLS */}
+            {isAdmin && (
+                <div className="flex flex-wrap gap-2 items-center bg-[#0f1d36] p-2 rounded-lg border border-gray-700">
+                    <span className="text-[10px] uppercase font-bold text-red-400 mr-2">Admin:</span>
+                    
+                    <div className="relative">
+                        <select 
+                            value={activeConfigRound}
+                            onChange={(e) => handleChangeActiveRound(parseInt(e.target.value))}
+                            className="bg-black border border-gray-600 text-white text-xs rounded px-2 py-1 pr-6 cursor-pointer hover:border-white focus:outline-none focus:border-red-500 transition-colors"
+                            disabled={isAdminSaving}
+                        >
+                            {FANTASY_SCHEDULE.map(r => (
+                                <option key={r.id} value={r.id}>Activa: {r.label}</option>
+                            ))}
+                        </select>
+                        {isAdminSaving && <div className="absolute right-1 top-1.5"><Loader2 className="w-3 h-3 animate-spin text-white"/></div>}
+                    </div>
+
+                    <button 
+                        onClick={handleToggleLock}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold uppercase border transition-all ${roundLocked ? 'bg-red-900/50 border-red-500 text-red-200' : 'bg-green-900/50 border-green-500 text-green-200'}`}
+                    >
+                        {roundLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                        {roundLocked ? 'Desbloquear' : 'Bloquear'}
+                    </button>
+                </div>
+            )}
+          </div>
+
+          {/* VIEW CONTROLS & TABS */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-gray-700 pb-2">
+              <div className="flex bg-[#0f1923] p-1 rounded-lg border border-gray-700 items-center">
+                  <button 
+                    onClick={() => setActiveTab('lineup')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-bold uppercase transition-all ${activeTab === 'lineup' ? 'bg-[#0ac8b9] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                  >
+                      <Layout className="w-4 h-4" /> Alineación
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('history')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-bold uppercase transition-all ${activeTab === 'history' ? 'bg-[#0ac8b9] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                  >
+                      <History className="w-4 h-4" /> Historial
+                  </button>
+                  
+                  <div className="w-px h-6 bg-gray-700 mx-1"></div>
+                  
+                  {/* RULES BUTTON */}
+                  <button
+                    onClick={() => setShowRules(true)}
+                    className="p-2 text-gray-400 hover:text-[#0ac8b9] transition-colors rounded-md hover:bg-[#0a1428]"
+                    title="Reglas de Puntuación"
+                  >
+                    <Info className="w-4 h-4" />
+                  </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                  
+                  {/* ROUND SELECTOR (Only shown in Lineup tab) */}
+                  {activeTab === 'lineup' && (
+                      <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400 uppercase font-bold hidden sm:block">Jornada:</span>
+                          <select 
+                              value={viewRoundId}
+                              onChange={(e) => setViewRoundId(Number(e.target.value))}
+                              className="bg-[#0f1923] text-white border border-gray-600 text-sm rounded-lg px-3 py-2 outline-none focus:border-[#0ac8b9]"
+                          >
+                              {FANTASY_SCHEDULE.map(r => (
+                                  <option key={r.id} value={r.id}>{r.label} {r.id === activeConfigRound ? '(Actual)' : ''}</option>
+                              ))}
+                          </select>
+                      </div>
+                  )}
+
+                  {/* USER INDICATOR (NO SELECTOR) */}
+                  <div className="flex items-center gap-2 bg-[#0f1923] p-1 pr-3 rounded-lg border border-gray-700">
+                      <div className="w-8 h-8 rounded bg-black flex items-center justify-center overflow-hidden border border-gray-600">
+                          <img 
+                            src={viewingUser?.avatar || `https://ui-avatars.com/api/?name=${viewingUser?.name || '?'}&background=random`} 
+                            className="w-full h-full object-cover"
+                          />
+                      </div>
+                      <div className="flex flex-col">
+                          <span className="text-xs text-gray-500 uppercase font-bold leading-none">Viendo a:</span>
+                          <span className="text-white font-bold leading-none">{viewingUser?.name}</span>
+                      </div>
+                      
+                      {/* Back to Me Button */}
+                      {!isOwnTeam && (
+                          <button 
+                              onClick={() => setViewingUserId(currentUserId)}
+                              className="ml-2 p-1 bg-red-900/50 hover:bg-red-900 text-red-200 rounded border border-red-500/30 transition-colors"
+                              title="Volver a mi equipo"
+                          >
+                              <LogOut className="w-3 h-3" />
+                          </button>
+                      )}
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      {!isOwnTeam && (
+          <div className="mb-6 bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg flex items-center gap-3 animate-in slide-in-from-top-2">
+              <Eye className="w-5 h-5 text-blue-400" />
+              <div>
+                  <p className="text-sm font-bold text-blue-200 uppercase">Modo Espectador</p>
+                  <p className="text-xs text-blue-300/70">Estás viendo el equipo de <span className="font-bold text-white">{viewingUser?.name}</span>. No puedes hacer cambios.</p>
+              </div>
+          </div>
+      )}
+
+      {activeTab === 'lineup' ? (
+          <>
+            {/* HIDDEN LINEUP STATE (FOG OF WAR) */}
+            {!canViewTeam ? (
+                <div className="flex flex-col items-center justify-center py-20 bg-[#091428]/50 border-2 border-dashed border-gray-700 rounded-xl animate-in fade-in">
+                    <div className="p-4 bg-black/40 rounded-full mb-4 border border-gray-700">
+                        <EyeOff className="w-12 h-12 text-gray-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white uppercase tracking-wider mb-2">Alineación Oculta</h3>
+                    <p className="text-gray-400 text-sm max-w-md text-center">
+                        La estrategia de <span className="text-[#0ac8b9] font-bold">{viewingUser?.name}</span> para la Jornada {viewRoundId} es secreta.
+                    </p>
+                    <p className="text-xs text-gray-600 mt-2 uppercase font-bold tracking-widest bg-black/30 px-3 py-1 rounded">
+                        Disponible al inicio de la jornada
+                    </p>
+                </div>
+            ) : (
+                <>
+                    {/* STATS BAR */}
+                    <div className="sticky top-[70px] z-40 bg-[#091428]/95 backdrop-blur-md border-y border-gray-700 shadow-xl mb-6 -mx-4 px-4 py-3 sm:rounded-xl sm:border sm:mx-0 transition-colors duration-500">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-5xl mx-auto">
+                                <div className="flex-1 w-full sm:w-auto">
+                                    <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1.5">
+                                        <span className="flex items-center gap-2 text-gray-300">
+                                            <Coins className="w-4 h-4 text-[#0ac8b9]" />
+                                            Presupuesto
+                                        </span>
+                                        <span className={`${isOverBudget ? 'text-red-500' : 'text-[#0ac8b9]'}`}>
+                                            ${totalCost} / ${MAX_BUDGET}
+                                        </span>
+                                    </div>
+                                    <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+                                        <div className={`h-full transition-all duration-500 ${isOverBudget ? 'bg-red-500' : 'bg-gradient-to-r from-[#0a7e78] to-[#0ac8b9]'}`} style={{ width: `${Math.min((totalCost / MAX_BUDGET) * 100, 100)}%` }}></div>
+                                    </div>
+                                </div>
+                                {isViewLocked && (
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-600 rounded text-gray-400 font-bold uppercase text-xs">
+                                        <Lock className="w-4 h-4" /> 
+                                        {!isOwnTeam ? 'Solo Lectura' : viewRoundId !== activeConfigRound ? 'Jornada Pasada/Futura' : 'Alineación Bloqueada'}
+                                    </div>
+                                )}
+                        </div>
+                    </div>
+
+                    {/* GRID */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                        {Object.values(Role).map((role) => (
+                            <PlayerCard 
+                                key={role} 
+                                role={role} 
+                                slot={myTeam[role]}
+                                onSelect={handleSelect} 
+                                onSetCaptain={handleSetCaptain}
+                                isCaptain={myCaptain === myTeam[role].playerId}
+                                players={players}
+                                teams={teams}
+                                opponents={getOpponentsForPlayer(myTeam[role].playerId)}
+                                locked={isViewLocked}
+                            />
+                        ))}
+                    </div>
+
+                    {/* FOOTER SAVE BUTTON */}
+                    {!isViewLocked && (
+                        <div className="mt-8 flex justify-center">
+                            <button 
+                                onClick={handleSave}
+                                disabled={isSaving || isOverBudget}
+                                className={`
+                                    font-bold px-10 py-3 rounded-xl shadow-lg transition-all transform hover:scale-105 flex items-center gap-2 border
+                                    ${isOverBudget 
+                                        ? 'bg-red-900/20 border-red-500 text-red-400 cursor-not-allowed' 
+                                        : 'bg-gradient-to-r from-[#0ac8b9] to-[#0a7e78] text-black border-[#0ac8b9]'
+                                    }
+                                `}
+                            >
+                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+                                saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> : 
+                                <Save className="w-5 h-5" />}
+                                {saveStatus === 'success' ? '¡Guardado!' : 'Guardar Alineación'}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* NEW: DUAL LEADERBOARD LAYOUT */}
+                    <div className="mt-16 grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in slide-in-from-bottom-8">
+                        
+                        {/* LEFT: ROUND RANKING */}
+                        <div>
+                            <div className="flex items-center gap-3 mb-4 border-b border-[#0ac8b9]/20 pb-3">
+                                <div className="p-2 bg-[#0ac8b9]/10 rounded-full border border-[#0ac8b9]/30">
+                                    <ListOrdered className="w-5 h-5 text-[#0ac8b9]" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-white uppercase tracking-widest">Clasificación Jornada {viewRoundId}</h2>
+                                    <p className="text-[10px] text-gray-500 uppercase font-bold">Puntos obtenidos solo en esta ronda</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
+                                {roundLeaderboard.slice(0, 10).map((user) => (
+                                    <RankingRow 
+                                        key={user.id}
+                                        user={user}
+                                        rank={user.roundRank || 0}
+                                        score={user.roundScore || 0}
+                                        isMe={user.id === currentUserId}
+                                        isViewing={user.id === viewingUserId}
+                                        onClick={() => setViewingUserId(user.id)}
+                                    />
+                                ))}
+                                {currentUserId && roundLeaderboard.findIndex(u => u.id === currentUserId) >= 10 && (
+                                    <div className="border-t-2 border-gray-700 mt-1">
+                                        {roundLeaderboard.filter(u => u.id === currentUserId).map(user => (
+                                            <RankingRow 
+                                                key={user.id}
+                                                user={user}
+                                                rank={user.roundRank || 0}
+                                                score={user.roundScore || 0}
+                                                isMe={true}
+                                                isViewing={user.id === viewingUserId}
+                                                onClick={() => setViewingUserId(user.id)}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* RIGHT: GENERAL RANKING */}
+                        <div>
+                            <div className="flex items-center gap-3 mb-4 border-b border-[#c8aa6e]/20 pb-3">
+                                <div className="p-2 bg-[#c8aa6e]/10 rounded-full border border-[#c8aa6e]/30">
+                                    <Trophy className="w-5 h-5 text-[#c8aa6e]" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-white uppercase tracking-widest">Clasificación General</h2>
+                                    <p className="text-[10px] text-gray-500 uppercase font-bold">Puntos Totales Acumulados</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
+                                {totalLeaderboard.slice(0, 10).map((user) => (
+                                    <RankingRow 
+                                        key={user.id}
+                                        user={user}
+                                        rank={user.rank}
+                                        score={user.scoreBreakdown.fantasy}
+                                        isMe={user.id === currentUserId}
+                                        isViewing={user.id === viewingUserId}
+                                        onClick={() => setViewingUserId(user.id)}
+                                    />
+                                ))}
+                                {currentUserId && totalLeaderboard.findIndex(u => u.id === currentUserId) >= 10 && (
+                                    <div className="border-t-2 border-gray-700 mt-1">
+                                        {totalLeaderboard.filter(u => u.id === currentUserId).map(user => (
+                                            <RankingRow 
+                                                key={user.id}
+                                                user={user}
+                                                rank={user.rank}
+                                                score={user.scoreBreakdown.fantasy}
+                                                isMe={true}
+                                                isViewing={user.id === viewingUserId}
+                                                onClick={() => setViewingUserId(user.id)}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+                </>
+            )}
+          </>
+      ) : (
+          /* HISTORY TAB */
+          <div className="max-w-4xl mx-auto">
+              <div className="bg-[#091428] border border-gray-800 rounded-xl overflow-hidden shadow-xl">
+                  <div className="p-4 bg-[#0f1d36] border-b border-gray-700 flex items-center gap-2">
+                      <ListOrdered className="w-5 h-5 text-[#0ac8b9]" />
+                      <h3 className="font-bold text-white uppercase tracking-wider">
+                          Historial de Puntos ({viewingUser?.name})
+                      </h3>
+                  </div>
+                  <div className="divide-y divide-gray-800">
+                      {historyScores.map((roundData) => {
+                          const config = FANTASY_SCHEDULE.find(f => f.id === roundData.round);
+                          const isCurrent = roundData.round === activeConfigRound;
+                          
+                          return (
+                              <div key={roundData.round} className="p-4 flex items-center justify-between hover:bg-[#0f1923] transition-colors">
+                                  <div className="flex items-center gap-4">
+                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg border ${isCurrent ? 'bg-[#0ac8b9] text-[#0a1428] border-[#0ac8b9]' : 'bg-gray-800 text-gray-400 border-gray-700'}`}>
+                                          {roundData.round}
+                                      </div>
+                                      <div>
+                                          <div className="font-bold text-white text-sm">{config?.label}</div>
+                                          <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
+                                              Jornadas: {config?.matchdays.join(', ')}
+                                          </div>
+                                      </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-6">
+                                      <div className="text-right">
+                                          <div className="text-xs text-gray-500 uppercase font-bold">Puntos</div>
+                                          <div className="text-xl font-bold text-[#0ac8b9]">{roundData.score.toFixed(2)}</div>
+                                      </div>
+                                      <button 
+                                          onClick={() => {
+                                              setViewRoundId(roundData.round);
+                                              setActiveTab('lineup');
+                                          }}
+                                          className="p-2 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                                          title="Ver Alineación"
+                                      >
+                                          <ArrowLeft className="w-5 h-5 rotate-180" />
+                                      </button>
+                                  </div>
+                              </div>
+                          );
+                      })}
+                  </div>
+                  <div className="p-4 bg-[#0f1d36] border-t border-gray-700 text-center">
+                      <div className="text-xs text-gray-400 uppercase font-bold mb-1">Total Acumulado</div>
+                      <div className="text-3xl font-bold text-white">
+                          {historyScores.reduce((acc, curr) => acc + curr.score, 0).toFixed(2)}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
     </div>
   );
 };
