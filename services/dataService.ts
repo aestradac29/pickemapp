@@ -93,27 +93,32 @@ export const dataService = {
 
     // NEW: Handle Round Transitions (Price Updates)
     async processRoundTransition(newRound: number) {
-        // 1. Get current state
+        // 1. Get current state (Using fresh stats)
         const currentPlayers = await this.getPlayers();
         
         // 2. Calculate new prices based on performance (Last Round vs Average)
         const updatedPlayers = currentPlayers.map(p => {
+            const avg = p.averagePoints || 0;
             // Target price based on performance (Multiplier 18-20 is standard for Fantasy LoL budgets ~1500)
-            const targetPrice = p.averagePoints * 18; 
+            const targetPrice = avg * 18; 
             let change = 0;
+            const currentCost = p.cost || 250; // Fallback cost if missing
 
-            if (targetPrice > p.cost) {
-                // Should increase
-                change = Math.min(50, Math.ceil((targetPrice - p.cost) * 0.2)); // Move 20% towards target
-            } else if (targetPrice < p.cost) {
-                // Should decrease
-                change = Math.max(-50, Math.floor((targetPrice - p.cost) * 0.1)); // Move 10% towards target (prices stickier downwards)
+            // Only change price if they have played at least 1 game
+            if ((p.totalPoints || 0) > 0) {
+                if (targetPrice > currentCost) {
+                    // Should increase
+                    change = Math.min(50, Math.ceil((targetPrice - currentCost) * 0.2)); // Move 20% towards target
+                } else if (targetPrice < currentCost) {
+                    // Should decrease
+                    change = Math.max(-50, Math.floor((targetPrice - currentCost) * 0.1)); // Move 10% towards target (prices stickier downwards)
+                }
             }
 
-            // Apply Change
-            let newCost = p.cost + change;
-            // Floor at 100, Cap at 500 (Soft limits)
-            newCost = Math.max(100, Math.min(500, newCost));
+            // Apply Change & Integers only
+            let newCost = Math.round(currentCost + change);
+            // Floor at 150, Cap at 550 (Soft limits)
+            newCost = Math.max(150, Math.min(550, newCost));
 
             return {
                 ...p,
@@ -404,16 +409,16 @@ export const dataService = {
                     };
                     const rawTeam = data.team || {};
                     
-                    // Normalize inherited data if it was in legacy string format
-                    // IMPORTANT: If legacy, we can't recover the old price easily, so purchaseCost will be undefined.
-                    // The UI handles undefined purchaseCost by falling back to current price (so price hike applies to legacy).
-                    // This encourages users to open the app and "lock in" new teams to get price protection moving forward.
                     Object.keys(rawTeam).forEach(key => {
                         const val = rawTeam[key];
+                        // IMPORTANT: Carry over the 'purchaseCost' to maintain price protection!
                         if (typeof val === 'string' || val === null) {
-                            inheritedTeam[key as Role] = { playerId: val }; 
+                            inheritedTeam[key as Role] = { playerId: val }; // Lost protection if legacy, handled in UI
                         } else {
-                            inheritedTeam[key as Role] = val;
+                            inheritedTeam[key as Role] = {
+                                playerId: val.playerId,
+                                purchaseCost: val.purchaseCost // THIS IS KEY for protection persistence
+                            };
                         }
                     });
 

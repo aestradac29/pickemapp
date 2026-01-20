@@ -167,6 +167,7 @@ export const DatabaseManager: React.FC = () => {
                                     <th className="p-4">Equipo</th>
                                     <th className="p-4">Rol</th>
                                     <th className="p-4">Coste ($)</th>
+                                    <th className="p-4">Pts Totales</th>
                                     <th className="p-4">Pts Media</th>
                                     <th className="p-4">KDA</th>
                                     <th className="p-4">Foto URL</th>
@@ -237,6 +238,18 @@ export const DatabaseManager: React.FC = () => {
                                                         className="bg-black border border-gray-600 rounded p-1 w-16"
                                                     />
                                                 ) : `$${player.cost}`}
+                                            </td>
+
+                                            {/* TOTAL POINTS (NEW) */}
+                                            <td className="p-4 text-purple-400 font-bold">
+                                                {isEditing ? (
+                                                     <input 
+                                                        type="number"
+                                                        value={editFormPlayer.totalPoints}
+                                                        onChange={e => setEditFormPlayer({...editFormPlayer, totalPoints: Number(e.target.value)})}
+                                                        className="bg-black border border-gray-600 rounded p-1 w-16"
+                                                    />
+                                                ) : player.totalPoints?.toFixed(1) || '0.0'}
                                             </td>
 
                                             {/* AVG POINTS */}

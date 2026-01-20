@@ -70,8 +70,9 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
           : 'border-dashed border-gray-700 bg-[#091428]/50'
         }
         ${!readOnly && !playerId && !locked ? 'hover:border-[#0ac8b9]/50' : ''}
+        ${isValueProtected ? 'ring-1 ring-green-500/50' : ''} 
       `}
-      style={playerId ? { borderColor: isCaptain ? '#facc15' : teamColor } : {}}
+      style={playerId ? { borderColor: isCaptain ? '#facc15' : (isValueProtected ? '#22c55e' : teamColor) } : {}}
       >
         {/* Role Icon */}
         <div className="absolute top-3 right-3 z-20 p-1.5 bg-black/40 rounded-full border border-white/10 backdrop-blur-sm">
@@ -149,7 +150,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
                   <div className="grid grid-cols-2 gap-1.5">
                       
                       {/* Price Box with Protection Indicator */}
-                      <div className={`bg-[#0f1923] p-1.5 rounded border flex flex-col items-center justify-center relative overflow-hidden h-[50px] ${isValueProtected ? 'border-green-500/30 bg-green-900/10' : 'border-gray-700'}`}>
+                      <div className={`bg-[#0f1923] p-1.5 rounded border flex flex-col items-center justify-center relative overflow-hidden h-[50px] ${isValueProtected ? 'border-green-500 bg-green-900/10' : 'border-gray-700'}`}>
                           <span className="text-[8px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">
                               {isValueProtected ? 'Tu Coste' : 'Coste'}
                           </span>
@@ -158,7 +159,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
                               
                               {/* If price went up since purchase, show indicator */}
                               {isValueProtected && !locked && (
-                                  <div className="absolute top-0 right-0 p-0.5 bg-green-500/20 rounded-bl text-[8px] text-green-300 font-bold flex items-center" title={`Te ahorras $${savings} respecto al mercado`}>
+                                  <div className="absolute top-0 right-0 p-0.5 bg-green-500/20 rounded-bl text-[8px] text-green-300 font-bold flex items-center" title={`PRECIO CONGELADO: Te ahorras $${savings} porque fichaste antes de la subida.`}>
                                       <LockKeyhole className="w-2 h-2 mr-0.5" />
                                       -${savings}
                                   </div>
@@ -206,8 +207,8 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
                   
                   {/* Market Price Context (Only if protected) */}
                   {isValueProtected && !locked && (
-                      <div className="text-[9px] text-center text-gray-500 font-mono bg-black/40 rounded py-0.5">
-                          Precio Mercado: ${currentMarketCost}
+                      <div className="text-[9px] text-center text-gray-400 font-mono bg-black/40 rounded py-0.5 border border-gray-800">
+                          Precio actual en tienda: <span className="text-red-400 line-through">${currentMarketCost}</span>
                       </div>
                   )}
                </div>
@@ -222,7 +223,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
                     ? 'text-red-300 bg-red-900/40 border-red-500/50 hover:bg-red-600 hover:text-white hover:border-red-400 animate-pulse' 
                     : 'text-gray-500 bg-black/40 border-gray-700 hover:text-red-400 hover:bg-red-900/20 hover:border-red-500/30'
                 }`}
-                title={isValueProtected ? "¡CUIDADO! Si vendes, perderás el precio protegido y tendrás que pagar el actual." : "Vender jugador"}
+                title={isValueProtected ? "¡CUIDADO! Si vendes, perderás el precio protegido. Si lo vuelves a fichar sin guardar, lo recuperarás." : "Vender jugador"}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -258,7 +259,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
   );
 };
 
-// ... (RankingRow component stays the same) ...
 // --- RANKING ROW COMPONENT ---
 interface RankingRowProps {
     user: User;
@@ -326,9 +326,15 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
   const [pendingRoundChange, setPendingRoundChange] = useState<number | null>(null);
   const [showRules, setShowRules] = useState(false);
 
+  // Current Working Team
   const [myTeam, setMyTeam] = useState<Record<Role, FantasySlot>>({
     [Role.TOP]: {playerId:null}, [Role.JUNGLE]: {playerId:null}, [Role.MID]: {playerId:null}, [Role.ADC]: {playerId:null}, [Role.SUPPORT]: {playerId:null}
   });
+  
+  // ORIGINAL Team Snapshot (Loaded from DB)
+  // This is used to check if we "owned" the player at the start of the session to restore their protected price.
+  const [originalTeam, setOriginalTeam] = useState<Record<Role, FantasySlot> | null>(null);
+
   const [myCaptain, setMyCaptain] = useState<string | null>(null);
   
   const [historyScores, setHistoryScores] = useState<any[]>([]);
@@ -349,6 +355,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
       if (viewingUserId && !isLoadingData) {
           const fetchTeam = async () => {
               setIsTeamLoading(true);
+              // Reset States
               setMyTeam({
                   [Role.TOP]: {playerId:null}, 
                   [Role.JUNGLE]: {playerId:null}, 
@@ -356,6 +363,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                   [Role.ADC]: {playerId:null}, 
                   [Role.SUPPORT]: {playerId:null}
               });
+              setOriginalTeam(null);
               setMyCaptain(null);
 
               try {
@@ -374,9 +382,11 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
       const savedData = await dataService.getFantasyTeam(userId, round);
       if (savedData) {
           setMyTeam(savedData.team);
+          setOriginalTeam(savedData.team); // Save snapshot for price restoration logic
           setMyCaptain(savedData.captain || null);
       } else {
           setMyTeam({[Role.TOP]: {playerId:null}, [Role.JUNGLE]: {playerId:null}, [Role.MID]: {playerId:null}, [Role.ADC]: {playerId:null}, [Role.SUPPORT]: {playerId:null}});
+          setOriginalTeam(null);
           setMyCaptain(null);
       }
   };
@@ -432,15 +442,32 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
   const handleSelect = (role: Role, playerId: string | null) => {
     if (viewingUserId !== currentUserId || roundLocked || viewRoundId !== activeConfigRound) return;
     
-    // When selecting a NEW player (or deselecting), we use the CURRENT market cost.
-    // This satisfies the "pay new price if you buy back" requirement.
+    // Logic for Price Persistence:
+    // 1. If selecting a player, check if they were in our ORIGINAL roster when we loaded the page.
+    // 2. If yes, restore their `purchaseCost` from the original roster (Price Protection).
+    // 3. If no, use the current market cost.
+    
+    let costToUse = 0;
     const player = players.find(p => p.id === playerId);
+
+    if (playerId && player) {
+        costToUse = player.cost; // Default to current market
+
+        if (originalTeam) {
+            // Find this player in ANY role in the original team (usually strictly same role, but safer to check values)
+            const originalSlot = (Object.values(originalTeam) as FantasySlot[]).find(slot => slot.playerId === playerId);
+            if (originalSlot && originalSlot.purchaseCost) {
+                // Restore protected price because we owned them at start of session
+                costToUse = originalSlot.purchaseCost;
+            }
+        }
+    }
     
     setMyTeam(prev => ({ 
         ...prev, 
         [role]: { 
             playerId, 
-            purchaseCost: player ? player.cost : 0 // CRITICAL: Always reset to current market cost on new selection
+            purchaseCost: costToUse
         } 
     }));
 
@@ -514,6 +541,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
         
         // Update local state to reflect the committed lower prices immediately
         setMyTeam(teamToSave);
+        setOriginalTeam(teamToSave); // Update the "Original/Saved" state to match the new save
 
         setSaveStatus('success');
         setTimeout(() => setSaveStatus('idle'), 3000);
@@ -667,12 +695,16 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                 <div className="bg-black/30 p-3 rounded-lg border border-gray-700 mb-6">
                     <ul className="text-xs text-gray-300 space-y-3">
                         <li className="flex gap-2">
+                            <span className="text-yellow-400 font-bold">IMPORTANTE:</span>
+                            <span>Asegúrate de que TODOS los partidos de la jornada anterior están <strong>FINALIZADOS</strong> y tienen estadísticas. Si no, los precios se desplomarán.</span>
+                        </li>
+                        <li className="flex gap-2">
                             <span className="text-green-400 font-bold">1. Mercado:</span>
-                            <span>Se actualizarán los precios.</span>
+                            <span>Se actualizarán los precios según rendimiento.</span>
                         </li>
                         <li className="flex gap-2">
                             <span className="text-blue-400 font-bold">2. Equipos:</span>
-                            <span>Los usuarios mantienen sus jugadores y <strong>mantienen su precio de compra original</strong> (si no los venden).</span>
+                            <span>Los usuarios mantienen sus jugadores y <strong>mantienen su precio protegido</strong> (si subió) o reciben el descuento (si bajó).</span>
                         </li>
                     </ul>
                 </div>
@@ -680,15 +712,15 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                 <div className="flex justify-end gap-3">
                     <button onClick={() => setPendingRoundChange(null)} className="px-4 py-2.5 rounded-lg bg-gray-800 text-gray-300 font-bold text-xs uppercase">Cancelar</button>
                     <button onClick={executeRoundChange} className="px-6 py-2.5 rounded-lg bg-red-600 text-white font-bold text-xs uppercase flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4" /> Confirmar
+                        <CheckCircle2 className="w-4 h-4" /> Confirmar Transición
                     </button>
                 </div>
             </div>
         </div>
+    
       )}
 
       {/* ... Header and Tabs Code ... */}
-      {/* Omitted for brevity in XML as it duplicates the previous block structure mostly, focusing on the changes */}
       
       {/* MAIN CONTENT */}
       
@@ -823,7 +855,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                 </div>
             ) : (
                 <>
-                    <div className="sticky top-[70px] z-40 bg-[#091428]/95 backdrop-blur-md border-y border-gray-700 shadow-xl mb-6 -mx-4 px-4 py-3 sm:rounded-xl sm:border sm:mx-0 transition-colors duration-500">
+                    <div className="bg-[#091428]/95 backdrop-blur-md border-y border-gray-700 shadow-xl mb-6 -mx-4 px-4 py-3 sm:rounded-xl sm:border sm:mx-0 transition-colors duration-500">
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-5xl mx-auto">
                                 <div className="flex-1 w-full sm:w-auto">
                                     <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1.5">
