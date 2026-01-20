@@ -391,14 +391,34 @@ export const dataService = {
                     score: data.score
                 };
             } else if (round > 1) {
+                // FALLBACK: INHERITANCE FROM PREVIOUS ROUND
                 const prevRound = round - 1;
                 const prevDocRef = doc(db, "users", userId, "fantasy_rounds", `round_${prevRound}`);
                 const prevSnap = await getDoc(prevDocRef);
 
                 if (prevSnap.exists()) {
                     const data = prevSnap.data();
+                    const inheritedTeam: Record<Role, FantasySlot> = {
+                        [Role.TOP]: { playerId: null }, [Role.JUNGLE]: { playerId: null }, [Role.MID]: { playerId: null }, 
+                        [Role.ADC]: { playerId: null }, [Role.SUPPORT]: { playerId: null }
+                    };
+                    const rawTeam = data.team || {};
+                    
+                    // Normalize inherited data if it was in legacy string format
+                    // IMPORTANT: If legacy, we can't recover the old price easily, so purchaseCost will be undefined.
+                    // The UI handles undefined purchaseCost by falling back to current price (so price hike applies to legacy).
+                    // This encourages users to open the app and "lock in" new teams to get price protection moving forward.
+                    Object.keys(rawTeam).forEach(key => {
+                        const val = rawTeam[key];
+                        if (typeof val === 'string' || val === null) {
+                            inheritedTeam[key as Role] = { playerId: val }; 
+                        } else {
+                            inheritedTeam[key as Role] = val;
+                        }
+                    });
+
                     return {
-                        team: data.team, 
+                        team: inheritedTeam, 
                         captain: data.captain,
                         score: 0 
                     };
@@ -406,6 +426,12 @@ export const dataService = {
             }
             return null;
         } catch (e) { return null; }
+    },
+
+    // MANUAL FORCE RECALCULATION WRAPPER
+    async forceRecalculateAll() {
+        const matches = await this.getMatches();
+        await this.recalculateAllFantasyScores(matches);
     },
 
     // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
