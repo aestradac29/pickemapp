@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Match, Team, Player, PlayerGameStats, Role, MatchGame } from '../types';
 import { fantasyService } from '../services/fantasyService';
-import { X, Save, RefreshCw, Trophy, Skull, Target, Swords, HeartHandshake, Crosshair, Droplet, ChevronDown, ChevronUp, Eye, Flame, Activity, RotateCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { extractStatsFromData } from '../services/geminiService'; // Importar servicio IA
+import { X, Save, RefreshCw, Trophy, Skull, Target, Swords, HeartHandshake, Crosshair, Droplet, ChevronDown, ChevronUp, Eye, Flame, Activity, RotateCcw, AlertTriangle, CheckCircle2, Sparkles, FileText } from 'lucide-react';
 import { ROLE_ICONS } from '../constants';
 
 interface StatsEntryModalProps {
@@ -309,14 +310,18 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     const [activeGame, setActiveGame] = useState(1);
 
     // State: Data Structure for ALL games
-    // gamesData = { 1: { winnerId: '...', stats: {...} }, 2: { ... } }
     const [gamesData, setGamesData] = useState<Record<number, { winnerId: string | null, stats: Record<string, PlayerGameStats> }>>({});
     
-    const [showResetConfirm, setShowResetConfirm] = useState(false);
-    
+    // Import AI State
+    const [showImport, setShowImport] = useState(false);
+    const [importText, setImportText] = useState('');
+    const [isImporting, setIsImporting] = useState(false);
+    const [importError, setImportError] = useState<string | null>(null);
+
     // Players lists
     const playersA = allPlayers.filter(p => p.teamId === teamA.id);
     const playersB = allPlayers.filter(p => p.teamId === teamB.id);
+    const matchPlayers = [...playersA, ...playersB];
 
     // Initialize logic
     useEffect(() => {
@@ -328,18 +333,13 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
             });
             setGamesData(loadedData);
         } else {
-            // Initialize empty structure
-            // If match.stats exists (legacy or aggregate), we DO NOT use it to seed specific games
-            // because we don't know which game it belongs to. Start fresh for detailed entry.
-            // UNLESS it's a BO1, then we can assume aggregate = game 1
             const initialData: Record<number, any> = {};
             
             for (let i = 1; i <= numGames; i++) {
-                // If BO1 and we have stats, use them for Game 1
                 const useExistingStats = (i === 1 && numGames === 1 && match.stats);
                 
                 const statsMap: Record<string, PlayerGameStats> = {};
-                [...playersA, ...playersB].forEach(p => {
+                matchPlayers.forEach(p => {
                     if (useExistingStats && match.stats && match.stats[p.id]) {
                         statsMap[p.id] = { ...match.stats[p.id] };
                     } else {
@@ -431,6 +431,63 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
         );
     };
 
+    // --- AUTO IMPORT LOGIC (GEMINI) ---
+    const handleAutoImport = async () => {
+        if (!importText) {
+            setImportError("Por favor introduce el texto de las estadísticas.");
+            return;
+        }
+
+        setIsImporting(true);
+        setImportError(null);
+
+        try {
+            let dataToProcess = importText;
+
+            if (!dataToProcess) {
+                 throw new Error("No hay datos para procesar.");
+            }
+
+            // Llamada a Gemini
+            const extractedStats = await extractStatsFromData(dataToProcess, matchPlayers);
+            
+            // Merge results into current game
+            setGamesData(prev => {
+                const currentGameData = prev[activeGame];
+                const newStatsMap = { ...currentGameData.stats };
+                let newWinnerId = currentGameData.winnerId;
+
+                Object.keys(extractedStats).forEach(playerId => {
+                    if (newStatsMap[playerId]) {
+                        newStatsMap[playerId] = {
+                            ...newStatsMap[playerId],
+                            ...extractedStats[playerId]
+                        };
+                    }
+                });
+
+                // Recalcular puntos con los nuevos datos
+                Object.keys(newStatsMap).forEach(pid => {
+                    recalculatePlayerPoints(newStatsMap[pid], newWinnerId);
+                });
+
+                return {
+                    ...prev,
+                    [activeGame]: { ...currentGameData, stats: newStatsMap }
+                };
+            });
+
+            setShowImport(false);
+            setImportText('');
+
+        } catch (err: any) {
+            console.error(err);
+            setImportError(err.message || "Error al procesar con IA.");
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     const handleSave = () => {
         // Transform internal state to array
         const gamesList: MatchGame[] = [];
@@ -438,10 +495,6 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
         Object.keys(gamesData).forEach(key => {
             const gameId = parseInt(key);
             const data = gamesData[gameId];
-            
-            // Only save games that have data (e.g. winner selected or some stats changed)
-            // Or save all for simplicity, the service handles aggregation.
-            // Let's check if "winnerId" is set or any points > 0 to identify "played" games
             const hasData = data.winnerId !== null || Object.values(data.stats).some((s: PlayerGameStats) => s.totalPoints !== 0);
             
             if (hasData) {
@@ -462,8 +515,70 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
 
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-            <div className="w-full max-w-5xl bg-[#091428] border-2 border-red-500 rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh]">
+            <div className="w-full max-w-5xl bg-[#091428] border-2 border-red-500 rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh] relative">
                 
+                {/* AI Import Modal Overlay */}
+                {showImport && (
+                    <div className="absolute inset-0 z-50 bg-black/95 flex items-center justify-center p-8 animate-in fade-in">
+                        <div className="w-full max-w-lg bg-[#0f1d36] border border-[#c8aa6e] rounded-xl p-6 shadow-2xl">
+                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-[#c8aa6e]" />
+                                Importar con IA
+                            </h3>
+                            
+                            <div className="text-xs text-gray-400 mb-4 space-y-2">
+                                <p>
+                                    Copia todo el texto de la página de estadísticas (Ctrl+A, Ctrl+C) y pégalo abajo. (Recomendado: Gol.gg o web oficial).
+                                </p>
+                                <div className="p-2 bg-yellow-900/20 border border-yellow-500/30 rounded text-yellow-200/80">
+                                    <span className="font-bold text-yellow-400">IMPORTANTE:</span> La IA rellena K/D/A, Farm y DPM.
+                                    Debes completar manualmente:
+                                    <ul className="list-disc list-inside mt-1 ml-1 text-[10px] space-y-0.5 text-gray-300">
+                                        <li>Equipo Ganador, MVP y Primera Sangre.</li>
+                                        <li>Dragones y Barones (en el Jungla).</li>
+                                        <li>1er Dragón (en el Support).</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1 flex items-center gap-2">
+                                        <FileText className="w-3 h-3" /> Texto / HTML Pegado
+                                    </label>
+                                    <textarea 
+                                        placeholder="Pega aquí el contenido de la web..." 
+                                        className="w-full bg-black/50 border border-gray-700 rounded p-2 text-white text-xs font-mono h-48 focus:border-[#c8aa6e] outline-none resize-none"
+                                        value={importText}
+                                        onChange={(e) => setImportText(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            {importError && (
+                                <div className="mt-4 p-2 bg-red-900/50 border border-red-500 text-red-200 text-xs rounded flex items-center gap-2">
+                                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                                    {importError}
+                                </div>
+                            )}
+
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button onClick={() => setShowImport(false)} className="px-4 py-2 rounded text-gray-400 hover:text-white transition-colors text-xs font-bold uppercase">
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={handleAutoImport}
+                                    disabled={isImporting}
+                                    className="px-6 py-2 rounded bg-[#c8aa6e] text-[#0a1428] font-bold text-xs uppercase flex items-center gap-2 hover:bg-[#e0c285] disabled:opacity-50"
+                                >
+                                    {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                    {isImporting ? 'Analizando...' : 'Procesar Datos'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Header */}
                 <div className="p-4 bg-red-900/20 border-b border-red-500/30">
                     <div className="flex justify-between items-center mb-4">
@@ -478,9 +593,17 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                                 <span className="text-xs bg-black/30 px-2 py-1 rounded border border-gray-700 text-gray-400">BO{numGames}</span>
                             </div>
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white">
-                            <X className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={() => setShowImport(true)}
+                                className="px-3 py-1.5 bg-[#c8aa6e]/10 border border-[#c8aa6e]/50 text-[#c8aa6e] rounded text-xs font-bold uppercase flex items-center gap-2 hover:bg-[#c8aa6e]/20 transition-all"
+                            >
+                                <Sparkles className="w-3 h-3" /> Importar IA
+                            </button>
+                            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Game Tabs */}
@@ -502,7 +625,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                                 >
                                     Partida {i}
                                     {hasWinner && <span className="ml-2 text-green-400">✓</span>}
-                                    {isActive && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#091428]"></div>} {/* Cover border bottom */}
+                                    {isActive && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#091428]"></div>}
                                 </button>
                             );
                         })}
