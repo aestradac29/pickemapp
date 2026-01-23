@@ -360,6 +360,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
   const [historyScores, setHistoryScores] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -385,6 +386,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
               });
               setOriginalTeam(null);
               setMyCaptain(null);
+              setValidationError(null);
 
               try {
                   await loadFantasyTeam(viewRoundId, viewingUserId);
@@ -494,12 +496,14 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
     if (!playerId && myCaptain && myTeam[role].playerId === myCaptain) {
         setMyCaptain(null);
     }
-    setSaveStatus('idle'); 
+    setSaveStatus('idle');
+    setValidationError(null);
   };
 
   const handleSetCaptain = (playerId: string) => {
       if (viewingUserId === currentUserId && !roundLocked && viewRoundId === activeConfigRound) {
           setMyCaptain(playerId);
+          setValidationError(null);
           setSaveStatus('idle');
       }
   };
@@ -519,8 +523,16 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
   };
 
   const handleSave = async () => {
+    setValidationError(null); // Clear errors
     if (!currentUserId || viewingUserId !== currentUserId || roundLocked || viewRoundId !== activeConfigRound) return;
     
+    // Check Captain Selected
+    if (!myCaptain) {
+        setValidationError("⚠️ Debes seleccionar un Capitán para tu equipo antes de guardar.");
+        setSaveStatus('idle');
+        return;
+    }
+
     // Validate budget using effective cost (auto-lowered)
     let currentTotalCost = 0;
     (Object.values(myTeam) as FantasySlot[]).forEach(slot => {
@@ -528,7 +540,8 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
     });
 
     if (currentTotalCost > MAX_BUDGET) {
-        alert("Presupuesto excedido. No se puede guardar.");
+        setValidationError("Presupuesto excedido. No se puede guardar.");
+        setSaveStatus('idle');
         return;
     }
 
@@ -752,7 +765,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                 </div>
                 
                 <div className="p-6 space-y-8 bg-[#091428] text-sm text-gray-300">
-                    
+                    {/* ... (Rules content preserved) ... */}
                     {/* General Stats */}
                     <div>
                         <h3 className="text-[#0ac8b9] font-bold uppercase tracking-wider mb-3 border-b border-[#0ac8b9]/30 pb-1">Estadísticas Base</h3>
@@ -1085,7 +1098,15 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                     </div>
 
                     {!isViewLocked && (
-                        <div className="mt-8 flex justify-center">
+                        <div className="mt-8 flex flex-col items-center gap-4">
+                            {/* VALIDATION MESSAGE */}
+                            {validationError && (
+                                <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-2 rounded-lg flex items-center gap-2 animate-in slide-in-from-bottom-2">
+                                    <AlertTriangle className="w-5 h-5" />
+                                    <span className="font-bold text-sm">{validationError}</span>
+                                </div>
+                            )}
+
                             <button 
                                 onClick={handleSave}
                                 disabled={isSaving || isOverBudget}
