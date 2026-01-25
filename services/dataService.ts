@@ -197,6 +197,7 @@ export const dataService = {
             const updatedPlayers = playersList.map(player => {
                 let totalKills = 0, totalDeaths = 0, totalAssists = 0, totalPoints = 0, gamesPlayed = 0;
                 let highlight: string | undefined = undefined;
+                let lastMatchPoints: number | undefined = undefined;
 
                 const sortedMatches = matches.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
@@ -210,6 +211,12 @@ export const dataService = {
                         totalDeaths += s.deaths;
                         totalAssists += s.assists;
                         totalPoints += s.totalPoints;
+                        
+                        // Set lastMatchPoints on the first valid match found (most recent)
+                        if (lastMatchPoints === undefined) {
+                            lastMatchPoints = s.totalPoints;
+                        }
+
                         gamesPlayed++;
 
                         if (!highlight) {
@@ -241,6 +248,7 @@ export const dataService = {
                     kda: parseFloat(kda.toFixed(2)),
                     averagePoints: parseFloat(averagePoints.toFixed(1)),
                     totalPoints: parseFloat(totalPoints.toFixed(1)),
+                    lastMatchPoints: lastMatchPoints,
                     highlight: highlight,
                     isHot: isHot
                 };

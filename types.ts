@@ -57,6 +57,7 @@ export interface Player {
   cost: number; // Fantasy cost (CURRENT Market Value)
   averagePoints: number; // Average points per game
   totalPoints?: number; // New: Sum of all points
+  lastMatchPoints?: number; // New: Points from the most recent game
   kda: number; // Kill Death Assist Ratio (Season Cumulative)
   // New Fantasy Fields
   nextOpponentId?: string; // Calculated dynamically based on schedule

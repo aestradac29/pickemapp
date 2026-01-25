@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ROLE_ICONS, FANTASY_SCHEDULE, COUNTRIES } from '../constants';
 import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User } from '../types';
-import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, TrendingDown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole, Skull, Crosshair, Droplet } from 'lucide-react';
+import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, TrendingDown, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole, Skull, Crosshair, Droplet } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { dataService } from '../services/dataService';
 
@@ -182,6 +182,17 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
 
                {/* STATS GRID */}
                <div className="w-full mt-auto space-y-1.5">
+                  {/* NEW: Last Match Points Box */}
+                  <div className="bg-[#0f1923] p-1.5 rounded border border-gray-700 flex flex-col items-center justify-center h-[40px] relative overflow-hidden">
+                      <span className="text-[8px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Última Jornada</span>
+                      <div className="flex items-center gap-1">
+                          <span className={`text-lg font-bold leading-none ${player.lastMatchPoints !== undefined && player.lastMatchPoints > 0 ? 'text-white' : 'text-gray-600'}`}>
+                              {player.lastMatchPoints !== undefined ? player.lastMatchPoints.toFixed(1) : '-'}
+                          </span>
+                          {isCaptain && <span className="text-[8px] text-yellow-500 bg-yellow-900/20 px-1 rounded border border-yellow-700/50">x1.5</span>}
+                      </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-1.5">
                       
                       {/* Price Box with Protection Indicator */}
@@ -213,10 +224,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ role, slot, onSelect, onSetCapt
                       {/* Total Points */}
                       <div className="bg-[#0f1923] p-1.5 rounded border border-gray-700 flex flex-col items-center justify-center h-[50px]">
                           <span className="text-[8px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Total Pts</span>
-                          <div className="flex items-center gap-1">
-                              <span className="text-sm font-bold text-[#c8aa6e]">{player.totalPoints?.toFixed(1) || '0.0'}</span>
-                              {isCaptain && <span className="text-[8px] text-yellow-500 bg-yellow-900/20 px-1 rounded border border-yellow-700/50">x1.5</span>}
-                          </div>
+                          <span className="text-sm font-bold text-[#c8aa6e]">{player.totalPoints?.toFixed(1) || '0.0'}</span>
                       </div>
 
                       {/* KDA Box */}
@@ -589,7 +597,6 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
     }
   };
 
-  // ... (Admin Actions: toggleLock, forceRecalc, changeRound remain the same) ...
   const handleToggleLock = async () => {
       if (!isAdmin) return;
       const newStatus = !roundLocked;
@@ -680,7 +687,6 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
       }).filter(Boolean);
   };
 
-  // ... (Leaderboard calculations remain same) ...
   const totalLeaderboard = useMemo(() => {
       return [...allUsers]
           .sort((a, b) => (b.scoreBreakdown.fantasy || 0) - (a.scoreBreakdown.fantasy || 0))
@@ -765,7 +771,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                 </div>
                 
                 <div className="p-6 space-y-8 bg-[#091428] text-sm text-gray-300">
-                    {/* ... (Rules content preserved) ... */}
+                    
                     {/* General Stats */}
                     <div>
                         <h3 className="text-[#0ac8b9] font-bold uppercase tracking-wider mb-3 border-b border-[#0ac8b9]/30 pb-1">Estadísticas Base</h3>
