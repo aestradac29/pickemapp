@@ -1,14 +1,6 @@
+
 import { auth, db } from '../lib/firebase';
-import { 
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword, 
-    signOut as firebaseSignOut,
-    updateProfile,
-    onAuthStateChanged,
-    sendPasswordResetEmail,
-    updatePassword,
-    User
-} from "firebase/auth";
+import * as Auth from "firebase/auth";
 import { doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 // Helper para notificar cambios de auth
@@ -17,7 +9,7 @@ type AuthListener = (user: any | null) => void;
 export const authService = {
     // Suscribirse a cambios de sesión (Login/Logout) usando el SDK de Firebase
     onAuthStateChange(listener: AuthListener) {
-        return onAuthStateChanged(auth, async (firebaseUser) => {
+        return Auth.onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
                 // Obtener datos adicionales del perfil en Firestore
                 const userProfile = await this.getUserProfile(firebaseUser.uid);
@@ -41,11 +33,11 @@ export const authService = {
     // Registro
     async signUp(email: string, password: string, username: string) {
         // 1. Crear usuario en Auth
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await Auth.createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
         // 2. Actualizar perfil básico
-        await updateProfile(user, {
+        await Auth.updateProfile(user, {
             displayName: username,
             photoURL: `https://ui-avatars.com/api/?name=${username}&background=random`
         });
@@ -87,18 +79,18 @@ export const authService = {
              }
         }
 
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await Auth.signInWithEmailAndPassword(auth, email, password);
         return { user: userCredential.user };
     },
 
     async signOut() {
-        await firebaseSignOut(auth);
+        await Auth.signOut(auth);
     },
 
     // Obtener sesión actual (Promise-based, útil para carga inicial)
     async getCurrentUser() {
         return new Promise((resolve) => {
-            const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            const unsubscribe = Auth.onAuthStateChanged(auth, async (firebaseUser) => {
                 unsubscribe();
                 if (firebaseUser) {
                     const userProfile = await this.getUserProfile(firebaseUser.uid);
@@ -134,12 +126,12 @@ export const authService = {
     },
 
     async resetPasswordForEmail(email: string) {
-        await sendPasswordResetEmail(auth, email);
+        await Auth.sendPasswordResetEmail(auth, email);
     },
 
     async updateUserPassword(newPassword: string) {
         if (auth.currentUser) {
-            await updatePassword(auth.currentUser, newPassword);
+            await Auth.updatePassword(auth.currentUser, newPassword);
         }
     }
 };

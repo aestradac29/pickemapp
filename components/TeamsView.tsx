@@ -160,8 +160,16 @@ const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ player, team, m
                                         <div className="flex items-center gap-0.5 text-[10px] text-gray-500" title="Súbditos">
                                             <Target className="w-3 h-3" /> {game.stats.cs}
                                         </div>
-                                        {game.stats.isMvp && <Trophy className="w-3 h-3 text-yellow-400" title="MVP" />}
-                                        {game.stats.pentaKills > 0 && <Skull className="w-3 h-3 text-purple-400" title="Pentakill" />}
+                                        {game.stats.isMvp && (
+                                            <span title="MVP">
+                                                <Trophy className="w-3 h-3 text-yellow-400" />
+                                            </span>
+                                        )}
+                                        {game.stats.pentaKills > 0 && (
+                                            <span title="Pentakill">
+                                                <Skull className="w-3 h-3 text-purple-400" />
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 
