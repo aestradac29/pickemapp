@@ -35,7 +35,7 @@ export const HallOfFame: React.FC = () => {
                 setPlayers(p);
                 setTeams(t);
                 
-                // Calculate days that have completed matches
+                // Calculate days that have completed matche
                 const daysWithResults = new Set(m.filter(match => match.isCompleted && match.stage === Stage.GROUPS).map(match => match.day || 0));
                 
                 // Merge configured visible days with days that have results (so we can see history even if "closed" in admin)
