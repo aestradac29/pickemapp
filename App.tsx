@@ -15,7 +15,7 @@ export default function TestApi() {
       const token = await auth.currentUser.getIdToken()
 
       // 🌍 2. Llamar a tu Worker
-      const res = await fetch("https://TU-WORKER.workers.dev", {
+      const res = await fetch("https://pickemapp.pages.dev", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
