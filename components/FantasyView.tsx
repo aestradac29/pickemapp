@@ -907,18 +907,42 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                 <div className="flex flex-wrap gap-2 items-center bg-[#0f1d36] p-2 rounded-lg border border-gray-700">
                     <span className="text-[10px] uppercase font-bold text-red-400 mr-2">Admin:</span>
                     
-                    <div className="relative">
-                        <select 
-                            value={activeConfigRound}
-                            onChange={(e) => handleChangeActiveRound(parseInt(e.target.value))}
-                            className="bg-black border border-gray-600 text-white text-xs rounded px-2 py-1 pr-6 cursor-pointer hover:border-white focus:outline-none focus:border-red-500 transition-colors"
-                            disabled={isAdminSaving}
-                        >
-                            {FANTASY_SCHEDULE.map(r => (
-                                <option key={r.id} value={r.id}>Activa: {r.label}</option>
-                            ))}
-                        </select>
-                        {isAdminSaving && <div className="absolute right-1 top-1.5"><Loader2 className="w-3 h-3 animate-spin text-white"/></div>}
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <select 
+                                value={pendingRoundChange ?? activeConfigRound}
+                                onChange={(e) => handleChangeActiveRound(parseInt(e.target.value))}
+                                className="bg-black border border-gray-600 text-white text-xs rounded px-2 py-1 pr-6 cursor-pointer hover:border-white focus:outline-none focus:border-red-500 transition-colors"
+                                disabled={isAdminSaving}
+                            >
+                                {FANTASY_SCHEDULE.map(r => (
+                                    <option key={r.id} value={r.id}>Activa: {r.label}</option>
+                                ))}
+                            </select>
+                            {isAdminSaving && <div className="absolute right-1 top-1.5"><Loader2 className="w-3 h-3 animate-spin text-white"/></div>}
+                        </div>
+
+                        {/* Confirmation Actions */}
+                        {pendingRoundChange !== null && pendingRoundChange !== activeConfigRound && (
+                            <>
+                                <button 
+                                    onClick={executeRoundChange}
+                                    className="bg-green-600 hover:bg-green-500 text-white p-1 rounded border border-green-400 shadow-lg animate-in zoom-in"
+                                    title="Confirmar y Procesar cambio de jornada"
+                                    disabled={isAdminSaving}
+                                >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                    onClick={() => setPendingRoundChange(null)}
+                                    className="bg-red-600 hover:bg-red-500 text-white p-1 rounded border border-red-400 shadow-lg animate-in zoom-in"
+                                    title="Cancelar"
+                                    disabled={isAdminSaving}
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </>
+                        )}
                     </div>
 
                     <button 

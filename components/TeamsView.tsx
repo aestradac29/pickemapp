@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { dataService } from '../services/dataService';
 import { Team, Player, Role, Match, Stage } from '../types';
-import { ROLE_ICONS } from '../constants';
-import { Loader2, Users, TrendingUp, TrendingDown, Coins, X, Activity, Target, Skull, Trophy, ListOrdered, LayoutGrid, Minus } from 'lucide-react';
+import { ROLE_ICONS, FANTASY_SCHEDULE } from '../constants';
+import { Loader2, Users, TrendingUp, TrendingDown, Coins, X, Activity, Target, Skull, Trophy, ListOrdered, LayoutGrid, Minus, Calendar, ChevronRight } from 'lucide-react';
 
 interface PlayerHistoryModalProps {
     player: Player;
@@ -194,7 +194,8 @@ export const TeamsView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     
     // Tab State
-    const [activeTab, setActiveTab] = useState<'teams' | 'roles' | 'trends'>('teams');
+    const [activeTab, setActiveTab] = useState<'teams' | 'roles' | 'trends' | 'points'>('teams');
+    const [pointsRoleFilter, setPointsRoleFilter] = useState<Role>(Role.TOP);
 
     // Modal State
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -274,6 +275,41 @@ export const TeamsView: React.FC = () => {
         return result;
     }, [players]);
 
+    // Calculate Points By Round Matrix
+    const pointsByRound = useMemo(() => {
+        const data: Record<string, Record<number, number>> = {};
+
+        players.forEach(p => {
+            data[p.id] = {};
+            FANTASY_SCHEDULE.forEach(round => {
+                let roundPoints = 0;
+                // Find matches for this round that involve this player's team
+                const roundMatches = matches.filter(m =>
+                    (round.stage === Stage.GROUPS ? m.stage === Stage.GROUPS : m.stage !== Stage.GROUPS) &&
+                    round.matchdays.includes(m.day || 0) &&
+                    m.isCompleted &&
+                    (m.teamA.id === p.teamId || m.teamB.id === p.teamId) // Optimization
+                );
+
+                roundMatches.forEach(m => {
+                    // Check aggregate stats (works for legacy and detailed games since saveMatchStatsAndCalculate populates match.stats)
+                    if (m.stats && m.stats[p.id]) {
+                        roundPoints += m.stats[p.id].totalPoints;
+                    }
+                });
+                data[p.id][round.id] = parseFloat(roundPoints.toFixed(1));
+            });
+        });
+        return data;
+    }, [players, matches]);
+
+    // Filtered Players for Points Table
+    const playersForPointsTable = useMemo(() => {
+        return players
+            .filter(p => p.role === pointsRoleFilter)
+            .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+    }, [players, pointsRoleFilter]);
+
     if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 animate-spin text-[#c8aa6e]" /></div>;
 
     return (
@@ -289,19 +325,25 @@ export const TeamsView: React.FC = () => {
                 <div className="flex flex-wrap justify-center bg-[#0f1d36] p-1 rounded-lg border border-gray-700">
                     <button 
                         onClick={() => setActiveTab('teams')}
-                        className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-bold uppercase transition-all ${activeTab === 'teams' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs sm:text-sm font-bold uppercase transition-all ${activeTab === 'teams' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
                     >
                         <LayoutGrid className="w-4 h-4" /> Equipos
                     </button>
                     <button 
                         onClick={() => setActiveTab('roles')}
-                        className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-bold uppercase transition-all ${activeTab === 'roles' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs sm:text-sm font-bold uppercase transition-all ${activeTab === 'roles' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
                     >
-                        <ListOrdered className="w-4 h-4" /> Ranking por Rol
+                        <ListOrdered className="w-4 h-4" /> Ranking
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('points')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs sm:text-sm font-bold uppercase transition-all ${activeTab === 'points' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <Calendar className="w-4 h-4" /> Puntos/Jornada
                     </button>
                     <button 
                         onClick={() => setActiveTab('trends')}
-                        className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-bold uppercase transition-all ${activeTab === 'trends' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs sm:text-sm font-bold uppercase transition-all ${activeTab === 'trends' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
                     >
                         <TrendingUp className="w-4 h-4" /> Tendencias
                     </button>
@@ -550,6 +592,104 @@ export const TeamsView: React.FC = () => {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* TAB: POINTS PER ROUND (NEW) */}
+            {activeTab === 'points' && (
+                <div className="max-w-6xl mx-auto animate-in fade-in">
+                    
+                    {/* Role Filter for Points Table */}
+                    <div className="flex justify-center mb-6 overflow-x-auto no-scrollbar py-2">
+                        <div className="flex gap-2 bg-[#0f1d36] p-1 rounded-full border border-gray-700">
+                            {Object.values(Role).map(role => (
+                                <button
+                                    key={role}
+                                    onClick={() => setPointsRoleFilter(role)}
+                                    className={`
+                                        flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase transition-all whitespace-nowrap
+                                        ${pointsRoleFilter === role 
+                                            ? 'bg-[#c8aa6e] text-[#0a1428] shadow-lg' 
+                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        }
+                                    `}
+                                >
+                                    <img src={ROLE_ICONS[role]} className={`w-3 h-3 ${pointsRoleFilter === role ? 'opacity-100' : 'opacity-50 grayscale'}`} />
+                                    {role}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm border-collapse">
+                                <thead className="bg-[#0f1d36] text-gray-400 text-xs font-bold uppercase">
+                                    <tr>
+                                        <th className="p-3 w-12 text-center sticky left-0 bg-[#0f1d36] z-10">#</th>
+                                        <th className="p-3 sticky left-12 bg-[#0f1d36] z-10 border-r border-gray-700">Jugador</th>
+                                        <th className="p-3 text-center bg-[#1a2c4e] text-white border-x border-gray-700 min-w-[80px]">Total</th>
+                                        {FANTASY_SCHEDULE.map(r => (
+                                            <th key={r.id} className="p-3 text-center min-w-[60px] whitespace-nowrap">
+                                                {r.stage === Stage.GROUPS ? `J${r.matchdays.join('-')}` : `PO${r.id - 4}`}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-800">
+                                    {playersForPointsTable.map((p, index) => {
+                                        const rank = index + 1;
+                                        const team = teams[p.teamId];
+                                        return (
+                                            <tr key={p.id} onClick={() => setSelectedPlayer(p)} className="hover:bg-[#1a2c4e] cursor-pointer transition-colors group">
+                                                {/* Rank */}
+                                                <td className="p-3 text-center text-gray-500 font-mono sticky left-0 bg-[#091428] group-hover:bg-[#1a2c4e]">
+                                                    {rank}
+                                                </td>
+                                                
+                                                {/* Player Info */}
+                                                <td className="p-3 sticky left-12 bg-[#091428] group-hover:bg-[#1a2c4e] border-r border-gray-800">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden border border-gray-700 flex-shrink-0">
+                                                            <img 
+                                                                src={p.photo || ROLE_ICONS[p.role]} 
+                                                                className="w-full h-full object-cover transform scale-110 pt-1" 
+                                                                onError={(e) => (e.target as HTMLImageElement).src = ROLE_ICONS[p.role]}
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="font-bold text-gray-200 truncate group-hover:text-white">{p.name}</span>
+                                                            <span className="text-[10px] text-gray-500 uppercase flex items-center gap-1">
+                                                                {team?.shortName}
+                                                                <span className="w-1 h-1 rounded-full bg-gray-600"></span>
+                                                                ${p.cost}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                {/* Total Points */}
+                                                <td className="p-3 text-center font-bold text-[#c8aa6e] bg-[#0f1923] group-hover:bg-[#1f2e46] border-x border-gray-800">
+                                                    {p.totalPoints?.toFixed(1) || '0.0'}
+                                                </td>
+
+                                                {/* Round Columns */}
+                                                {FANTASY_SCHEDULE.map(r => {
+                                                    const pts = pointsByRound[p.id]?.[r.id] || 0;
+                                                    const hasPlayed = pts !== 0;
+                                                    return (
+                                                        <td key={r.id} className={`p-3 text-center font-mono ${hasPlayed ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {hasPlayed ? pts.toFixed(1) : '-'}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             )}
 

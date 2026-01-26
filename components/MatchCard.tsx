@@ -9,6 +9,8 @@ interface MatchCardProps {
   onSelectWinner: (matchId: string, teamId: string) => void;
   isDayLocked?: boolean; // Prop para bloqueo global de jornada
   customTitle?: string; // Nuevo prop para mostrar "R1 1", "L-SEMI", etc.
+  teamARecord?: string; // Nuevo: Record del equipo A (ej: "3-0")
+  teamBRecord?: string; // Nuevo: Record del equipo B
   // Admin Props
   isEditing?: boolean;
   teams?: Team[]; // Required for editing dropdowns
@@ -26,7 +28,8 @@ const TeamButton = ({
     match, 
     isEditing, 
     isLocked, 
-    onSelect 
+    onSelect,
+    record
 }: { 
     team: Team; 
     isSelected: boolean; 
@@ -34,6 +37,7 @@ const TeamButton = ({
     isEditing: boolean;
     isLocked: boolean;
     onSelect: (id: string, teamId: string) => void; 
+    record?: string;
 }) => {
     // Determinar si es el ganador oficial
     const isWinner = match.winnerId === team.id;
@@ -79,9 +83,16 @@ const TeamButton = ({
             </div>
         </div>
         
-        <span className={`font-bold text-lg ${isSelected ? (isWrongPick ? 'text-red-500' : 'text-hextech-500') : 'text-gray-300'}`}>
-          {team.shortName}
-        </span>
+        <div className="flex flex-col items-center">
+            <span className={`font-bold text-lg leading-none ${isSelected ? (isWrongPick ? 'text-red-500' : 'text-hextech-500') : 'text-gray-300'}`}>
+            {team.shortName}
+            </span>
+            {record && (
+                <span className="text-[10px] font-bold text-gray-500 mt-1 bg-black/30 px-1.5 rounded">
+                    {record}
+                </span>
+            )}
+        </div>
         
         {/* Indicators */}
         {isSelected && !match.isCompleted && (
@@ -111,6 +122,8 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     onSelectWinner,
     isDayLocked = false,
     customTitle,
+    teamARecord,
+    teamBRecord,
     isEditing = false,
     teams = [],
     onUpdate,
@@ -486,6 +499,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             isEditing={isEditing}
             isLocked={isLocked}
             onSelect={onSelectWinner}
+            record={teamARecord}
           />
           
           <div className="flex flex-col items-center justify-center gap-2">
@@ -511,6 +525,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             isEditing={isEditing}
             isLocked={isLocked}
             onSelect={onSelectWinner}
+            record={teamBRecord}
           />
         </div>
       </div>

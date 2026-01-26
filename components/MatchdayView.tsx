@@ -91,6 +91,39 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }, [allMatches, currentDay]);
 
+  // Calculate Standing Records (Wins-Losses) based on ALL completed regular season matches
+  const teamRecords = useMemo(() => {
+      const records: Record<string, { w: number, l: number }> = {};
+      
+      // Initialize for all known teams
+      allTeams.forEach(t => {
+          records[t.id] = { w: 0, l: 0 };
+      });
+
+      // Filter for completed Regular Season matches
+      const completedMatches = allMatches.filter(m => 
+          m.stage === Stage.GROUPS && m.isCompleted && m.winnerId
+      );
+
+      completedMatches.forEach(m => {
+          if (m.winnerId) {
+              // Ensure record object exists (for teams added later or not in initial list)
+              if (!records[m.teamA.id]) records[m.teamA.id] = { w: 0, l: 0 };
+              if (!records[m.teamB.id]) records[m.teamB.id] = { w: 0, l: 0 };
+
+              if (m.winnerId === m.teamA.id) {
+                  records[m.teamA.id].w++;
+                  records[m.teamB.id].l++;
+              } else {
+                  records[m.teamB.id].w++;
+                  records[m.teamA.id].l++;
+              }
+          }
+      });
+
+      return records;
+  }, [allMatches, allTeams]);
+
   // Robust check for unsaved changes using actual match data logic instead of ID string parsing
   const checkUnsavedChanges = (day: number) => {
     // 1. Obtener los IDs de los partidos que pertenecen a este día Y son de fase regular
@@ -457,21 +490,31 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                         </p>
                     </div>
                 ) : (
-                    matches.map(match => (
-                        <MatchCard 
-                            key={match.id} 
-                            match={match}
-                            teams={allTeams}
-                            selectedWinnerId={predictions.find(p => p.matchId === match.id)?.predictedWinnerId}
-                            onSelectWinner={handleSelectWinner}
-                            isEditing={isEditMode}
-                            isDayLocked={isLockedForUser} 
-                            onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
-                            onDelete={() => handleAdminDelete(match.id)}
-                            onEditStats={(m) => setStatsMatch(m)}
-                            onViewStats={(m) => setViewStatsMatch(m)}
-                        />
-                    ))
+                    matches.map(match => {
+                        // Get records from calculated map
+                        const recA = teamRecords[match.teamA.id];
+                        const recB = teamRecords[match.teamB.id];
+                        const strRecA = recA ? `${recA.w}-${recA.l}` : undefined;
+                        const strRecB = recB ? `${recB.w}-${recB.l}` : undefined;
+
+                        return (
+                            <MatchCard 
+                                key={match.id} 
+                                match={match}
+                                teams={allTeams}
+                                selectedWinnerId={predictions.find(p => p.matchId === match.id)?.predictedWinnerId}
+                                onSelectWinner={handleSelectWinner}
+                                isEditing={isEditMode}
+                                isDayLocked={isLockedForUser}
+                                teamARecord={strRecA}
+                                teamBRecord={strRecB}
+                                onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
+                                onDelete={() => handleAdminDelete(match.id)}
+                                onEditStats={(m) => setStatsMatch(m)}
+                                onViewStats={(m) => setViewStatsMatch(m)}
+                            />
+                        );
+                    })
                 )}
 
                 {newMatch && (
