@@ -10,12 +10,12 @@ import { getFirestore } from "firebase/firestore";
 // 4. Copia las credenciales aquí:
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAVFP9bRb8GZ-PzLI1BqCaPVfiS1P2l38c",
-  authDomain: "pickem-des.firebaseapp.com",
-  projectId: "pickem-des",
-  storageBucket: "pickem-des.firebasestorage.app",
-  messagingSenderId: "515907119194",
-  appId: "1:515907119194:web:ef5f55d5ee2900b7fd9063",
+  apiKey: "AIzaSyBQYpUJcE7zi7RAjNTF4qj4Jflq4vpD-rM",
+  authDomain: "pickem-pro-ab471.firebaseapp.com",
+  projectId: "pickem-pro-ab471",
+  storageBucket: "pickem-pro-ab471.firebasestorage.app",
+  messagingSenderId: "39093532180",
+  appId: "1:39093532180:web:5786502cf51322fe915901"
 };
 
 // Inicializar Firebase
