@@ -15,7 +15,7 @@ const firebaseConfig = {
   projectId: "pickem-pro-ab471",
   storageBucket: "pickem-pro-ab471.firebasestorage.app",
   messagingSenderId: "39093532180",
-  appId: "1:39093532180:web:5786502cf51322fe915901",
+  appId: "1:39093532180:web:5786502cf51322fe915901"
 };
 
 // Inicializar Firebase
