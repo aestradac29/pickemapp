@@ -4,7 +4,6 @@ import * as Auth from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Add global type augmentation for ImportMeta to fix TypeScript errors
-// when vite/client types are not explicitly included in tsconfig.
 declare global {
   interface ImportMeta {
     env: any;
@@ -15,28 +14,34 @@ declare global {
 
 let firebaseConfig;
 
-// Lógica de separación de entornos (Build-Time)
-// Al usar import.meta.env.PROD, el empaquetador (Vite) eliminará el código del 'else'
-// cuando construya la versión para producción en Vercel.
-// Las claves de desarrollo NO aparecerán en el código final de la web pública.
-
-// Fix: Check if import.meta.env exists to prevent crashes in environments without Vite injection (like AI Studio preview)
+// 1. Detectar si estamos en Producción
 const isProd = typeof import.meta.env !== 'undefined' && import.meta.env.PROD;
 
-if (isProd) {
+// 2. Verificar si las variables de entorno de Vercel existen
+// NOTA: Vite requiere que las variables empiecen por VITE_
+const env = import.meta.env || {};
+const hasProdKeys = isProd && !!env.VITE_FIREBASE_API_KEY;
+
+if (hasProdKeys) {
   // --- PRODUCCIÓN (VERCEL) ---
-  // Estas variables DEBEN estar configuradas en Vercel > Settings > Environment Variables
+  console.log("🔥 Firebase: Usando configuración de Producción");
   firebaseConfig = {
-    apiKey: import.meta.env.FIREBASE_API_KEY,
-    authDomain: import.meta.env.FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.FIREBASE_APP_ID,
+    apiKey: env.VITE_FIREBASE_API_KEY,
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: env.VITE_FIREBASE_APP_ID,
   };
 } else {
-  // --- DESARROLLO (LOCAL / AI STUDIO) ---
-  // Estas claves solo existen mientras trabajas en el editor.
+  // --- DESARROLLO (LOCAL) O FALLBACK ---
+  if (isProd) {
+      console.warn("⚠️ AVISO: Entorno de Producción detectado pero faltan las variables VITE_FIREBASE_*. Usando configuración de desarrollo (fallback). Asegúrate de REDESPLEGAR en Vercel tras guardar las variables.");
+  } else {
+      console.log("🔧 Firebase: Usando configuración de Desarrollo");
+  }
+
+  // Claves de Desarrollo (Pick'em Des)
   firebaseConfig = {
     apiKey: "AIzaSyAVFP9bRb8GZ-PzLI1BqCaPVfiS1P2l38c",
     authDomain: "pickem-des.firebaseapp.com",
