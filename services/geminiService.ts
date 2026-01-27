@@ -49,7 +49,7 @@ export const extractStatsFromData = async (
   
   // 1. Intentar VITE env vars (Estándar para React+Vite)
   if (typeof import.meta !== 'undefined' && import.meta.env) {
-      apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY || process.env.API_KEY || '';
+      apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY || '';
   }
 
   // 2. Fallback a process.env (Si se define en build time o un polyfill)
