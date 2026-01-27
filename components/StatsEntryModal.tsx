@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Match, Team, Player, PlayerGameStats, Role, MatchGame } from '../types';
 import { fantasyService } from '../services/fantasyService';
-import { X, Save, RefreshCw, Trophy, Skull, Target, Swords, HeartHandshake, Crosshair, Droplet, ChevronDown, ChevronUp, Eye, Flame, Activity, CheckCircle2 } from 'lucide-react';
+import { extractStatsFromData } from '../services/geminiService';
+import { X, Save, RefreshCw, Trophy, Skull, Target, Swords, HeartHandshake, Crosshair, Droplet, ChevronDown, ChevronUp, Eye, Flame, Activity, CheckCircle2, Bot, FileText, Download, Sparkles, AlertTriangle, Crown } from 'lucide-react';
 import { ROLE_ICONS } from '../constants';
 
 interface StatsEntryModalProps {
@@ -311,6 +312,11 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     // State: Data Structure for ALL games
     const [gamesData, setGamesData] = useState<Record<number, { winnerId: string | null, stats: Record<string, PlayerGameStats> }>>({});
     
+    // Import AI State
+    const [isImporting, setIsImporting] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importText, setImportText] = useState("");
+
     // Players lists
     const playersA = allPlayers.filter(p => p.teamId === teamA.id);
     const playersB = allPlayers.filter(p => p.teamId === teamB.id);
@@ -445,6 +451,50 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
         onSave(gamesList);
     };
 
+    // --- AI IMPORT LOGIC ---
+    const handleAIImport = async () => {
+        if (!importText.trim()) return;
+        
+        setIsImporting(true);
+        try {
+            // Call Gemini service
+            const extractedStats = await extractStatsFromData(importText, matchPlayers);
+            
+            // Merge into current game state
+            setGamesData(prev => {
+                const currentGameData = prev[activeGame];
+                const currentStatsMap = currentGameData.stats;
+                const newStatsMap = { ...currentStatsMap };
+
+                Object.keys(extractedStats).forEach(playerId => {
+                    if (newStatsMap[playerId]) {
+                        const newStats = extractedStats[playerId]!;
+                        // Merge fields carefully
+                        newStatsMap[playerId] = {
+                            ...newStatsMap[playerId],
+                            ...newStats
+                        };
+                        // Recalculate points for this player
+                        recalculatePlayerPoints(newStatsMap[playerId], currentGameData.winnerId);
+                    }
+                });
+
+                return {
+                    ...prev,
+                    [activeGame]: { ...currentGameData, stats: newStatsMap }
+                };
+            });
+
+            setImportText("");
+            setShowImportModal(false);
+        } catch (error) {
+            console.error("AI Import Failed:", error);
+            alert("Falló la importación. Inténtalo de nuevo o revisa la consola.");
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     // Current View Helpers
     const currentStats = gamesData[activeGame]?.stats || {};
     const currentWinner = gamesData[activeGame]?.winnerId;
@@ -468,6 +518,14 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            <button 
+                                onClick={() => setShowImportModal(true)}
+                                className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg hover:shadow-purple-500/30 transition-all hover:scale-105 overflow-hidden"
+                            >
+                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                                <Sparkles className="w-4 h-4 fill-current animate-pulse" />
+                                <span>Importar con IA</span>
+                            </button>
                             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white">
                                 <X className="w-5 h-5" />
                             </button>
@@ -562,6 +620,72 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                         Guardar Serie
                     </button>
                 </div>
+
+                {/* --- AI IMPORT OVERLAY --- */}
+                {showImportModal && (
+                    <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-8 backdrop-blur-sm animate-in fade-in">
+                        <div className="w-full max-w-2xl bg-[#0f1d36] rounded-xl border border-purple-500/50 shadow-2xl p-6 relative">
+                            <button onClick={() => setShowImportModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
+                                <X className="w-5 h-5" />
+                            </button>
+                            
+                            <h3 className="text-xl font-bold text-purple-300 mb-4 flex items-center gap-2">
+                                <Bot className="w-6 h-6" /> Importación Inteligente (Gemini)
+                            </h3>
+
+                            {/* WARNING NOTICE */}
+                            <div className="mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                                <div className="flex items-start gap-3">
+                                    <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                                    <div className="space-y-2">
+                                        <p className="text-sm text-yellow-200 font-bold">
+                                            Verificación Manual Requerida
+                                        </p>
+                                        <p className="text-xs text-yellow-400/80 leading-relaxed">
+                                            La IA extrae KDA y Daño. Por favor, asigna manualmente:
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-gray-400 uppercase font-bold tracking-wide">
+                                            <span className="flex items-center gap-1.5"><Crown className="w-3 h-3 text-yellow-500" /> Ganador del Mapa</span>
+                                            <span className="flex items-center gap-1.5"><Trophy className="w-3 h-3 text-yellow-500" /> MVP</span>
+                                            <span className="flex items-center gap-1.5"><Droplet className="w-3 h-3 text-red-500" /> Primera Sangre</span>
+                                            <span className="flex items-center gap-1.5"><Crosshair className="w-3 h-3 text-green-500" /> Jungla: Objetivos</span>
+                                            <span className="flex items-center gap-1.5"><Eye className="w-3 h-3 text-cyan-500" /> Supp: 1º Dragón</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="mb-4">
+                                <p className="text-sm text-gray-300 mb-2">
+                                    Copia todo el texto de la página de estadísticas (Ctrl+A, Ctrl+C en <strong>gol.gg</strong>) y pégalo aquí.
+                                </p>
+                                <textarea 
+                                    className="w-full h-64 bg-black/50 border border-gray-600 rounded-lg p-4 text-xs font-mono text-gray-300 focus:border-purple-500 outline-none resize-none"
+                                    placeholder="Pega aquí el contenido crudo de la web de estadísticas..."
+                                    value={importText}
+                                    onChange={(e) => setImportText(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3">
+                                <button 
+                                    onClick={() => setShowImportModal(false)}
+                                    className="px-4 py-2 rounded text-gray-400 hover:text-white"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={handleAIImport}
+                                    disabled={isImporting || !importText}
+                                    className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded font-bold flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                    {isImporting ? 'Analizando...' : 'Procesar Datos'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
             </div>
         </div>

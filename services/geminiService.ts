@@ -65,7 +65,7 @@ export const extractStatsFromData = async (
     5. Detecta Multikills (Double, Triple, Quadra, Penta).
     
     Datos a procesar:
-    ${rawData.substring(0, 30000)} 
+    ${rawData.substring(0, 40000)} 
   `;
   // Limitamos caracteres para no exceder tokens si pegan HTML gigante
 
@@ -91,7 +91,8 @@ export const extractStatsFromData = async (
         // Encontrar el jugador en nuestra DB haciendo matching flexible de nombre
         const player = availablePlayers.find(p => 
           p.name.toLowerCase() === extracted.playerName?.toLowerCase() ||
-          extracted.playerName?.toLowerCase().includes(p.name.toLowerCase())
+          extracted.playerName?.toLowerCase().includes(p.name.toLowerCase()) ||
+          p.name.toLowerCase().includes(extracted.playerName?.toLowerCase())
         );
 
         if (player) {
