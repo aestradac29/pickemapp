@@ -1,13 +1,12 @@
+// MOCK SUPABASE LIB
+// Hemos desconectado Supabase para usar LocalStorage como alternativa gratuita y estable.
 
-import { createClient } from '@supabase/supabase-js';
+export const supabase = {
+    auth: {
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+        getUser: async () => ({ data: { user: null } }),
+        signOut: async () => {},
+    }
+} as any;
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-    console.error("Faltan las variables de entorno de Supabase (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)");
-}
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
-
-export const isSupabaseConfigured = () => !!supabaseUrl && !!supabaseKey;
+export const isSupabaseConfigured = () => true; // Always true in local mode
