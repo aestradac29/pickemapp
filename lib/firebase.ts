@@ -4,19 +4,25 @@ import * as Auth from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // --- CONFIGURACIÓN DE FIREBASE ---
-// 1. Ve a console.firebase.google.com
-// 2. Crea un proyecto
-// 3. Añade una App Web
-// 4. Copia las credenciales aquí:
+// Usamos variables de entorno (Vite) para separar Desarrollo de Producción.
+// 1. En local: Crea un archivo .env.local con las credenciales de la BBDD de desarrollo.
+// 2. En Vercel: Añade estas mismas variables en Settings > Environment Variables con los datos de producción.
+
+const env = (import.meta as any).env;
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBQYpUJcE7zi7RAjNTF4qj4Jflq4vpD-rM",
-  authDomain: "pickem-pro-ab471.firebaseapp.com",
-  projectId: "pickem-pro-ab471",
-  storageBucket: "pickem-pro-ab471.firebasestorage.app",
-  messagingSenderId: "39093532180",
-  appId: "1:39093532180:web:5786502cf51322fe915901"
+  apiKey: env.FIREBASE_API_KEY,
+  authDomain: env.FIREBASE_AUTH_DOMAIN,
+  projectId: env.FIREBASE_PROJECT_ID,
+  storageBucket: env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: env.FIREBASE_APP_ID,
 };
+
+// Validación simple para evitar errores silenciosos si faltan las variables
+if (!firebaseConfig.apiKey) {
+  console.warn("⚠️ Firebase Config is missing. Make sure you have set VITE_FIREBASE_... environment variables in .env.local or Vercel.");
+}
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
