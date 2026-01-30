@@ -1,10 +1,21 @@
-
 <!DOCTYPE html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="referrer" content="no-referrer" />
+    
+    <!-- PWA Configuration -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0a1428" />
+    <meta name="background-color" content="#0a1428" />
+    
+    <!-- iOS Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Pick'em Pro" />
+    <link rel="apple-touch-icon" href="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/svg/position-middle.svg">
+
     <title>LoL Pick'em Pro</title>
     
     <!-- Favicon: Hextech Diamond "P" -->
@@ -62,6 +73,8 @@
       body {
         background-color: #0a1428;
         color: #f0e6d2;
+        /* Prevent pull-to-refresh on mobile for app-like feel */
+        overscroll-behavior-y: none;
       }
       /* Custom scrollbar for webkit */
       ::-webkit-scrollbar {
