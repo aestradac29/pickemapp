@@ -158,6 +158,22 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   // Has Stats Data?
   const hasStats = (match.games && match.games.length > 0) || (match.stats && Object.keys(match.stats).length > 0);
 
+  // Calculate Score for Completed Matches
+  let scoreA = 0;
+  let scoreB = 0;
+  if (match.isCompleted) {
+      if (match.games && match.games.length > 0) {
+          match.games.forEach(g => {
+              if (g.winnerId === match.teamA.id) scoreA++;
+              if (g.winnerId === match.teamB.id) scoreB++;
+          });
+      } else if (match.winnerId) {
+          // Fallback for simple BO1
+          if (match.winnerId === match.teamA.id) scoreA = 1;
+          else scoreB = 1;
+      }
+  }
+
   // Sync state with props when match changes
   useEffect(() => {
     setEditState({
@@ -502,8 +518,17 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             record={teamARecord}
           />
           
-          <div className="flex flex-col items-center justify-center gap-2">
-            <span className="text-gray-600 font-bold text-xl italic">VS</span>
+          <div className="flex flex-col items-center justify-center gap-2 min-w-[60px]">
+            {match.isCompleted ? (
+                // SHOW NUMERIC SCORE FOR COMPLETED MATCHES
+                <div className="flex items-center gap-2 text-2xl font-black italic tracking-widest drop-shadow-md">
+                    <span className={scoreA > scoreB ? 'text-green-400' : 'text-gray-500'}>{scoreA}</span>
+                    <span className="text-gray-700 text-base">-</span>
+                    <span className={scoreB > scoreA ? 'text-green-400' : 'text-gray-500'}>{scoreB}</span>
+                </div>
+            ) : (
+                <span className="text-gray-600 font-bold text-xl italic">VS</span>
+            )}
             
             {/* VIEW STATS BUTTON (User Mode) */}
             {match.isCompleted && hasStats && onViewStats && !isEditing && (

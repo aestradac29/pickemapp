@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Match, Team, Stage } from '../types';
 import { Trophy, ShieldAlert, Crown, Clock, Swords, Lock } from 'lucide-react';
@@ -43,10 +44,26 @@ const BracketMatch = ({
     const timeString = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const dateString = dateObj.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
     
+    // CALCULATE SCORE FOR BRACKET
+    let scoreA = 0;
+    let scoreB = 0;
+    if (isFinished) {
+        if (match.games && match.games.length > 0) {
+            match.games.forEach(g => {
+                if (g.winnerId === match.teamA.id) scoreA++;
+                if (g.winnerId === match.teamB.id) scoreB++;
+            });
+        } else if (match.winnerId) {
+            if (match.winnerId === match.teamA.id) scoreA = 1;
+            else scoreB = 1;
+        }
+    }
+
     const renderTeam = (team: Team, isTeamA: boolean) => {
         const isSelected = prediction === team.id;
         const isWinner = match.winnerId === team.id;
         const isLoser = match.winnerId && match.winnerId !== team.id;
+        const teamScore = isTeamA ? scoreA : scoreB;
         
         const isPlaceholder = !team.id || team.id.toLowerCase().includes('winner') || team.id.toLowerCase().includes('loser') || team.name.includes('Winner') || team.name.includes('Loser') || team.name === 'TBD';
 
@@ -90,7 +107,15 @@ const BracketMatch = ({
                     )}
                     <span className={`text-[10px] truncate ${textClass}`}>{team.name}</span>
                 </div>
-                {isWinner && <Trophy className="w-2.5 h-2.5 text-green-400 flex-shrink-0" />}
+                
+                {/* SHOW SCORE IF FINISHED */}
+                {isFinished && (
+                    <span className={`text-[10px] font-bold ml-1 ${isWinner ? 'text-green-400' : 'text-gray-600'}`}>
+                        {teamScore}
+                    </span>
+                )}
+                
+                {isWinner && <Trophy className="w-2.5 h-2.5 text-green-400 flex-shrink-0 ml-1" />}
             </button>
         );
     };
