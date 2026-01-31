@@ -403,38 +403,40 @@ export const dataService = {
                     captain: data.captain,
                     score: data.score
                 };
-            } else if (round > 1) {
-                // FALLBACK: INHERITANCE FROM PREVIOUS ROUND
-                const prevRound = round - 1;
-                const prevDocRef = doc(db, "users", userId, "fantasy_rounds", `round_${prevRound}`);
-                const prevSnap = await getDoc(prevDocRef);
+            } else {
+                // FALLBACK: INHERITANCE FROM ANY PREVIOUS ROUND
+                // If current round doesn't exist, search backwards for the most recent submitted lineup
+                for (let r = round - 1; r >= 1; r--) {
+                    const prevDocRef = doc(db, "users", userId, "fantasy_rounds", `round_${r}`);
+                    const prevSnap = await getDoc(prevDocRef);
 
-                if (prevSnap.exists()) {
-                    const data = prevSnap.data();
-                    const inheritedTeam: Record<Role, FantasySlot> = {
-                        [Role.TOP]: { playerId: null }, [Role.JUNGLE]: { playerId: null }, [Role.MID]: { playerId: null }, 
-                        [Role.ADC]: { playerId: null }, [Role.SUPPORT]: { playerId: null }
-                    };
-                    const rawTeam = data.team || {};
-                    
-                    Object.keys(rawTeam).forEach(key => {
-                        const val = rawTeam[key];
-                        // IMPORTANT: Carry over the 'purchaseCost' to maintain price protection!
-                        if (typeof val === 'string' || val === null) {
-                            inheritedTeam[key as Role] = { playerId: val }; // Lost protection if legacy, handled in UI
-                        } else {
-                            inheritedTeam[key as Role] = {
-                                playerId: val.playerId,
-                                purchaseCost: val.purchaseCost // THIS IS KEY for protection persistence
-                            };
-                        }
-                    });
+                    if (prevSnap.exists()) {
+                        const data = prevSnap.data();
+                        const inheritedTeam: Record<Role, FantasySlot> = {
+                            [Role.TOP]: { playerId: null }, [Role.JUNGLE]: { playerId: null }, [Role.MID]: { playerId: null }, 
+                            [Role.ADC]: { playerId: null }, [Role.SUPPORT]: { playerId: null }
+                        };
+                        const rawTeam = data.team || {};
+                        
+                        Object.keys(rawTeam).forEach(key => {
+                            const val = rawTeam[key];
+                            // IMPORTANT: Carry over the 'purchaseCost' to maintain price protection!
+                            if (typeof val === 'string' || val === null) {
+                                inheritedTeam[key as Role] = { playerId: val }; 
+                            } else {
+                                inheritedTeam[key as Role] = {
+                                    playerId: val.playerId,
+                                    purchaseCost: val.purchaseCost 
+                                };
+                            }
+                        });
 
-                    return {
-                        team: inheritedTeam, 
-                        captain: data.captain,
-                        score: 0 
-                    };
+                        return {
+                            team: inheritedTeam, 
+                            captain: data.captain,
+                            score: 0 // New round score starts at 0, calculated later
+                        };
+                    }
                 }
             }
             return null;
@@ -586,12 +588,29 @@ export const dataService = {
                 const roundRef = doc(db, "users", user.id, "fantasy_rounds", `round_${roundId}`);
                 const roundSnap = await getDoc(roundRef);
                 
+                // FIND TEAM: Current or Inherited
+                let teamToScore = null;
+                let captainToScore = null;
+
                 if (roundSnap.exists()) {
                     const data = roundSnap.data();
-                    const team = data.team;
-                    const captain = data.captain;
-                    let roundScore = 0;
+                    teamToScore = data.team;
+                    captainToScore = data.captain;
+                } else {
+                    // Try backwards inheritance
+                    for (let r = roundId - 1; r >= 1; r--) {
+                        const prevRef = doc(db, "users", user.id, "fantasy_rounds", `round_${r}`);
+                        const prevSnap = await getDoc(prevRef);
+                        if (prevSnap.exists()) {
+                            teamToScore = prevSnap.data().team;
+                            captainToScore = prevSnap.data().captain;
+                            break; // Found most recent
+                        }
+                    }
+                }
 
+                if (teamToScore) {
+                    let roundScore = 0;
                     const relevantMatches = allMatches.filter(m => {
                         if (roundConfig.stage === Stage.GROUPS) {
                             return m.stage === Stage.GROUPS && roundConfig.matchdays.includes(m.day || 0);
@@ -600,7 +619,7 @@ export const dataService = {
                         }
                     });
 
-                    Object.values(team).forEach((slot: any) => {
+                    Object.values(teamToScore).forEach((slot: any) => {
                         const pid = slot?.playerId || (typeof slot === 'string' ? slot : null);
                         if (pid) {
                             let playerRoundPoints = 0;
@@ -609,12 +628,19 @@ export const dataService = {
                                 playerRoundPoints += points;
                             });
                             
-                            if (pid === captain) playerRoundPoints *= 1.5;
+                            if (pid === captainToScore) playerRoundPoints *= 1.5;
                             roundScore += playerRoundPoints;
                         }
                     });
 
-                    await setDoc(roundRef, { score: parseFloat(roundScore.toFixed(2)) }, { merge: true });
+                    // SAVE THE SCORE (And populate the round doc if it was missing)
+                    await setDoc(roundRef, { 
+                        team: cleanPayload(teamToScore),
+                        captain: captainToScore,
+                        score: parseFloat(roundScore.toFixed(2)),
+                        inherited: !roundSnap.exists() // Flag to know it was auto-filled
+                    }, { merge: true });
+                    
                     totalFantasyScore += roundScore;
                 }
             }
