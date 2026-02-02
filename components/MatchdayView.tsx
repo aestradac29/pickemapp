@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
 import { DaySelector } from './DaySelector';
-import { UserPrediction, Match, Team, Stage, Player } from '../types';
-import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy } from 'lucide-react';
+import { UserPrediction, Match, Team, Stage, Player, User } from '../types';
+import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, LogOut, User as UserIcon } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { TEAMS } from '../constants';
 import { StatsEntryModal } from './StatsEntryModal';
@@ -30,9 +30,14 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   const [allMatches, setAllMatches] = useState<Match[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]); // Need players for stats
+  const [allUsers, setAllUsers] = useState<User[]>([]); // For User Selector
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
 
+  // Viewing State
+  const [viewingUserId, setViewingUserId] = useState<string | null>(currentUserId);
   const [predictions, setPredictions] = useState<UserPrediction[]>(initialPredictions);
+  const [isLoadingPicks, setIsLoadingPicks] = useState(false);
+
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
   
@@ -50,28 +55,32 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   // Stats View State (User)
   const [viewStatsMatch, setViewStatsMatch] = useState<Match | null>(null);
 
-  // Sync state with props (Cloud Data)
+  // Sync state with props (Cloud Data) only if viewing self
   useEffect(() => {
-    setPredictions(initialPredictions);
-  }, [initialPredictions]);
+    if (viewingUserId === currentUserId) {
+        setPredictions(initialPredictions);
+    }
+  }, [initialPredictions, viewingUserId, currentUserId]);
 
-  // Initial Data Load (All Matches + Players)
+  // Initial Data Load (All Matches + Players + Users)
   useEffect(() => {
     const loadData = async () => {
         setIsLoadingMatches(true);
         setNewMatch(null); 
         try {
-            // Cargar TODOS los partidos de una vez para poder calcular cambios en cualquier jornada
-            const [fetchedMatches, teamsMap, config, playersList] = await Promise.all([
+            // Cargar TODOS los datos necesarios
+            const [fetchedMatches, teamsMap, config, playersList, usersList] = await Promise.all([
                 dataService.getMatches(), 
                 dataService.getTeams(),
                 dataService.getDaysConfig(),
-                dataService.getPlayers()
+                dataService.getPlayers(),
+                dataService.getAllUsers()
             ]);
             
             setAllMatches(fetchedMatches);
             setAllTeams(Object.values(teamsMap));
             setAllPlayers(playersList);
+            setAllUsers(usersList);
             
             setVisibleDays(config.visibleDays);
             setClosedDays(config.closedDays);
@@ -84,6 +93,31 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
     loadData();
   }, []);
 
+  // Fetch predictions when viewingUserId changes
+  useEffect(() => {
+      const fetchPicks = async () => {
+          if (!viewingUserId) return;
+          
+          if (viewingUserId === currentUserId) {
+              setPredictions(initialPredictions);
+              return;
+          }
+
+          setIsLoadingPicks(true);
+          try {
+              const userPicks = await dataService.getUserPredictions(viewingUserId);
+              setPredictions(userPicks);
+          } catch (e) {
+              console.error("Error fetching user picks", e);
+              setPredictions([]);
+          } finally {
+              setIsLoadingPicks(false);
+          }
+      };
+      
+      fetchPicks();
+  }, [viewingUserId, currentUserId]);
+
   // Derive matches for current day from allMatches state
   const matches = useMemo(() => {
       return allMatches
@@ -91,26 +125,15 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }, [allMatches, currentDay]);
 
-  // Calculate Standing Records (Wins-Losses) based on ALL completed regular season matches
+  // Calculate Standing Records
   const teamRecords = useMemo(() => {
       const records: Record<string, { w: number, l: number }> = {};
-      
-      // Initialize for all known teams
-      allTeams.forEach(t => {
-          records[t.id] = { w: 0, l: 0 };
-      });
-
-      // Filter for completed Regular Season matches
-      const completedMatches = allMatches.filter(m => 
-          m.stage === Stage.GROUPS && m.isCompleted && m.winnerId
-      );
-
+      allTeams.forEach(t => { records[t.id] = { w: 0, l: 0 }; });
+      const completedMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.isCompleted && m.winnerId);
       completedMatches.forEach(m => {
           if (m.winnerId) {
-              // Ensure record object exists (for teams added later or not in initial list)
               if (!records[m.teamA.id]) records[m.teamA.id] = { w: 0, l: 0 };
               if (!records[m.teamB.id]) records[m.teamB.id] = { w: 0, l: 0 };
-
               if (m.winnerId === m.teamA.id) {
                   records[m.teamA.id].w++;
                   records[m.teamB.id].l++;
@@ -120,27 +143,24 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
               }
           }
       });
-
       return records;
   }, [allMatches, allTeams]);
 
-  // Robust check for unsaved changes using actual match data logic instead of ID string parsing
   const checkUnsavedChanges = (day: number) => {
-    // 1. Obtener los IDs de los partidos que pertenecen a este día Y son de fase regular
+    // Only check unsaved changes for the current user
+    if (viewingUserId !== currentUserId) return false;
+
     const dayMatchIds = allMatches
         .filter(m => m.day === day && m.stage === Stage.GROUPS && !m.id.startsWith('temp-'))
         .map(m => m.id);
 
     if (dayMatchIds.length === 0) return false;
 
-    // 2. Filtrar las predicciones locales e iniciales relevantes para este día
     const currentDayPreds = predictions.filter(p => dayMatchIds.includes(p.matchId));
     const initialDayPreds = initialPredictions.filter(p => dayMatchIds.includes(p.matchId));
     
-    // 3. Comparar cantidades
     if (currentDayPreds.length !== initialDayPreds.length) return true;
 
-    // 4. Comparar contenido (si cambió el ganador)
     return currentDayPreds.some(curr => {
         const init = initialDayPreds.find(i => i.matchId === curr.matchId);
         return !init || init.predictedWinnerId !== curr.predictedWinnerId;
@@ -154,9 +174,13 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   const firstMatchTime = matches.length > 0 ? new Date(matches[0].startTime) : null;
   const isTimeLocked = firstMatchTime ? now >= firstMatchTime : false;
   const isLockedForUser = isManuallyClosed || isTimeLocked;
+  
+  // Derived state for Spectating
+  const isSpectating = viewingUserId !== currentUserId;
+  const viewingUser = allUsers.find(u => u.id === viewingUserId);
 
   const handleSelectWinner = (matchId: string, teamId: string) => {
-    if (isEditMode) return;
+    if (isEditMode || isSpectating) return; // Disable picking if spectating
     if (isLockedForUser) return; 
 
     const match = matches.find(m => m.id === matchId);
@@ -182,10 +206,10 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           teamA: TEAMS.fnc,
           teamB: TEAMS.g2,
           startTime: new Date().toISOString(),
-          stage: Stage.GROUPS, // Force Stage.GROUPS for Matchday View
+          stage: Stage.GROUPS, 
           isCompleted: false,
           day: currentDay,
-          bestOf: 1 // Default BO1
+          bestOf: 1 
       };
       setNewMatch(tempMatch);
   };
@@ -198,7 +222,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                 team_a_id: updates.teamA,
                 team_b_id: updates.teamB,
                 start_time: updates.startTime,
-                stage: Stage.GROUPS, // Explicitly set to GROUPS
+                stage: Stage.GROUPS,
                 status: updates.status,
                 day: currentDay,
                 bestOf: updates.bestOf || 1
@@ -216,17 +240,15 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
              };
              await dataService.updateMatch(matchId, dbUpdates);
           }
-          // Re-fetch ALL to keep state consistent
           const updatedMatches = await dataService.getMatches();
           setAllMatches(updatedMatches);
       } catch (error) {
           console.error("Failed to update/create match:", error);
-          alert("Error actualizando o creando el partido. Comprueba la consola.");
+          alert("Error actualizando o creando el partido.");
       }
   };
 
   const handleAdminDelete = async (matchId: string) => {
-      // Optimistic update
       const originalMatches = [...allMatches];
       setAllMatches(prev => prev.filter(m => m.id !== matchId));
 
@@ -236,13 +258,12 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
               return;
           }
           await dataService.deleteMatch(matchId);
-          // Confirm with server state
           const updatedMatches = await dataService.getMatches();
           setAllMatches(updatedMatches);
       } catch (error: any) {
           console.error("FATAL ERROR deleting match", error);
-          alert("Error crítico al borrar el partido: " + (error.message || JSON.stringify(error)));
-          setAllMatches(originalMatches); // Rollback
+          alert("Error crítico al borrar el partido.");
+          setAllMatches(originalMatches);
       }
   };
 
@@ -271,8 +292,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       setIsSavingStats(true);
       try {
           await dataService.saveMatchStatsAndCalculate(statsMatch.id, games);
-          setStatsMatch(null); // Close modal
-          // Refresh matches to show updated state (e.g. green button?)
+          setStatsMatch(null); 
           const updated = await dataService.getMatches();
           setAllMatches(updated);
       } catch (e) {
@@ -288,14 +308,13 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           alert("Debes iniciar sesión para guardar.");
           return;
       }
-      if (isEditMode) return;
+      if (isEditMode || isSpectating) return;
       
       setIsSaving(true);
       isSavingRef.current = true;
       setSaveStatus('idle');
       setErrorMessage(null);
 
-      // Use matches (filtered for current day) to determine what to save
       const currentDayMatchIds = matches.filter(m => !m.id.startsWith('temp-')).map(m => m.id);
       
       const dayPredictions = predictions
@@ -311,24 +330,19 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
               setIsSaving(false);
               isSavingRef.current = false;
               setSaveStatus('error');
-              setErrorMessage("La conexión es lenta, pero seguimos intentándolo...");
+              setErrorMessage("La conexión es lenta...");
           }
       }, 60000);
 
       try {
           await dataService.savePredictions(dayPredictions);
-          
-          if (onPredictionsSaved) {
-              await onPredictionsSaved();
-          }
-
+          if (onPredictionsSaved) await onPredictionsSaved();
           setSaveStatus('success');
           setTimeout(() => setSaveStatus('idle'), 3000);
       } catch (error: any) {
           console.error("Error saving matchday:", error);
           setSaveStatus('error');
-          const msg = error instanceof Error ? error.message : (typeof error === 'string' ? error : "Error desconocido al guardar");
-          setErrorMessage(msg);
+          setErrorMessage(error.message || "Error al guardar");
       } finally {
           clearTimeout(fallbackTimer);
           setIsSaving(false);
@@ -345,41 +359,66 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   return (
     <div className={`animate-in fade-in slide-in-from-bottom-4 pb-24 transition-all duration-300 ${isEditMode ? 'border-l-4 border-r-4 border-red-900/50 bg-red-950/10 min-h-screen' : ''}`}>
       
-      {/* Header with Day Selector */}
+      {/* Header with Day Selector & User Selector */}
       <div className={`sticky top-0 z-30 pt-4 pb-4 -mx-4 px-4 border-b mb-6 backdrop-blur-md transition-colors ${isEditMode ? 'bg-red-950/90 border-red-800' : 'bg-[#0a1428]/95 border-gray-800'}`}>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-full border ${isEditMode ? 'bg-red-900 border-red-500' : 'bg-blue-900/20 border-blue-500/30'}`}>
                     <CalendarCheck className={`w-5 h-5 ${isEditMode ? 'text-white' : 'text-blue-400'}`} />
                 </div>
                 <div>
                     <h2 className={`text-xl font-bold uppercase tracking-wide ${isEditMode ? 'text-white' : 'text-[#c8aa6e]'}`}>
-                        {isEditMode ? 'MODO ADMINISTRADOR' : 'Fase Regular'}
+                        {isEditMode ? 'ADMINISTRADOR' : 'Fase Regular'}
                     </h2>
                     <p className={`text-[10px] uppercase tracking-widest leading-none ${isEditMode ? 'text-red-300' : 'text-blue-300/60'}`}>
-                        {isEditMode ? 'Editando Datos en Vivo' : 'Winter 2026'}
+                        {isEditMode ? 'Modo Edición' : 'Winter 2026'}
                     </p>
                 </div>
             </div>
 
-            {isAdmin && (
-                <button 
-                    onClick={() => {
-                        setIsEditMode(!isEditMode);
-                        setNewMatch(null); 
-                    }}
-                    className={`
-                        flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border transition-all
-                        ${isEditMode 
-                            ? 'bg-red-600 border-red-400 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)]' 
-                            : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white hover:border-gray-400'
-                        }
-                    `}
-                >
-                    <Settings className={`w-4 h-4 ${isEditMode ? 'animate-spin-slow' : ''}`} />
-                    {isEditMode ? 'Salir' : 'Admin'}
-                </button>
-            )}
+            <div className="flex items-center gap-2">
+                {/* User Selector Dropdown (Shown if viewing allowed) */}
+                {!isEditMode && (
+                    <div className="flex items-center gap-2 bg-[#0f1923] p-1 pr-3 rounded-lg border border-gray-700 max-w-[200px] md:max-w-xs">
+                        <div className="w-8 h-8 rounded bg-black flex items-center justify-center overflow-hidden border border-gray-600 flex-shrink-0">
+                            {viewingUser?.avatar ? (
+                                <img src={viewingUser.avatar} className="w-full h-full object-cover" />
+                            ) : (
+                                <UserIcon className="w-4 h-4 text-gray-500" />
+                            )}
+                        </div>
+                        <select 
+                            value={viewingUserId || ''}
+                            onChange={(e) => setViewingUserId(e.target.value)}
+                            className="bg-transparent text-white text-xs sm:text-sm outline-none font-bold w-full truncate"
+                        >
+                            <option value={currentUserId || ''} className="bg-black text-[#c8aa6e]">Mis Predicciones</option>
+                            {allUsers.filter(u => u.id !== currentUserId).map(u => (
+                                <option key={u.id} value={u.id} className="bg-black">{u.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {isAdmin && (
+                    <button 
+                        onClick={() => {
+                            setIsEditMode(!isEditMode);
+                            setNewMatch(null); 
+                        }}
+                        className={`
+                            flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border transition-all h-10
+                            ${isEditMode 
+                                ? 'bg-red-600 border-red-400 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)]' 
+                                : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white hover:border-gray-400'
+                            }
+                        `}
+                    >
+                        <Settings className={`w-4 h-4 ${isEditMode ? 'animate-spin-slow' : ''}`} />
+                        <span className="hidden sm:inline">{isEditMode ? 'Salir' : 'Admin'}</span>
+                    </button>
+                )}
+            </div>
         </div>
 
         <DaySelector 
@@ -422,6 +461,27 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         )}
       </div>
 
+      {/* Spectator Banner */}
+      {isSpectating && (
+          <div className="mb-6 bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg flex items-center gap-3 animate-in slide-in-from-top-2 mx-4 sm:mx-0">
+              <Eye className="w-5 h-5 text-blue-400" />
+              <div>
+                  <p className="text-sm font-bold text-blue-200 uppercase">Modo Espectador</p>
+                  <p className="text-xs text-blue-300/70">
+                      Viendo predicciones de <span className="font-bold text-white">{viewingUser?.name}</span>. 
+                      Solo verás las de partidos ya iniciados.
+                  </p>
+              </div>
+              <button 
+                  onClick={() => setViewingUserId(currentUserId)}
+                  className="ml-auto p-2 bg-blue-900/40 hover:bg-blue-900/60 rounded-full border border-blue-500/30 text-blue-300 transition-colors"
+                  title="Volver a mi perfil"
+              >
+                  <LogOut className="w-4 h-4" />
+              </button>
+          </div>
+      )}
+
       {/* Matches List */}
       <div className="space-y-6 animate-in fade-in duration-500">
         
@@ -438,7 +498,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     </div>
                 )}
 
-                {isDayVisible && isLockedForUser && (
+                {isDayVisible && isLockedForUser && !isSpectating && (
                     <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center justify-center gap-2 text-red-300 mb-6 animate-in slide-in-from-top-2 font-bold uppercase tracking-widest text-sm">
                         <Lock className="w-4 h-4" />
                         <span>Jornada Cerrada</span>
@@ -476,7 +536,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     </div>
                 )}
 
-                {isLoadingMatches ? (
+                {isLoadingMatches || isLoadingPicks ? (
                     <div className="flex flex-col items-center justify-center py-12 text-[#c8aa6e]">
                         <Loader2 className="w-8 h-8 animate-spin mb-4" />
                         <p>Cargando enfrentamientos...</p>
@@ -491,21 +551,28 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     </div>
                 ) : (
                     matches.map(match => {
-                        // Get records from calculated map
                         const recA = teamRecords[match.teamA.id];
                         const recB = teamRecords[match.teamB.id];
                         const strRecA = recA ? `${recA.w}-${recA.l}` : undefined;
                         const strRecB = recB ? `${recB.w}-${recB.l}` : undefined;
+
+                        // Visibility Logic for Spectating
+                        // If spectating, you can ONLY see the pick if the match has started OR the day is closed
+                        const matchStarted = new Date() >= new Date(match.startTime);
+                        const canSeePick = !isSpectating || isLockedForUser || matchStarted || isAdmin;
+                        const userPick = predictions.find(p => p.matchId === match.id)?.predictedWinnerId;
 
                         return (
                             <MatchCard 
                                 key={match.id} 
                                 match={match}
                                 teams={allTeams}
-                                selectedWinnerId={predictions.find(p => p.matchId === match.id)?.predictedWinnerId}
+                                // Pass pick only if visible logic passes, otherwise undefined (visually hides selection)
+                                selectedWinnerId={canSeePick ? userPick : undefined}
                                 onSelectWinner={handleSelectWinner}
                                 isEditing={isEditMode}
-                                isDayLocked={isLockedForUser}
+                                // If spectating, treat as locked (read-only)
+                                isDayLocked={isLockedForUser || isSpectating}
                                 teamARecord={strRecA}
                                 teamBRecord={strRecB}
                                 onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
@@ -548,8 +615,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
       </div>
 
-      {/* Footer Action (Save Button) */}
-      {!isEditMode && matches.length > 0 && isDayVisible && !isLockedForUser && (
+      {/* Footer Action (Save Button) - Only show if current user */}
+      {!isEditMode && matches.length > 0 && isDayVisible && !isLockedForUser && !isSpectating && (
           <div className="fixed bottom-8 left-0 right-0 px-4 flex flex-col items-center pointer-events-none z-40 gap-2">
             
             {saveStatus === 'error' && errorMessage && (
