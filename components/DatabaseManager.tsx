@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Team, Role } from '../types';
 import { dataService } from '../services/dataService';
-import { Save, Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, Flag, Calculator, ArrowRight, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Save, Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, Flag, Calculator, ArrowRight, RefreshCw, AlertTriangle, CalendarClock } from 'lucide-react';
 import { ROLE_ICONS, COUNTRIES } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
@@ -26,6 +26,7 @@ export const DatabaseManager: React.FC = () => {
     // Calibrator State
     const [calculatedData, setCalculatedData] = useState<any[]>([]);
     const [isCalibrating, setIsCalibrating] = useState(false);
+    const [calibrationLimit, setCalibrationLimit] = useState<number>(11); // Default to max regular season
 
     // Action State
     const [isSaving, setIsSaving] = useState(false);
@@ -108,12 +109,17 @@ export const DatabaseManager: React.FC = () => {
             ]);
 
             const results = currentPlayers.map(p => {
-                // 1. Recalculate Stats from Match History
+                // 1. Recalculate Stats from Match History UP TO selected limit
                 let totalPoints = 0;
                 let gamesPlayed = 0;
                 
-                // Only completed matches
-                const playedMatches = allMatches.filter(m => m.isCompleted && m.stats && m.stats[p.id]);
+                // Filter matches: Completed AND within the selected day limit
+                const playedMatches = allMatches.filter(m => 
+                    m.isCompleted && 
+                    m.stats && 
+                    m.stats[p.id] &&
+                    (m.day || 99) <= calibrationLimit // Logic fix: Filter by Day Limit
+                );
                 
                 playedMatches.forEach(m => {
                     if (m.stats && m.stats[p.id]) {
@@ -129,7 +135,7 @@ export const DatabaseManager: React.FC = () => {
                 const targetPrice = newAverage * 18; // Formula base
                 let change = 0;
 
-                // Solo aplicar cambios si ha jugado o tiene puntos
+                // Solo aplicar cambios si ha jugado o tiene puntos en el rango seleccionado
                 if (gamesPlayed > 0 || totalPoints > 0) {
                     if (targetPrice > currentCost) {
                         // Subida: 20% de la diferencia, max 50
@@ -174,9 +180,6 @@ export const DatabaseManager: React.FC = () => {
 
         setIsSaving(true);
         try {
-            // Batch updates are not supported natively in this mocked dataService structure easily without loop
-            // We'll simulate batch by looping updates. In a real Firestore, use a Batch write.
-            
             const updates = calculatedData.map(d => 
                 dataService.updatePlayer(d.id, {
                     cost: d.newCost,
@@ -653,11 +656,37 @@ export const DatabaseManager: React.FC = () => {
                         </div>
                         <h2 className="text-xl font-bold text-white mb-2">Calibrador de Precios y Medias</h2>
                         <p className="text-gray-400 text-sm max-w-lg">
-                            Esta herramienta recalculará los puntos totales, la media y el precio de mercado de TODOS los jugadores basándose en el historial de partidos actual. Úsala si los datos parecen inconsistentes.
+                            Esta herramienta recalculará los puntos totales, la media y el precio de mercado de TODOS los jugadores basándose en el historial de partidos.
                         </p>
+                        
+                        {/* INSTRUCTION BOX FOR ROLLBACK */}
+                        <div className="mt-4 bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg text-xs text-blue-200 text-left max-w-lg flex items-start gap-3">
+                            <CalendarClock className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                            <div>
+                                <p className="font-bold mb-1">¿Necesitas retroceder el tiempo?</p>
+                                <p className="opacity-80">Si quieres calcular los precios como si acabara de terminar la Jornada 3 (para configurar la Jornada 4), selecciona <strong>Jornada 3</strong> en el límite abajo.</p>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="flex justify-center mb-8">
+                    <div className="flex flex-col items-center justify-center mb-8 gap-4">
+                        
+                        {/* CALIBRATION LIMIT SELECTOR */}
+                        <div className="flex items-center gap-2 bg-[#0f1d36] p-2 rounded-lg border border-gray-700">
+                            <label className="text-xs font-bold text-gray-400 uppercase">Incluir datos hasta:</label>
+                            <select 
+                                value={calibrationLimit}
+                                onChange={(e) => setCalibrationLimit(parseInt(e.target.value))}
+                                disabled={isCalibrating || calculatedData.length > 0}
+                                className="bg-black text-white text-sm font-bold border border-gray-600 rounded px-2 py-1 outline-none focus:border-purple-500"
+                            >
+                                <option value="11">Toda la Fase Regular</option>
+                                {[...Array(11)].map((_, i) => (
+                                    <option key={i+1} value={i+1}>Jornada {i+1}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         {calculatedData.length === 0 ? (
                             <button 
                                 onClick={runCalibration}
@@ -665,10 +694,10 @@ export const DatabaseManager: React.FC = () => {
                                 className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-full shadow-lg flex items-center gap-3 transition-all transform hover:scale-105"
                             >
                                 {isCalibrating ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-                                {isCalibrating ? 'Calculando...' : 'Iniciar Escaneo y Cálculo'}
+                                {isCalibrating ? 'Calculando...' : 'Iniciar Escaneo'}
                             </button>
                         ) : (
-                            <div className="flex flex-col items-center gap-4 animate-in fade-in">
+                            <div className="flex flex-col items-center gap-4 animate-in fade-in w-full">
                                 <div className="flex items-center gap-4 bg-yellow-900/20 p-4 rounded-lg border border-yellow-500/30">
                                     <AlertTriangle className="w-6 h-6 text-yellow-500" />
                                     <div className="text-left">
