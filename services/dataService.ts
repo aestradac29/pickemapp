@@ -358,6 +358,26 @@ export const dataService = {
         await setDoc(docRef, { list: cleanPayload(currentList) }, { merge: true });
     },
 
+    // NEW: Bulk update for Players to avoid Race Conditions
+    async updatePlayersBulk(updates: { id: string, data: Partial<Player> }[]) {
+        const docRef = doc(db, "admin_data", "players");
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) return;
+        
+        let currentList: Player[] = docSnap.data().list || [];
+        
+        // Iterate through updates and apply to memory list
+        updates.forEach(update => {
+            const index = currentList.findIndex(p => p.id === update.id);
+            if (index !== -1) {
+                currentList[index] = { ...currentList[index], ...update.data };
+            }
+        });
+
+        // Single write operation
+        await setDoc(docRef, { list: cleanPayload(currentList) }, { merge: true });
+    },
+
     // --- MATCHES ---
     async getMatches(day?: number): Promise<Match[]> {
         try {

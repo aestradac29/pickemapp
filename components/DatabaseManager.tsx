@@ -202,16 +202,18 @@ export const DatabaseManager: React.FC = () => {
 
         setIsSaving(true);
         try {
-            const updates = calculatedData.map(d => 
-                dataService.updatePlayer(d.id, {
+            // NEW: Batch updates using updatePlayersBulk to avoid race conditions
+            const bulkUpdates = calculatedData.map(d => ({
+                id: d.id,
+                data: {
                     cost: d.newCost,
                     priceChange: d.priceChange, // Store the trend!
                     averagePoints: d.newAvg,
                     totalPoints: d.totalPoints
-                })
-            );
+                }
+            }));
 
-            await Promise.all(updates);
+            await dataService.updatePlayersBulk(bulkUpdates);
             
             alert("¡Base de datos actualizada con éxito!");
             setCalculatedData([]);
