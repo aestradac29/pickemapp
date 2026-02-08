@@ -123,8 +123,8 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   const isViewingOther = viewingUserId !== currentUserId;
   const viewingUser = allUsers.find(u => u.id === viewingUserId);
 
-  // Drag logic needs to check if locked OR if viewing someone else
-  const canDrag = !isLocked && !isViewingOther && mode === 'prediction';
+  // Drag logic: Allow if Official Result Mode OR (Prediction Mode + Not Locked + Own Profile)
+  const canDrag = mode === 'official_result' || (!isLocked && !isViewingOther);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     if (!canDrag) return;
@@ -152,8 +152,8 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   };
 
   const handleSave = async () => {
-      // Bloquear guardado si está bloqueado o viendo a otro
-      if ((isLocked && mode === 'prediction') || isViewingOther) return;
+      // Bloquear guardado SOLO si está bloqueado en modo predicción o viendo a otro (en predicción)
+      if (mode === 'prediction' && (isLocked || isViewingOther)) return;
 
       if (!currentUserId && !isAdmin) {
           alert("Debes iniciar sesión.");
@@ -274,7 +274,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
       </div>
 
       {/* View Other User Banner */}
-      {isViewingOther && (
+      {isViewingOther && mode === 'prediction' && (
         <div className="mb-6 bg-[#c8aa6e]/10 border border-[#c8aa6e]/30 p-3 rounded-lg flex items-center gap-3 animate-in slide-in-from-top-2">
             <Eye className="w-5 h-5 text-[#c8aa6e]" />
             <div>
@@ -448,8 +448,8 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
         })}
       </div>
 
-      {/* Footer Actions (Only show Save if NOT viewing other) */}
-      {!isViewingOther && (
+      {/* Footer Actions (Only show Save if NOT viewing other user's prediction OR in Official Result Mode) */}
+      {(!isViewingOther || mode === 'official_result') && (
         <div className="mt-6 flex justify-center sticky bottom-8 z-20 pointer-events-none">
             <button 
                 onClick={handleSave}
