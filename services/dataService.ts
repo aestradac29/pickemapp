@@ -151,17 +151,17 @@ export const dataService = {
         
         const updates = userSnapshot.docs.map(async (userDoc) => {
             const userId = userDoc.id;
-            
-            // Check if new round already exists (avoid overwriting if re-running)
             const targetRef = doc(db, "users", userId, "fantasy_rounds", `round_${newRound}`);
-            const targetSnap = await getDoc(targetRef);
             
-            if (targetSnap.exists()) return; // Already data there, skip
+            // Check if new round already exists (avoid overwriting if re-running manually)
+            const targetSnap = await getDoc(targetRef);
+            if (targetSnap.exists()) return; 
 
             // Find best previous team
             let teamToCopy = null;
             let captainToCopy = null;
 
+            // Strategy 1: Look backwards in round history (Priority)
             for (let r = newRound - 1; r >= 1; r--) {
                 const prevRef = doc(db, "users", userId, "fantasy_rounds", `round_${r}`);
                 const prevSnap = await getDoc(prevRef);
@@ -171,6 +171,20 @@ export const dataService = {
                         teamToCopy = data.team;
                         captainToCopy = data.captain;
                         break;
+                    }
+                }
+            }
+
+            // Strategy 2: If history is broken/missing, check the 'current active' snapshot
+            // This acts as a safety net if round_4 didn't save correctly but fantasy/winter_2026 has data
+            if (!teamToCopy) {
+                const mainRef = doc(db, "users", userId, "fantasy", "winter_2026");
+                const mainSnap = await getDoc(mainRef);
+                if (mainSnap.exists()) {
+                    const data = mainSnap.data();
+                    if (data.team) {
+                        teamToCopy = data.team;
+                        captainToCopy = data.captain;
                     }
                 }
             }
@@ -186,15 +200,18 @@ export const dataService = {
                             playerId: slot.playerId || null,
                             purchaseCost: slot.purchaseCost // Preserve original cost
                         };
-                    } else {
+                    } else if (typeof slot === 'string') {
                         // Legacy string format
                         preservedTeam[key] = { playerId: slot };
+                    } else {
+                        // Empty/Null
+                        preservedTeam[key] = { playerId: null };
                     }
                 });
 
                 await setDoc(targetRef, {
                     team: cleanPayload(preservedTeam),
-                    captain: captainToCopy,
+                    captain: captainToCopy || null,
                     roundId: newRound,
                     score: 0,
                     updatedAt: new Date().toISOString(),
