@@ -131,11 +131,79 @@ export const dataService = {
         const playersDocRef = doc(db, "admin_data", "players");
         await setDoc(playersDocRef, { list: cleanPayload(updatedPlayers) }, { merge: true });
 
+        // 3.5. CARRY OVER TEAMS (Rollover Lineups)
+        // This ensures every user starts the new round with their previous team physically saved.
+        await this.carryOverFantasyTeams(newRound);
+
         // 4. Update Config to new round & UNLOCK explicitly (admin triggers next round, so it starts open)
         await this.updateGlobalConfig({ 
             fantasyRound: newRound,
             fantasyLocked: false // Reset manual lock if it was set
         });
+    },
+
+    // Explicitly copy previous teams to the new round for all users
+    async carryOverFantasyTeams(newRound: number) {
+        if (newRound <= 1) return; // No rollover for first round
+
+        const usersRef = collection(db, "users");
+        const userSnapshot = await getDocs(usersRef);
+        
+        const updates = userSnapshot.docs.map(async (userDoc) => {
+            const userId = userDoc.id;
+            
+            // Check if new round already exists (avoid overwriting if re-running)
+            const targetRef = doc(db, "users", userId, "fantasy_rounds", `round_${newRound}`);
+            const targetSnap = await getDoc(targetRef);
+            
+            if (targetSnap.exists()) return; // Already data there, skip
+
+            // Find best previous team
+            let teamToCopy = null;
+            let captainToCopy = null;
+
+            for (let r = newRound - 1; r >= 1; r--) {
+                const prevRef = doc(db, "users", userId, "fantasy_rounds", `round_${r}`);
+                const prevSnap = await getDoc(prevRef);
+                if (prevSnap.exists()) {
+                    const data = prevSnap.data();
+                    if (data.team) {
+                        teamToCopy = data.team;
+                        captainToCopy = data.captain;
+                        break;
+                    }
+                }
+            }
+
+            if (teamToCopy) {
+                // Ensure purchaseCost is preserved in the copy
+                const preservedTeam: Record<string, any> = {};
+                Object.keys(teamToCopy).forEach(key => {
+                    const slot = teamToCopy[key];
+                    // Clean format
+                    if (slot && typeof slot === 'object') {
+                        preservedTeam[key] = {
+                            playerId: slot.playerId || null,
+                            purchaseCost: slot.purchaseCost // Preserve original cost
+                        };
+                    } else {
+                        // Legacy string format
+                        preservedTeam[key] = { playerId: slot };
+                    }
+                });
+
+                await setDoc(targetRef, {
+                    team: cleanPayload(preservedTeam),
+                    captain: captainToCopy,
+                    roundId: newRound,
+                    score: 0,
+                    updatedAt: new Date().toISOString(),
+                    rolledOver: true // Flag to indicate auto-copy
+                });
+            }
+        });
+
+        await Promise.all(updates);
     },
 
     async getSplits() {
