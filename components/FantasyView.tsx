@@ -164,11 +164,12 @@ interface PlayerCardProps {
   locked: boolean;
   roundPoints?: number; // New prop: Points specific to the selected round
   roundLabel?: string;  // New prop: Label for the round
+  isHistorical?: boolean; // New prop: If true, show strictly purchaseCost
 }
 
 const PlayerCard: React.FC<PlayerCardProps> = ({ 
     role, slot, onSelect, onSetCaptain, isCaptain, readOnly = false, 
-    players, teams, opponents, locked, roundPoints, roundLabel 
+    players, teams, opponents, locked, roundPoints, roundLabel, isHistorical = false
 }) => {
   const playerId = slot?.playerId;
   const player = players.find(p => p.id === playerId);
@@ -195,13 +196,21 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   const storedCost = slot?.purchaseCost || player?.cost || 0;
   const currentMarketCost = player?.cost || 0;
   
-  // Regla: Pagas el MÍNIMO entre tu precio guardado y el precio actual.
-  // - Si sube: Mantienes storedCost (Protegido).
-  // - Si baja: Se actualiza a currentMarketCost (Beneficio).
-  const effectiveCost = playerId ? Math.min(storedCost, currentMarketCost) : 0;
+  let effectiveCost = 0;
+  if (playerId) {
+      if (isHistorical) {
+          // If historical, strictly show what was paid/stored.
+          // Fallback to storedCost (which falls back to current if missing in legacy data)
+          effectiveCost = storedCost; 
+      } else {
+          // Active or Future round: Apply "Best Price" logic
+          // Regla: Pagas el MÍNIMO entre tu precio guardado y el precio actual.
+          effectiveCost = Math.min(storedCost, currentMarketCost);
+      }
+  }
   
-  // Tienes "Valor Protegido" SOLO si tu coste efectivo es MENOR que el mercado.
-  const isValueProtected = playerId && effectiveCost < currentMarketCost;
+  // Tienes "Valor Protegido" SOLO si NO es histórico y tu coste efectivo es MENOR que el mercado.
+  const isValueProtected = !isHistorical && playerId && effectiveCost < currentMarketCost;
   const savings = currentMarketCost - effectiveCost;
 
   // Price Trend (Visual indicators only)
@@ -236,7 +245,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         </div>
 
         {/* Captain Button */}
-        {playerId && !readOnly && !locked && (
+        {playerId && !readOnly && !locked && !isHistorical && (
             <button 
                 onClick={(e) => { e.stopPropagation(); onSetCaptain(playerId); }}
                 className={`absolute top-3 left-3 z-30 p-2 rounded-full transition-all duration-300 transform hover:scale-110 ${isCaptain ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.6)]' : 'bg-black/40 text-gray-500 border border-gray-600 hover:text-yellow-400 hover:border-yellow-400'}`}
@@ -247,7 +256,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         )}
         
         {/* Read-only Captain Badge */}
-        {playerId && (readOnly || locked) && isCaptain && (
+        {playerId && (readOnly || locked || isHistorical) && isCaptain && (
              <div className="absolute top-3 left-3 z-30 bg-yellow-500 text-black px-2 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 shadow-[0_0_15px_rgba(234,179,8,0.6)]">
                  <Crown className="w-3 h-3 fill-current" />
                  <span>Capi</span>
@@ -316,7 +325,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
                </div>
 
                 {/* SELL BUTTON (MOVED HERE) */}
-                {!readOnly && !locked && (
+                {!readOnly && !locked && !isHistorical && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onSelect(role, null); }}
                         className={`w-full py-1.5 mb-3 text-[10px] font-bold uppercase tracking-wider rounded border transition-all flex items-center justify-center gap-1.5
@@ -355,7 +364,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
                           <div className="flex items-center gap-1">
                               <span className={`text-sm font-bold ${isValueProtected ? 'text-green-400' : 'text-[#0ac8b9]'}`}>${effectiveCost}</span>
                               
-                              {/* If price went up since purchase, show indicator */}
+                              {/* If price went up since purchase, show indicator (Active only) */}
                               {isValueProtected && !locked && (
                                   <div className="absolute top-0 right-0 p-0.5 bg-green-500/20 rounded-bl text-[8px] text-green-300 font-bold flex items-center" title={`PRECIO CONGELADO: Te ahorras $${savings} porque fichaste antes de la subida.`}>
                                       <LockKeyhole className="w-2 h-2 mr-0.5" />
@@ -363,8 +372,8 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
                                   </div>
                               )}
 
-                              {/* Standard Trend (If not protected or locked) */}
-                              {!isValueProtected && !locked && (
+                              {/* Standard Trend (If not protected or locked or historical) */}
+                              {!isValueProtected && !locked && !isHistorical && (
                                   <div className={`flex flex-col items-center text-[8px] leading-none font-bold ${isPriceUp ? 'text-green-400' : 'text-red-400'}`}>
                                       {isPriceUp ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
                                       <span>{Math.abs(priceChange)}</span>
@@ -417,10 +426,10 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
              </div>
              <h4 className="text-[#0ac8b9] text-lg font-bold uppercase tracking-widest mb-1">{role}</h4>
              <p className="text-gray-500 text-xs text-center mb-6">
-                {readOnly || locked ? 'Sin selección' : 'Selecciona un jugador'}
+                {readOnly || locked || isHistorical ? 'Sin selección' : 'Selecciona un jugador'}
              </p>
              
-             {!readOnly && !locked && (
+             {!readOnly && !locked && !isHistorical && (
                <div className="w-full relative z-30">
                  <SearchableSelect 
                     label="" 
@@ -703,6 +712,11 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
       const marketCost = player.cost;
       const storedCost = slot.purchaseCost || marketCost;
       
+      // If viewing past round, we return storedCost strictly
+      if (viewRoundId < activeConfigRound) {
+          return storedCost;
+      }
+
       return Math.min(storedCost, marketCost);
   };
 
@@ -880,6 +894,9 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
   const viewingUser = allUsers.find(u => u.id === viewingUserId);
   const isRoundStartedOrPast = viewRoundId < activeConfigRound || (viewRoundId === activeConfigRound && roundLocked);
   const canViewTeam = isOwnTeam || isRoundStartedOrPast;
+  
+  // Flag to indicate we are viewing a past round (where prices should be historical)
+  const isHistoricalView = viewRoundId < activeConfigRound;
 
   return (
     <div className="w-[98%] max-w-[2400px] mx-auto animate-in fade-in pb-20 pt-4 relative">
@@ -1088,6 +1105,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                                 locked={isViewLocked}
                                 roundPoints={myTeam[role].playerId ? roundPointsMap[myTeam[role].playerId!] : undefined}
                                 roundLabel={`Puntos J${FANTASY_SCHEDULE.find(r => r.id === viewRoundId)?.matchdays.join('-') || viewRoundId}`}
+                                isHistorical={isHistoricalView}
                             />
                         ))}
                     </div>
