@@ -2,11 +2,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Team, Role } from '../types';
 import { dataService } from '../services/dataService';
-import { Save, Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, Flag } from 'lucide-react';
+import { Save, Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, Flag, Calculator, ArrowRight, RefreshCw, AlertTriangle } from 'lucide-react';
 import { ROLE_ICONS, COUNTRIES } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'players' | 'teams'>('players');
+    const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'calibrator'>('players');
     
     // Data State
     const [players, setPlayers] = useState<Player[]>([]);
@@ -22,6 +22,10 @@ export const DatabaseManager: React.FC = () => {
     const [search, setSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState<Role | 'ALL'>('ALL');
     const [teamFilter, setTeamFilter] = useState<string>('ALL');
+
+    // Calibrator State
+    const [calculatedData, setCalculatedData] = useState<any[]>([]);
+    const [isCalibrating, setIsCalibrating] = useState(false);
 
     // Action State
     const [isSaving, setIsSaving] = useState(false);
@@ -94,6 +98,109 @@ export const DatabaseManager: React.FC = () => {
         }
     };
 
+    // --- CALIBRATOR LOGIC ---
+    const runCalibration = async () => {
+        setIsCalibrating(true);
+        try {
+            const [currentPlayers, allMatches] = await Promise.all([
+                dataService.getPlayers(),
+                dataService.getMatches()
+            ]);
+
+            const results = currentPlayers.map(p => {
+                // 1. Recalculate Stats from Match History
+                let totalPoints = 0;
+                let gamesPlayed = 0;
+                
+                // Only completed matches
+                const playedMatches = allMatches.filter(m => m.isCompleted && m.stats && m.stats[p.id]);
+                
+                playedMatches.forEach(m => {
+                    if (m.stats && m.stats[p.id]) {
+                        totalPoints += m.stats[p.id].totalPoints;
+                        gamesPlayed++;
+                    }
+                });
+
+                const newAverage = gamesPlayed > 0 ? totalPoints / gamesPlayed : (p.averagePoints || 0);
+                
+                // 2. Calculate Price (Same logic as dataService.processRoundTransition)
+                const currentCost = p.cost || 250;
+                const targetPrice = newAverage * 18; // Formula base
+                let change = 0;
+
+                // Solo aplicar cambios si ha jugado o tiene puntos
+                if (gamesPlayed > 0 || totalPoints > 0) {
+                    if (targetPrice > currentCost) {
+                        // Subida: 20% de la diferencia, max 50
+                        change = Math.min(50, Math.ceil((targetPrice - currentCost) * 0.2)); 
+                    } else if (targetPrice < currentCost) {
+                        // Bajada: 10% de la diferencia, max 50
+                        change = Math.max(-50, Math.floor((targetPrice - currentCost) * 0.1)); 
+                    }
+                }
+
+                // Hard Limits
+                let newCost = Math.round(currentCost + change);
+                newCost = Math.max(150, Math.min(550, newCost));
+
+                return {
+                    id: p.id,
+                    name: p.name,
+                    role: p.role,
+                    currentCost,
+                    newCost,
+                    priceChange: change, // Update trend
+                    currentAvg: p.averagePoints,
+                    newAvg: parseFloat(newAverage.toFixed(1)),
+                    totalPoints: parseFloat(totalPoints.toFixed(1))
+                };
+            });
+
+            // Sort by biggest absolute change
+            setCalculatedData(results.sort((a, b) => Math.abs(b.newCost - b.currentCost) - Math.abs(a.newCost - a.currentCost)));
+
+        } catch (e) {
+            console.error(e);
+            alert("Error calculando precios");
+        } finally {
+            setIsCalibrating(false);
+        }
+    };
+
+    const applyCalibration = async () => {
+        if (!calculatedData.length) return;
+        if (!window.confirm(`¿Estás seguro de actualizar ${calculatedData.length} jugadores? Esto sobrescribirá precios y medias.`)) return;
+
+        setIsSaving(true);
+        try {
+            // Batch updates are not supported natively in this mocked dataService structure easily without loop
+            // We'll simulate batch by looping updates. In a real Firestore, use a Batch write.
+            
+            const updates = calculatedData.map(d => 
+                dataService.updatePlayer(d.id, {
+                    cost: d.newCost,
+                    priceChange: d.priceChange, // Store the trend!
+                    averagePoints: d.newAvg,
+                    totalPoints: d.totalPoints
+                })
+            );
+
+            await Promise.all(updates);
+            
+            alert("¡Base de datos actualizada con éxito!");
+            setCalculatedData([]);
+            await loadData(); // Refresh main view
+            setActiveTab('players');
+
+        } catch (e) {
+            console.error(e);
+            alert("Hubo errores al guardar algunos registros.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     // Helper para renderizar la bandera
     const renderFlag = (countryCode?: string) => {
         if (!countryCode) return <span className="text-gray-600">-</span>;
@@ -147,6 +254,13 @@ export const DatabaseManager: React.FC = () => {
                 >
                     <Shield className="w-4 h-4" />
                     Equipos ({teams.length})
+                </button>
+                <button 
+                    onClick={() => setActiveTab('calibrator')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold uppercase tracking-wider transition-all border ${activeTab === 'calibrator' ? 'bg-purple-600 text-white border-purple-500' : 'bg-[#0f1923] text-gray-400 border-gray-700 hover:text-white'}`}
+                >
+                    <Calculator className="w-4 h-4" />
+                    Calibrador de Precios
                 </button>
             </div>
 
@@ -527,6 +641,98 @@ export const DatabaseManager: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
+                </div>
+            )}
+
+            {/* --- CALIBRATOR VIEW (NEW) --- */}
+            {activeTab === 'calibrator' && (
+                <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl p-6">
+                    <div className="flex flex-col items-center justify-center text-center mb-8">
+                        <div className="p-3 bg-purple-900/30 rounded-full border border-purple-500/50 mb-3">
+                            <Calculator className="w-8 h-8 text-purple-400" />
+                        </div>
+                        <h2 className="text-xl font-bold text-white mb-2">Calibrador de Precios y Medias</h2>
+                        <p className="text-gray-400 text-sm max-w-lg">
+                            Esta herramienta recalculará los puntos totales, la media y el precio de mercado de TODOS los jugadores basándose en el historial de partidos actual. Úsala si los datos parecen inconsistentes.
+                        </p>
+                    </div>
+
+                    <div className="flex justify-center mb-8">
+                        {calculatedData.length === 0 ? (
+                            <button 
+                                onClick={runCalibration}
+                                disabled={isCalibrating}
+                                className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-full shadow-lg flex items-center gap-3 transition-all transform hover:scale-105"
+                            >
+                                {isCalibrating ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+                                {isCalibrating ? 'Calculando...' : 'Iniciar Escaneo y Cálculo'}
+                            </button>
+                        ) : (
+                            <div className="flex flex-col items-center gap-4 animate-in fade-in">
+                                <div className="flex items-center gap-4 bg-yellow-900/20 p-4 rounded-lg border border-yellow-500/30">
+                                    <AlertTriangle className="w-6 h-6 text-yellow-500" />
+                                    <div className="text-left">
+                                        <p className="text-yellow-200 font-bold text-sm">Revisión Pendiente</p>
+                                        <p className="text-yellow-400/80 text-xs">Se han detectado cambios para {calculatedData.filter(d => d.currentCost !== d.newCost).length} jugadores.</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button 
+                                        onClick={applyCalibration}
+                                        disabled={isSaving}
+                                        className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-full shadow-lg flex items-center gap-3 transition-all transform hover:scale-105"
+                                    >
+                                        {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                                        Aplicar Cambios a Base de Datos
+                                    </button>
+                                    <button 
+                                        onClick={() => setCalculatedData([])}
+                                        className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {calculatedData.length > 0 && (
+                        <div className="overflow-x-auto max-h-[600px] border border-gray-700 rounded-lg">
+                            <table className="w-full text-left text-sm text-gray-300">
+                                <thead className="bg-[#1a2c4e] text-gray-400 uppercase font-bold text-xs sticky top-0 z-10">
+                                    <tr>
+                                        <th className="p-3">Jugador</th>
+                                        <th className="p-3 text-center">Media Actual</th>
+                                        <th className="p-3 text-center text-green-400">Nueva Media</th>
+                                        <th className="p-3 text-center">Coste Actual</th>
+                                        <th className="p-3 text-center text-[#0ac8b9]">Nuevo Coste</th>
+                                        <th className="p-3 text-right">Diferencia</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-800 bg-[#0a1428]">
+                                    {calculatedData.map(d => {
+                                        const diff = d.newCost - d.currentCost;
+                                        const hasChange = diff !== 0;
+                                        return (
+                                            <tr key={d.id} className={hasChange ? 'bg-white/5' : ''}>
+                                                <td className="p-3 font-bold text-white flex items-center gap-2">
+                                                    <img src={ROLE_ICONS[d.role as Role]} className="w-4 h-4 opacity-70" />
+                                                    {d.name}
+                                                </td>
+                                                <td className="p-3 text-center text-gray-500">{d.currentAvg || 0}</td>
+                                                <td className="p-3 text-center font-bold text-white">{d.newAvg}</td>
+                                                <td className="p-3 text-center text-gray-500">${d.currentCost}</td>
+                                                <td className="p-3 text-center font-bold text-white">${d.newCost}</td>
+                                                <td className={`p-3 text-right font-bold ${diff > 0 ? 'text-green-400' : diff < 0 ? 'text-red-400' : 'text-gray-600'}`}>
+                                                    {diff > 0 ? '+' : ''}{diff}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             )}
 
