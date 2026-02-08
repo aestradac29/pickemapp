@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Player, Team, Role } from '../types';
+import { Player, Team, Role, Stage } from '../types';
 import { dataService } from '../services/dataService';
 import { Save, Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, Flag, Calculator, ArrowRight, RefreshCw, AlertTriangle, CalendarClock } from 'lucide-react';
-import { ROLE_ICONS, COUNTRIES } from '../constants';
+import { ROLE_ICONS, COUNTRIES, FANTASY_SCHEDULE } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'calibrator'>('players');
@@ -26,7 +26,7 @@ export const DatabaseManager: React.FC = () => {
     // Calibrator State
     const [calculatedData, setCalculatedData] = useState<any[]>([]);
     const [isCalibrating, setIsCalibrating] = useState(false);
-    const [calibrationLimit, setCalibrationLimit] = useState<number>(11); // Default to max regular season
+    const [targetRoundId, setTargetRoundId] = useState<number>(4); // Default to fixing Round 4
 
     // Action State
     const [isSaving, setIsSaving] = useState(false);
@@ -99,7 +99,7 @@ export const DatabaseManager: React.FC = () => {
         }
     };
 
-    // --- CALIBRATOR LOGIC ---
+    // --- CALIBRATOR LOGIC (SIMULATION) ---
     const runCalibration = async () => {
         setIsCalibrating(true);
         try {
@@ -109,61 +109,83 @@ export const DatabaseManager: React.FC = () => {
             ]);
 
             const results = currentPlayers.map(p => {
-                // 1. Recalculate Stats from Match History UP TO selected limit
-                let totalPoints = 0;
-                let gamesPlayed = 0;
-                
-                // Filter matches: Completed AND within the selected day limit
-                const playedMatches = allMatches.filter(m => 
-                    m.isCompleted && 
-                    m.stats && 
-                    m.stats[p.id] &&
-                    (m.day || 99) <= calibrationLimit // Logic fix: Filter by Day Limit
-                );
-                
-                playedMatches.forEach(m => {
-                    if (m.stats && m.stats[p.id]) {
-                        totalPoints += m.stats[p.id].totalPoints;
-                        gamesPlayed++;
-                    }
-                });
+                // SIMULACIÓN DE TEMPORADA
+                // Usamos el precio actual de la DB como punto de partida (Precio Base Inicial)
+                // Se asume que el usuario ha reseteado los precios a su valor inicial antes de correr esto.
+                let simulatedCost = p.cost || 250; 
+                let cumulativePoints = 0;
+                let cumulativeGames = 0;
+                let lastChange = 0;
 
-                const newAverage = gamesPlayed > 0 ? totalPoints / gamesPlayed : (p.averagePoints || 0);
-                
-                // 2. Calculate Price (Same logic as dataService.processRoundTransition)
-                const currentCost = p.cost || 250;
-                const targetPrice = newAverage * 18; // Formula base
-                let change = 0;
+                // Iteramos desde la Ronda 1 hasta la Ronda ANTERIOR a la seleccionada.
+                // Ejemplo: Si selecciono "Jornada 4", simulo J1, J2 y J3 para llegar al precio inicial de J4.
+                for (let r = 1; r < targetRoundId; r++) {
+                    const roundConfig = FANTASY_SCHEDULE.find(sch => sch.id === r);
+                    if (!roundConfig) continue;
 
-                // Solo aplicar cambios si ha jugado o tiene puntos en el rango seleccionado
-                if (gamesPlayed > 0 || totalPoints > 0) {
-                    if (targetPrice > currentCost) {
-                        // Subida: 20% de la diferencia, max 50
-                        change = Math.min(50, Math.ceil((targetPrice - currentCost) * 0.2)); 
-                    } else if (targetPrice < currentCost) {
-                        // Bajada: 10% de la diferencia, max 50
-                        change = Math.max(-50, Math.floor((targetPrice - currentCost) * 0.1)); 
+                    // 1. Obtener partidos de ESTA ronda simulada
+                    const roundMatches = allMatches.filter(m => 
+                        m.isCompleted && 
+                        m.stats && 
+                        m.stats[p.id] &&
+                        (roundConfig.stage === Stage.GROUPS ? m.stage === Stage.GROUPS : m.stage !== Stage.GROUPS) &&
+                        roundConfig.matchdays.includes(m.day || 0)
+                    );
+
+                    // 2. Acumular estadísticas
+                    let pointsInRound = 0;
+                    let gamesInRound = 0;
+
+                    roundMatches.forEach(m => {
+                        if (m.stats && m.stats[p.id]) {
+                            pointsInRound += m.stats[p.id].totalPoints;
+                            gamesInRound++;
+                        }
+                    });
+
+                    // 3. Aplicar lógica de cambio de precio SI jugó en esta ronda
+                    if (gamesInRound > 0) {
+                        cumulativePoints += pointsInRound;
+                        cumulativeGames += gamesInRound;
+
+                        const currentTotalAvg = cumulativePoints / cumulativeGames;
+                        const targetPrice = currentTotalAvg * 18; // Fórmula oficial
+
+                        let change = 0;
+                        if (targetPrice > simulatedCost) {
+                            // Subida: 20% de la diferencia, max 50
+                            change = Math.min(50, Math.ceil((targetPrice - simulatedCost) * 0.2)); 
+                        } else if (targetPrice < simulatedCost) {
+                            // Bajada: 10% de la diferencia, max 50
+                            change = Math.max(-50, Math.floor((targetPrice - simulatedCost) * 0.1)); 
+                        }
+
+                        // Actualizar precio simulado para la siguiente ronda
+                        simulatedCost = Math.round(simulatedCost + change);
+                        // Hard Limits
+                        simulatedCost = Math.max(150, Math.min(550, simulatedCost));
+                        
+                        lastChange = change; // Guardar la tendencia de la última ronda simulada
                     }
                 }
 
-                // Hard Limits
-                let newCost = Math.round(currentCost + change);
-                newCost = Math.max(150, Math.min(550, newCost));
+                // Resultado Final
+                const finalAvg = cumulativeGames > 0 ? parseFloat((cumulativePoints / cumulativeGames).toFixed(1)) : (p.averagePoints || 0);
 
                 return {
                     id: p.id,
                     name: p.name,
                     role: p.role,
-                    currentCost,
-                    newCost,
-                    priceChange: change, // Update trend
+                    currentCost: p.cost, // Lo que tiene ahora en la BD (tu precio base)
+                    newCost: simulatedCost, // Lo que debería tener según la simulación
+                    priceChange: lastChange, // La última tendencia
                     currentAvg: p.averagePoints,
-                    newAvg: parseFloat(newAverage.toFixed(1)),
-                    totalPoints: parseFloat(totalPoints.toFixed(1))
+                    newAvg: finalAvg,
+                    totalPoints: parseFloat(cumulativePoints.toFixed(1))
                 };
             });
 
-            // Sort by biggest absolute change
+            // Sort by biggest absolute change to highlight fixes
             setCalculatedData(results.sort((a, b) => Math.abs(b.newCost - b.currentCost) - Math.abs(a.newCost - a.currentCost)));
 
         } catch (e) {
@@ -654,17 +676,17 @@ export const DatabaseManager: React.FC = () => {
                         <div className="p-3 bg-purple-900/30 rounded-full border border-purple-500/50 mb-3">
                             <Calculator className="w-8 h-8 text-purple-400" />
                         </div>
-                        <h2 className="text-xl font-bold text-white mb-2">Calibrador de Precios y Medias</h2>
+                        <h2 className="text-xl font-bold text-white mb-2">Simulador de Evolución de Precios</h2>
                         <p className="text-gray-400 text-sm max-w-lg">
-                            Esta herramienta recalculará los puntos totales, la media y el precio de mercado de TODOS los jugadores basándose en el historial de partidos.
+                            Esta herramienta simula la evolución de los precios ronda a ronda para corregir datos. Empezará con un precio base de 250$ para todos y aplicará los cambios acumulados.
                         </p>
                         
                         {/* INSTRUCTION BOX FOR ROLLBACK */}
                         <div className="mt-4 bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg text-xs text-blue-200 text-left max-w-lg flex items-start gap-3">
                             <CalendarClock className="w-5 h-5 text-blue-400 flex-shrink-0" />
                             <div>
-                                <p className="font-bold mb-1">¿Necesitas retroceder el tiempo?</p>
-                                <p className="opacity-80">Si quieres calcular los precios como si acabara de terminar la Jornada 3 (para configurar la Jornada 4), selecciona <strong>Jornada 3</strong> en el límite abajo.</p>
+                                <p className="font-bold mb-1">Cómo funciona:</p>
+                                <p className="opacity-80">Si seleccionas <strong>Jornada 4</strong>, el sistema simulará J1, J2 y J3 para calcular el precio exacto con el que deben empezar la Jornada 4.</p>
                             </div>
                         </div>
                     </div>
@@ -673,16 +695,15 @@ export const DatabaseManager: React.FC = () => {
                         
                         {/* CALIBRATION LIMIT SELECTOR */}
                         <div className="flex items-center gap-2 bg-[#0f1d36] p-2 rounded-lg border border-gray-700">
-                            <label className="text-xs font-bold text-gray-400 uppercase">Incluir datos hasta:</label>
+                            <label className="text-xs font-bold text-gray-400 uppercase">Preparar para el inicio de:</label>
                             <select 
-                                value={calibrationLimit}
-                                onChange={(e) => setCalibrationLimit(parseInt(e.target.value))}
+                                value={targetRoundId}
+                                onChange={(e) => setTargetRoundId(parseInt(e.target.value))}
                                 disabled={isCalibrating || calculatedData.length > 0}
                                 className="bg-black text-white text-sm font-bold border border-gray-600 rounded px-2 py-1 outline-none focus:border-purple-500"
                             >
-                                <option value="11">Toda la Fase Regular</option>
-                                {[...Array(11)].map((_, i) => (
-                                    <option key={i+1} value={i+1}>Jornada {i+1}</option>
+                                {FANTASY_SCHEDULE.map((round) => (
+                                    <option key={round.id} value={round.id}>{round.label} (Ronda {round.id})</option>
                                 ))}
                             </select>
                         </div>
@@ -694,15 +715,15 @@ export const DatabaseManager: React.FC = () => {
                                 className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-full shadow-lg flex items-center gap-3 transition-all transform hover:scale-105"
                             >
                                 {isCalibrating ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-                                {isCalibrating ? 'Calculando...' : 'Iniciar Escaneo'}
+                                {isCalibrating ? 'Simulando...' : 'Iniciar Simulación'}
                             </button>
                         ) : (
                             <div className="flex flex-col items-center gap-4 animate-in fade-in w-full">
                                 <div className="flex items-center gap-4 bg-yellow-900/20 p-4 rounded-lg border border-yellow-500/30">
                                     <AlertTriangle className="w-6 h-6 text-yellow-500" />
                                     <div className="text-left">
-                                        <p className="text-yellow-200 font-bold text-sm">Revisión Pendiente</p>
-                                        <p className="text-yellow-400/80 text-xs">Se han detectado cambios para {calculatedData.filter(d => d.currentCost !== d.newCost).length} jugadores.</p>
+                                        <p className="text-yellow-200 font-bold text-sm">Simulación Completada</p>
+                                        <p className="text-yellow-400/80 text-xs">Se han recalculado los precios de inicio para la {FANTASY_SCHEDULE.find(r => r.id === targetRoundId)?.label}.</p>
                                     </div>
                                 </div>
                                 <div className="flex gap-3">
@@ -731,11 +752,10 @@ export const DatabaseManager: React.FC = () => {
                                 <thead className="bg-[#1a2c4e] text-gray-400 uppercase font-bold text-xs sticky top-0 z-10">
                                     <tr>
                                         <th className="p-3">Jugador</th>
-                                        <th className="p-3 text-center">Media Actual</th>
-                                        <th className="p-3 text-center text-green-400">Nueva Media</th>
-                                        <th className="p-3 text-center">Coste Actual</th>
-                                        <th className="p-3 text-center text-[#0ac8b9]">Nuevo Coste</th>
-                                        <th className="p-3 text-right">Diferencia</th>
+                                        <th className="p-3 text-center">Media (Simulada)</th>
+                                        <th className="p-3 text-center">Coste Actual (BD)</th>
+                                        <th className="p-3 text-center text-[#0ac8b9]">Nuevo Coste (Simulado)</th>
+                                        <th className="p-3 text-right">Corrección</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-800 bg-[#0a1428]">
@@ -748,8 +768,7 @@ export const DatabaseManager: React.FC = () => {
                                                     <img src={ROLE_ICONS[d.role as Role]} className="w-4 h-4 opacity-70" />
                                                     {d.name}
                                                 </td>
-                                                <td className="p-3 text-center text-gray-500">{d.currentAvg || 0}</td>
-                                                <td className="p-3 text-center font-bold text-white">{d.newAvg}</td>
+                                                <td className="p-3 text-center text-white font-bold">{d.newAvg}</td>
                                                 <td className="p-3 text-center text-gray-500">${d.currentCost}</td>
                                                 <td className="p-3 text-center font-bold text-white">${d.newCost}</td>
                                                 <td className={`p-3 text-right font-bold ${diff > 0 ? 'text-green-400' : diff < 0 ? 'text-red-400' : 'text-gray-600'}`}>
