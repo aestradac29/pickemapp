@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Player, Team, Role, Stage } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Player, Team, Role } from '../types';
 import { dataService } from '../services/dataService';
-import { Save, Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, Flag, Calculator, ArrowRight, RefreshCw, AlertTriangle, CalendarClock } from 'lucide-react';
-import { ROLE_ICONS, COUNTRIES, FANTASY_SCHEDULE } from '../constants';
+import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download } from 'lucide-react';
+import { ROLE_ICONS, COUNTRIES } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'calibrator'>('players');
+    const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'prices'>('players');
     
     // Data State
     const [players, setPlayers] = useState<Player[]>([]);
@@ -23,12 +23,9 @@ export const DatabaseManager: React.FC = () => {
     const [roleFilter, setRoleFilter] = useState<Role | 'ALL'>('ALL');
     const [teamFilter, setTeamFilter] = useState<string>('ALL');
 
-    // Calibrator State
-    const [calculatedData, setCalculatedData] = useState<any[]>([]);
-    const [isCalibrating, setIsCalibrating] = useState(false);
-    const [targetRoundId, setTargetRoundId] = useState<number>(4); // Default to fixing Round 4
-
-    // Action State
+    // Price Import State
+    const [importText, setImportText] = useState("");
+    const [pendingUpdates, setPendingUpdates] = useState<{ player: Player, newCost: number, found: boolean, originalName: string }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -99,130 +96,81 @@ export const DatabaseManager: React.FC = () => {
         }
     };
 
-    // --- CALIBRATOR LOGIC (SIMULATION) ---
-    const runCalibration = async () => {
-        setIsCalibrating(true);
-        try {
-            const [currentPlayers, allMatches] = await Promise.all([
-                dataService.getPlayers(),
-                dataService.getMatches()
-            ]);
+    // --- PRICE IMPORT LOGIC ---
+    const parseImportText = () => {
+        if (!importText.trim()) return;
 
-            const results = currentPlayers.map(p => {
-                // SIMULACIÓN DE TEMPORADA
-                // Usamos el precio actual de la DB como punto de partida (Precio Base Inicial)
-                // Se asume que el usuario ha reseteado los precios a su valor inicial antes de correr esto.
-                let simulatedCost = p.cost || 250; 
-                let cumulativePoints = 0;
-                let cumulativeGames = 0;
-                let lastChange = 0;
+        const lines = importText.split('\n');
+        const updates: any[] = [];
 
-                // Iteramos desde la Ronda 1 hasta la Ronda ANTERIOR a la seleccionada.
-                // Ejemplo: Si selecciono "Jornada 4", simulo J1, J2 y J3 para llegar al precio inicial de J4.
-                for (let r = 1; r < targetRoundId; r++) {
-                    const roundConfig = FANTASY_SCHEDULE.find(sch => sch.id === r);
-                    if (!roundConfig) continue;
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
 
-                    // 1. Obtener partidos de ESTA ronda simulada
-                    const roundMatches = allMatches.filter(m => 
-                        m.isCompleted && 
-                        m.stats && 
-                        m.stats[p.id] &&
-                        (roundConfig.stage === Stage.GROUPS ? m.stage === Stage.GROUPS : m.stage !== Stage.GROUPS) &&
-                        roundConfig.matchdays.includes(m.day || 0)
-                    );
+            // Intentar separar el nombre del precio. 
+            // Buscamos el último número de la línea como precio.
+            // Ej: "Hans Sama 300" -> Name: "Hans Sama", Price: 300
+            // Ej: "Caps: 350" -> Name: "Caps", Price: 350
+            
+            const match = trimmed.match(/^(.*?)[ \t:;]+(\d+)$/);
+            
+            if (match) {
+                const rawName = match[1].trim().replace(/[:;]/g, ''); // Limpiar separadores extra
+                const price = parseInt(match[2]);
 
-                    // 2. Acumular estadísticas
-                    let pointsInRound = 0;
-                    let gamesInRound = 0;
+                // Buscar jugador (Case insensitive)
+                const player = players.find(p => p.name.toLowerCase() === rawName.toLowerCase());
 
-                    roundMatches.forEach(m => {
-                        if (m.stats && m.stats[p.id]) {
-                            pointsInRound += m.stats[p.id].totalPoints;
-                            gamesInRound++;
-                        }
+                if (player) {
+                    updates.push({
+                        player: player,
+                        newCost: price,
+                        found: true,
+                        originalName: rawName
                     });
-
-                    // 3. Aplicar lógica de cambio de precio SI jugó en esta ronda
-                    if (gamesInRound > 0) {
-                        cumulativePoints += pointsInRound;
-                        cumulativeGames += gamesInRound;
-
-                        const currentTotalAvg = cumulativePoints / cumulativeGames;
-                        const targetPrice = currentTotalAvg * 18; // Fórmula oficial
-
-                        let change = 0;
-                        if (targetPrice > simulatedCost) {
-                            // Subida: 20% de la diferencia, max 50
-                            change = Math.min(50, Math.ceil((targetPrice - simulatedCost) * 0.2)); 
-                        } else if (targetPrice < simulatedCost) {
-                            // Bajada: 10% de la diferencia, max 50
-                            change = Math.max(-50, Math.floor((targetPrice - simulatedCost) * 0.1)); 
-                        }
-
-                        // Actualizar precio simulado para la siguiente ronda
-                        simulatedCost = Math.round(simulatedCost + change);
-                        // Hard Limits
-                        simulatedCost = Math.max(150, Math.min(550, simulatedCost));
-                        
-                        lastChange = change; // Guardar la tendencia de la última ronda simulada
-                    }
+                } else {
+                    updates.push({
+                        player: null,
+                        newCost: price,
+                        found: false,
+                        originalName: rawName
+                    });
                 }
+            }
+        });
 
-                // Resultado Final
-                const finalAvg = cumulativeGames > 0 ? parseFloat((cumulativePoints / cumulativeGames).toFixed(1)) : (p.averagePoints || 0);
-
-                return {
-                    id: p.id,
-                    name: p.name,
-                    role: p.role,
-                    currentCost: p.cost, // Lo que tiene ahora en la BD (tu precio base)
-                    newCost: simulatedCost, // Lo que debería tener según la simulación
-                    priceChange: lastChange, // La última tendencia
-                    currentAvg: p.averagePoints,
-                    newAvg: finalAvg,
-                    totalPoints: parseFloat(cumulativePoints.toFixed(1))
-                };
-            });
-
-            // Sort by biggest absolute change to highlight fixes
-            setCalculatedData(results.sort((a, b) => Math.abs(b.newCost - b.currentCost) - Math.abs(a.newCost - a.currentCost)));
-
-        } catch (e) {
-            console.error(e);
-            alert("Error calculando precios");
-        } finally {
-            setIsCalibrating(false);
-        }
+        setPendingUpdates(updates);
     };
 
-    const applyCalibration = async () => {
-        if (!calculatedData.length) return;
-        if (!window.confirm(`¿Estás seguro de actualizar ${calculatedData.length} jugadores? Esto sobrescribirá precios y medias.`)) return;
+    const applyPriceUpdates = async () => {
+        const validUpdates = pendingUpdates.filter(u => u.found && u.player);
+        if (validUpdates.length === 0) return;
+
+        if (!window.confirm(`¿Aplicar nuevos precios a ${validUpdates.length} jugadores?`)) return;
 
         setIsSaving(true);
         try {
-            // NEW: Batch updates using updatePlayersBulk to avoid race conditions
-            const bulkUpdates = calculatedData.map(d => ({
-                id: d.id,
+            // Preparar payload para update masivo
+            const bulkData = validUpdates.map(u => ({
+                id: u.player.id,
                 data: {
-                    cost: d.newCost,
-                    priceChange: d.priceChange, // Store the trend!
-                    averagePoints: d.newAvg,
-                    totalPoints: d.totalPoints
+                    cost: u.newCost,
+                    // Calcular cambio de precio automáticamente si existe precio anterior
+                    priceChange: u.player.cost ? u.newCost - u.player.cost : 0
                 }
             }));
 
-            await dataService.updatePlayersBulk(bulkUpdates);
+            await dataService.updatePlayersBulk(bulkData);
             
-            alert("¡Base de datos actualizada con éxito!");
-            setCalculatedData([]);
-            await loadData(); // Refresh main view
+            alert("¡Precios actualizados correctamente!");
+            setPendingUpdates([]);
+            setImportText("");
+            await loadData();
             setActiveTab('players');
 
         } catch (e) {
             console.error(e);
-            alert("Hubo errores al guardar algunos registros.");
+            alert("Error al actualizar precios.");
         } finally {
             setIsSaving(false);
         }
@@ -238,7 +186,7 @@ export const DatabaseManager: React.FC = () => {
                     src={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`} 
                     srcSet={`https://flagcdn.com/w80/${countryCode.toLowerCase()}.png 2x`}
                     width="24" 
-                    height="16" // Aspect ratio approx for flags
+                    height="16" 
                     alt={countryCode} 
                     className="rounded-sm shadow-sm object-cover"
                 />
@@ -283,11 +231,11 @@ export const DatabaseManager: React.FC = () => {
                     Equipos ({teams.length})
                 </button>
                 <button 
-                    onClick={() => setActiveTab('calibrator')}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold uppercase tracking-wider transition-all border ${activeTab === 'calibrator' ? 'bg-purple-600 text-white border-purple-500' : 'bg-[#0f1923] text-gray-400 border-gray-700 hover:text-white'}`}
+                    onClick={() => setActiveTab('prices')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold uppercase tracking-wider transition-all border ${activeTab === 'prices' ? 'bg-green-600 text-white border-green-500' : 'bg-[#0f1923] text-gray-400 border-gray-700 hover:text-white'}`}
                 >
-                    <Calculator className="w-4 h-4" />
-                    Calibrador de Precios
+                    <DollarSign className="w-4 h-4" />
+                    Importar Precios
                 </button>
             </div>
 
@@ -671,116 +619,118 @@ export const DatabaseManager: React.FC = () => {
                 </div>
             )}
 
-            {/* --- CALIBRATOR VIEW (NEW) --- */}
-            {activeTab === 'calibrator' && (
+            {/* --- PRICES IMPORT VIEW (NEW) --- */}
+            {activeTab === 'prices' && (
                 <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl p-6">
                     <div className="flex flex-col items-center justify-center text-center mb-8">
-                        <div className="p-3 bg-purple-900/30 rounded-full border border-purple-500/50 mb-3">
-                            <Calculator className="w-8 h-8 text-purple-400" />
+                        <div className="p-3 bg-green-900/30 rounded-full border border-green-500/50 mb-3">
+                            <DollarSign className="w-8 h-8 text-green-400" />
                         </div>
-                        <h2 className="text-xl font-bold text-white mb-2">Simulador de Evolución de Precios</h2>
+                        <h2 className="text-xl font-bold text-white mb-2">Importar Precios Masivamente</h2>
                         <p className="text-gray-400 text-sm max-w-lg">
-                            Esta herramienta simula la evolución de los precios ronda a ronda para corregir datos. Empezará con un precio base de 250$ para todos y aplicará los cambios acumulados.
+                            Pega aquí una lista de nombres y precios para actualizarlos de golpe.
+                            El sistema detectará automáticamente el nombre del jugador y el precio al final de la línea.
                         </p>
-                        
-                        {/* INSTRUCTION BOX FOR ROLLBACK */}
-                        <div className="mt-4 bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg text-xs text-blue-200 text-left max-w-lg flex items-start gap-3">
-                            <CalendarClock className="w-5 h-5 text-blue-400 flex-shrink-0" />
-                            <div>
-                                <p className="font-bold mb-1">Cómo funciona:</p>
-                                <p className="opacity-80">Si seleccionas <strong>Jornada 4</strong>, el sistema simulará J1, J2 y J3 para calcular el precio exacto con el que deben empezar la Jornada 4.</p>
-                            </div>
+                        <div className="mt-4 bg-black/40 p-2 rounded border border-gray-700 text-xs font-mono text-gray-400">
+                            Ejemplo:<br/>
+                            Hans Sama 300<br/>
+                            Caps: 350<br/>
+                            Yike 280
                         </div>
                     </div>
 
-                    <div className="flex flex-col items-center justify-center mb-8 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         
-                        {/* CALIBRATION LIMIT SELECTOR */}
-                        <div className="flex items-center gap-2 bg-[#0f1d36] p-2 rounded-lg border border-gray-700">
-                            <label className="text-xs font-bold text-gray-400 uppercase">Preparar para el inicio de:</label>
-                            <select 
-                                value={targetRoundId}
-                                onChange={(e) => setTargetRoundId(parseInt(e.target.value))}
-                                disabled={isCalibrating || calculatedData.length > 0}
-                                className="bg-black text-white text-sm font-bold border border-gray-600 rounded px-2 py-1 outline-none focus:border-purple-500"
-                            >
-                                {FANTASY_SCHEDULE.map((round) => (
-                                    <option key={round.id} value={round.id}>{round.label} (Ronda {round.id})</option>
-                                ))}
-                            </select>
+                        {/* INPUT AREA */}
+                        <div className="flex flex-col gap-4">
+                            <textarea 
+                                className="w-full h-64 bg-[#050a14] border border-gray-700 rounded-lg p-4 text-white text-sm font-mono focus:border-green-500 outline-none resize-none"
+                                placeholder="Pega tu lista aquí..."
+                                value={importText}
+                                onChange={(e) => setImportText(e.target.value)}
+                            />
+                            <div className="flex justify-end gap-3">
+                                <button 
+                                    onClick={() => { setImportText(""); setPendingUpdates([]); }}
+                                    className="px-4 py-2 rounded text-gray-400 hover:text-white hover:bg-white/5"
+                                >
+                                    Limpiar
+                                </button>
+                                <button 
+                                    onClick={parseImportText}
+                                    disabled={!importText.trim()}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg flex items-center gap-2 transition-all disabled:opacity-50"
+                                >
+                                    <FileText className="w-4 h-4" />
+                                    Analizar Texto
+                                </button>
+                            </div>
                         </div>
 
-                        {calculatedData.length === 0 ? (
-                            <button 
-                                onClick={runCalibration}
-                                disabled={isCalibrating}
-                                className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-full shadow-lg flex items-center gap-3 transition-all transform hover:scale-105"
-                            >
-                                {isCalibrating ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-                                {isCalibrating ? 'Simulando...' : 'Iniciar Simulación'}
-                            </button>
-                        ) : (
-                            <div className="flex flex-col items-center gap-4 animate-in fade-in w-full">
-                                <div className="flex items-center gap-4 bg-yellow-900/20 p-4 rounded-lg border border-yellow-500/30">
-                                    <AlertTriangle className="w-6 h-6 text-yellow-500" />
-                                    <div className="text-left">
-                                        <p className="text-yellow-200 font-bold text-sm">Simulación Completada</p>
-                                        <p className="text-yellow-400/80 text-xs">Se han recalculado los precios de inicio para la {FANTASY_SCHEDULE.find(r => r.id === targetRoundId)?.label}.</p>
+                        {/* PREVIEW AREA */}
+                        <div className="bg-[#050a14] border border-gray-700 rounded-lg overflow-hidden flex flex-col h-64 md:h-auto">
+                            <div className="p-3 bg-[#0f1d36] border-b border-gray-700 font-bold text-xs uppercase text-gray-400 flex justify-between items-center">
+                                <span>Vista Previa ({pendingUpdates.length})</span>
+                                {pendingUpdates.length > 0 && (
+                                    <span className="text-green-400">{pendingUpdates.filter(u => u.found).length} Encontrados</span>
+                                )}
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                                {pendingUpdates.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-600 gap-2">
+                                        <ArrowRight className="w-6 h-6 opacity-30" />
+                                        <span className="text-xs">Esperando análisis...</span>
                                     </div>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button 
-                                        onClick={applyCalibration}
-                                        disabled={isSaving}
-                                        className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-full shadow-lg flex items-center gap-3 transition-all transform hover:scale-105"
-                                    >
-                                        {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
-                                        Aplicar Cambios a Base de Datos
-                                    </button>
-                                    <button 
-                                        onClick={() => setCalculatedData([])}
-                                        className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all"
-                                    >
-                                        Cancelar
-                                    </button>
-                                </div>
+                                ) : (
+                                    pendingUpdates.map((u, idx) => (
+                                        <div key={idx} className={`flex items-center justify-between p-2 rounded border ${u.found ? 'bg-green-900/10 border-green-900/30' : 'bg-red-900/10 border-red-900/30'}`}>
+                                            <div className="flex items-center gap-2">
+                                                {u.found ? (
+                                                    <Check className="w-3 h-3 text-green-500" />
+                                                ) : (
+                                                    <AlertTriangle className="w-3 h-3 text-red-500" />
+                                                )}
+                                                <div className="flex flex-col">
+                                                    <span className={`text-xs font-bold ${u.found ? 'text-white' : 'text-red-400 line-through'}`}>
+                                                        {u.found ? u.player?.name : u.originalName}
+                                                    </span>
+                                                    {!u.found && <span className="text-[9px] text-red-500">No encontrado</span>}
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex items-center gap-3">
+                                                {u.found && (
+                                                    <span className="text-xs text-gray-500 line-through">${u.player?.cost}</span>
+                                                )}
+                                                <div className="flex items-center gap-1">
+                                                    <ArrowRight className="w-3 h-3 text-gray-600" />
+                                                    <span className="text-sm font-bold text-green-400">${u.newCost}</span>
+                                                </div>
+                                                {u.found && u.player && (
+                                                    <span className={`text-[10px] font-bold ${u.newCost > u.player.cost ? 'text-green-500' : u.newCost < u.player.cost ? 'text-red-500' : 'text-gray-500'}`}>
+                                                        {u.newCost > u.player.cost ? '+' : ''}{u.newCost - u.player.cost}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
-                        )}
+                        </div>
                     </div>
 
-                    {calculatedData.length > 0 && (
-                        <div className="overflow-x-auto max-h-[600px] border border-gray-700 rounded-lg">
-                            <table className="w-full text-left text-sm text-gray-300">
-                                <thead className="bg-[#1a2c4e] text-gray-400 uppercase font-bold text-xs sticky top-0 z-10">
-                                    <tr>
-                                        <th className="p-3">Jugador</th>
-                                        <th className="p-3 text-center">Media (Simulada)</th>
-                                        <th className="p-3 text-center">Coste Actual (BD)</th>
-                                        <th className="p-3 text-center text-[#0ac8b9]">Nuevo Coste (Simulado)</th>
-                                        <th className="p-3 text-right">Corrección</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-800 bg-[#0a1428]">
-                                    {calculatedData.map(d => {
-                                        const diff = d.newCost - d.currentCost;
-                                        const hasChange = diff !== 0;
-                                        return (
-                                            <tr key={d.id} className={hasChange ? 'bg-white/5' : ''}>
-                                                <td className="p-3 font-bold text-white flex items-center gap-2">
-                                                    <img src={ROLE_ICONS[d.role as Role]} className="w-4 h-4 opacity-70" />
-                                                    {d.name}
-                                                </td>
-                                                <td className="p-3 text-center text-white font-bold">{d.newAvg}</td>
-                                                <td className="p-3 text-center text-gray-500">${d.currentCost}</td>
-                                                <td className="p-3 text-center font-bold text-white">${d.newCost}</td>
-                                                <td className={`p-3 text-right font-bold ${diff > 0 ? 'text-green-400' : diff < 0 ? 'text-red-400' : 'text-gray-600'}`}>
-                                                    {diff > 0 ? '+' : ''}{diff}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                    {/* ACTION FOOTER */}
+                    {pendingUpdates.length > 0 && (
+                        <div className="mt-6 flex justify-center border-t border-gray-700 pt-6">
+                            <button 
+                                onClick={applyPriceUpdates}
+                                disabled={isSaving || pendingUpdates.filter(u => u.found).length === 0}
+                                className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-10 rounded-full shadow-lg flex items-center gap-3 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                                Aplicar Cambios
+                            </button>
                         </div>
                     )}
                 </div>
