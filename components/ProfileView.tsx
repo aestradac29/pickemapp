@@ -436,10 +436,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
         <div className="mb-4">
             <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1.5">
                 <span className="text-gray-400">{label}</span>
-                <span className="text-white">{value} Pts</span>
+                <span className="text-white">
+                    {value} <span className="text-gray-500">/ {max}</span> Pts
+                </span>
             </div>
-            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-                <div className={`h-full transition-all duration-500 ${color}`} style={{ width: `${Math.min((value / (max || 1)) * 100, 100)}%` }}></div>
+            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden border border-gray-700/50">
+                <div className={`h-full transition-all duration-1000 ease-out ${color}`} style={{ width: `${Math.min((value / (max || 1)) * 100, 100)}%` }}></div>
             </div>
         </div>
     );
@@ -940,18 +942,27 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                     Desglose de Puntuación
                 </h3>
                 
-                <BreakdownBar label="Predicciones Jornada (Matchday)" value={user.scoreBreakdown.matchday} max={100} color="bg-blue-500" />
-                <BreakdownBar label="Ranking Winter 2026" value={user.scoreBreakdown.ranking} max={100} color="bg-green-500" />
-                <BreakdownBar label="Playoffs" value={user.scoreBreakdown.playoffs} max={150} color="bg-red-500" />
+                {/* Matchday: 11 Days * 5 Matches = 55 Pts Max */}
+                <BreakdownBar label="Predicciones Jornada (Matchday)" value={user.scoreBreakdown.matchday} max={55} color="bg-blue-500" />
+                
+                {/* Ranking: 10 Teams * 6 Pts (Exact) = 60 Pts Max */}
+                <BreakdownBar label="Ranking Winter 2026" value={user.scoreBreakdown.ranking} max={60} color="bg-green-500" />
+                
+                {/* Playoffs: Calculated based on bracket structure (~66 Pts Max) */}
+                <BreakdownBar label="Playoffs" value={user.scoreBreakdown.playoffs} max={66} color="bg-red-500" />
                 
                 <div className="mt-6 pt-6 border-t border-gray-800 grid grid-cols-2 gap-4">
-                    <div className="bg-[#0a1428] p-3 rounded border border-gray-700">
+                    <div className="bg-[#0a1428] p-3 rounded border border-gray-700 flex flex-col justify-center">
                         <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Aciertos Bola de Cristal</div>
-                        <div className="text-purple-400 font-bold text-xl">{user.scoreBreakdown.crystalBall} Pts</div>
+                        <div className="text-purple-400 font-bold text-xl">
+                            {user.scoreBreakdown.crystalBall} <span className="text-sm text-purple-400/50">/ 100</span>
+                        </div>
                     </div>
-                    <div className="bg-[#0a1428] p-3 rounded border border-gray-700">
+                    <div className="bg-[#0a1428] p-3 rounded border border-gray-700 flex flex-col justify-center">
                         <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Liga Fantasy</div>
-                        <div className="text-[#0ac8b9] font-bold text-xl">{user.scoreBreakdown.fantasy} Pts</div>
+                        <div className="text-[#0ac8b9] font-bold text-xl">
+                            {user.scoreBreakdown.fantasy} <span className="text-sm text-[#0ac8b9]/50">Pts</span>
+                        </div>
                     </div>
                 </div>
             </div>
