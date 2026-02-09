@@ -1,23 +1,29 @@
 
 import React, { useState, useEffect } from 'react';
-import { Player, Team, Role, Match, Stage } from '../types';
+import { Player, Team, Role, Match, Stage, User, CustomCosmetic } from '../types';
 import { dataService } from '../services/dataService';
-import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download, TrendingUp, History, Hash } from 'lucide-react';
-import { ROLE_ICONS, COUNTRIES, FANTASY_SCHEDULE } from '../constants';
+import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download, TrendingUp, History, Hash, Gift, Medal, Crown, Sparkles, Plus, Trash2 } from 'lucide-react';
+import { ROLE_ICONS, COUNTRIES, FANTASY_SCHEDULE, SPECIAL_REWARDS, BADGE_DEFINITIONS } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'prices'>('players');
+    const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'prices' | 'users'>('players');
     
     // Data State
     const [players, setPlayers] = useState<Player[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [allMatches, setAllMatches] = useState<Match[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Editing State
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editFormPlayer, setEditFormPlayer] = useState<Partial<Player>>({});
     const [editFormTeam, setEditFormTeam] = useState<Partial<Team>>({});
+    
+    // Gift Modal State
+    const [giftingUser, setGiftingUser] = useState<User | null>(null);
+    const [giftTab, setGiftTab] = useState<'cosmetics' | 'badges' | 'custom'>('cosmetics');
+    const [customTitleInput, setCustomTitleInput] = useState("");
     
     // Filter State
     const [search, setSearch] = useState("");
@@ -54,14 +60,16 @@ export const DatabaseManager: React.FC = () => {
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const [p, tMap, matches] = await Promise.all([
+            const [p, tMap, matches, uList] = await Promise.all([
                 dataService.getPlayers(),
                 dataService.getTeams(),
-                dataService.getMatches()
+                dataService.getMatches(),
+                dataService.getAllUsers()
             ]);
             setPlayers(p);
             setTeams(Object.values(tMap));
             setAllMatches(matches);
+            setUsers(uList);
         } catch (e) {
             console.error(e);
         } finally {
@@ -114,6 +122,95 @@ export const DatabaseManager: React.FC = () => {
             alert("Error al guardar equipo");
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    // --- GIFTING LOGIC ---
+    const handleToggleCosmetic = async (rewardId: string, type: 'title' | 'banner') => {
+        if (!giftingUser) return;
+        const currentUnlocked = giftingUser.unlockedCosmetics || [];
+        let newUnlocked = [...currentUnlocked];
+
+        if (newUnlocked.includes(rewardId)) {
+            newUnlocked = newUnlocked.filter(id => id !== rewardId);
+        } else {
+            newUnlocked.push(rewardId);
+        }
+
+        try {
+            await dataService.updateUserProfile(giftingUser.id, { unlockedCosmetics: newUnlocked });
+            // Update local state to reflect change instantly in modal
+            setGiftingUser({ ...giftingUser, unlockedCosmetics: newUnlocked });
+            // Refresh users list in background
+            const uList = await dataService.getAllUsers();
+            setUsers(uList);
+        } catch (e) {
+            console.error("Error toggling cosmetic", e);
+        }
+    };
+
+    const handleToggleBadge = async (badgeId: string) => {
+        if (!giftingUser) return;
+        const currentBadges = giftingUser.badges || [];
+        let newBadges = [...currentBadges];
+
+        if (newBadges.includes(badgeId)) {
+            newBadges = newBadges.filter(id => id !== badgeId);
+        } else {
+            newBadges.push(badgeId);
+        }
+
+        try {
+            await dataService.updateUserProfile(giftingUser.id, { badges: newBadges });
+            setGiftingUser({ ...giftingUser, badges: newBadges });
+            const uList = await dataService.getAllUsers();
+            setUsers(uList);
+        } catch (e) {
+            console.error("Error toggling badge", e);
+        }
+    };
+
+    const handleCreateCustomTitle = async () => {
+        if (!giftingUser || !customTitleInput.trim()) return;
+        
+        const newTitle: CustomCosmetic = {
+            id: `custom_${Date.now()}`,
+            label: customTitleInput.trim(),
+            type: 'title',
+            description: 'Título personalizado exclusivo'
+        };
+
+        const currentCustoms = giftingUser.customCosmetics || [];
+        const newCustoms = [...currentCustoms, newTitle];
+
+        try {
+            // Also optionally set it as active immediately? No, user chooses.
+            await dataService.updateUserProfile(giftingUser.id, { customCosmetics: newCustoms });
+            setGiftingUser({ ...giftingUser, customCosmetics: newCustoms });
+            setCustomTitleInput("");
+            const uList = await dataService.getAllUsers();
+            setUsers(uList);
+        } catch (e) {
+            console.error("Error creating custom title", e);
+        }
+    };
+
+    const handleDeleteCustomTitle = async (customId: string) => {
+        if (!giftingUser) return;
+        if (!window.confirm("¿Borrar este título personalizado?")) return;
+
+        const currentCustoms = giftingUser.customCosmetics || [];
+        const newCustoms = currentCustoms.filter(c => c.id !== customId);
+
+        try {
+            // If the user had this title equipped, we should probably reset their title or handle it, 
+            // but for simplicity we just remove it from the list.
+            await dataService.updateUserProfile(giftingUser.id, { customCosmetics: newCustoms });
+            setGiftingUser({ ...giftingUser, customCosmetics: newCustoms });
+            const uList = await dataService.getAllUsers();
+            setUsers(uList);
+        } catch (e) {
+            console.error("Error deleting custom title", e);
         }
     };
 
@@ -322,6 +419,13 @@ export const DatabaseManager: React.FC = () => {
                 >
                     <Shield className="w-4 h-4" />
                     Equipos ({teams.length})
+                </button>
+                <button 
+                    onClick={() => setActiveTab('users')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold uppercase tracking-wider transition-all border ${activeTab === 'users' ? 'bg-[#c8aa6e] text-[#0a1428] border-[#c8aa6e]' : 'bg-[#0f1923] text-gray-400 border-gray-700 hover:text-white'}`}
+                >
+                    <Gift className="w-4 h-4" />
+                    Usuarios & Regalos
                 </button>
                 <button 
                     onClick={() => setActiveTab('prices')}
@@ -712,6 +816,78 @@ export const DatabaseManager: React.FC = () => {
                 </div>
             )}
 
+            {/* --- USERS & GIFTING VIEW --- */}
+            {activeTab === 'users' && (
+                <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm text-gray-300">
+                            <thead className="bg-[#1a2c4e] text-gray-400 uppercase font-bold text-xs">
+                                <tr>
+                                    <th className="p-4">Usuario</th>
+                                    <th className="p-4">Puntos Totales</th>
+                                    <th className="p-4">Rango</th>
+                                    <th className="p-4">Título Actual</th>
+                                    <th className="p-4">Regalos (Manuales)</th>
+                                    <th className="p-4 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-800">
+                                {users.sort((a,b) => b.score - a.score).map((user, idx) => {
+                                    return (
+                                        <tr key={user.id} className="hover:bg-white/5 transition-colors">
+                                            {/* NAME & AVATAR */}
+                                            <td className="p-4">
+                                                <div className="flex items-center gap-3">
+                                                    <img src={user.avatar} className="w-10 h-10 rounded-full border border-gray-600" />
+                                                    <div>
+                                                        <div className="font-bold text-white">{user.name}</div>
+                                                        <div className="text-xs text-gray-500">{user.id}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {/* SCORE */}
+                                            <td className="p-4 font-bold text-[#c8aa6e]">
+                                                {user.score}
+                                            </td>
+
+                                            {/* RANK */}
+                                            <td className="p-4 font-mono">
+                                                #{idx + 1}
+                                            </td>
+
+                                            {/* TITLE */}
+                                            <td className="p-4">
+                                                {user.title ? (
+                                                    <span className="bg-black/30 px-2 py-1 rounded text-xs border border-gray-700">{user.title}</span>
+                                                ) : <span className="text-gray-600 italic">-</span>}
+                                            </td>
+
+                                            {/* UNLOCKED COSMETICS COUNT */}
+                                            <td className="p-4">
+                                                <span className="text-xs bg-purple-900/30 text-purple-300 px-2 py-1 rounded border border-purple-500/30">
+                                                    {user.unlockedCosmetics?.length || 0} items
+                                                </span>
+                                            </td>
+
+                                            {/* ACTIONS */}
+                                            <td className="p-4 text-right">
+                                                <button 
+                                                    onClick={() => setGiftingUser(user)}
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-[#c8aa6e]/10 border border-[#c8aa6e]/50 text-[#c8aa6e] rounded-lg hover:bg-[#c8aa6e] hover:text-[#0a1428] transition-all ml-auto text-xs font-bold uppercase"
+                                                >
+                                                    <Gift className="w-3 h-3" /> Regalar
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
             {/* --- PRICES IMPORT VIEW --- */}
             {activeTab === 'prices' && (
                 <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl p-6">
@@ -888,6 +1064,171 @@ export const DatabaseManager: React.FC = () => {
                             </button>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* --- GIFTING MODAL --- */}
+            {giftingUser && (
+                <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="w-full max-w-2xl bg-[#091428] border-2 border-[#c8aa6e] rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="p-4 bg-[#0f1d36] border-b border-gray-700 flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Gift className="w-5 h-5 text-[#c8aa6e]" />
+                                Regalar Recompensas a <span className="text-[#c8aa6e]">{giftingUser.name}</span>
+                            </h3>
+                            <button onClick={() => setGiftingUser(null)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+                        </div>
+                        
+                        <div className="p-2 bg-[#050a14] flex gap-2 justify-center border-b border-gray-800">
+                            <button 
+                                onClick={() => setGiftTab('cosmetics')}
+                                className={`px-4 py-2 rounded text-xs font-bold uppercase transition-all ${giftTab === 'cosmetics' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                Cosméticos Especiales
+                            </button>
+                            <button 
+                                onClick={() => setGiftTab('badges')}
+                                className={`px-4 py-2 rounded text-xs font-bold uppercase transition-all ${giftTab === 'badges' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                Insignias (Logros)
+                            </button>
+                            <button 
+                                onClick={() => setGiftTab('custom')}
+                                className={`px-4 py-2 rounded text-xs font-bold uppercase transition-all ${giftTab === 'custom' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                Forja (Personalizado)
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 bg-[#091428]">
+                            {giftTab === 'cosmetics' && (
+                                <div className="space-y-4">
+                                    <p className="text-sm text-gray-400 mb-4 text-center">Desbloquea estandartes o títulos exclusivos que no dependen del nivel.</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {SPECIAL_REWARDS.map(reward => {
+                                            const isUnlocked = giftingUser.unlockedCosmetics?.includes(reward.id);
+                                            const Icon = reward.icon;
+                                            return (
+                                                <button
+                                                    key={reward.id}
+                                                    onClick={() => handleToggleCosmetic(reward.id, reward.type as any)}
+                                                    className={`
+                                                        flex items-center gap-3 p-3 rounded-lg border text-left transition-all
+                                                        ${isUnlocked 
+                                                            ? 'bg-[#c8aa6e]/20 border-[#c8aa6e] ring-1 ring-[#c8aa6e]/50' 
+                                                            : 'bg-[#0f1d36] border-gray-700 hover:border-gray-500'
+                                                        }
+                                                    `}
+                                                >
+                                                    <div className={`p-2 rounded-full ${isUnlocked ? 'bg-[#c8aa6e] text-[#0a1428]' : 'bg-gray-800 text-gray-500'}`}>
+                                                        <Icon className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <div className={`text-sm font-bold ${isUnlocked ? 'text-[#c8aa6e]' : 'text-gray-300'}`}>{reward.label}</div>
+                                                        <div className="text-[10px] text-gray-500 uppercase font-bold">{reward.type === 'title' ? 'Título' : 'Estandarte'}</div>
+                                                        <div className="text-[10px] text-gray-600 mt-1">{reward.description}</div>
+                                                    </div>
+                                                    {isUnlocked && <Check className="w-5 h-5 text-[#c8aa6e] ml-auto" />}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {giftTab === 'badges' && (
+                                <div className="space-y-4">
+                                    <p className="text-sm text-gray-400 mb-4 text-center">Otorga insignias manualmente (ej: MVP Fantasy).</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {Object.entries(BADGE_DEFINITIONS).map(([id, def]) => {
+                                            const isUnlocked = giftingUser.badges?.includes(id);
+                                            const Icon = def.icon;
+                                            return (
+                                                <button
+                                                    key={id}
+                                                    onClick={() => handleToggleBadge(id)}
+                                                    className={`
+                                                        flex items-center gap-3 p-3 rounded-lg border text-left transition-all
+                                                        ${isUnlocked 
+                                                            ? 'bg-green-900/20 border-green-500 ring-1 ring-green-500/30' 
+                                                            : 'bg-[#0f1d36] border-gray-700 hover:border-gray-500'
+                                                        }
+                                                    `}
+                                                >
+                                                    <div className={`p-2 rounded-full ${isUnlocked ? 'bg-green-500 text-[#0a1428]' : 'bg-gray-800 text-gray-500'}`}>
+                                                        <Icon className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <div className={`text-sm font-bold ${isUnlocked ? 'text-green-400' : 'text-gray-300'}`}>{def.label}</div>
+                                                        <div className="text-[10px] text-gray-600 mt-1">{def.description}</div>
+                                                    </div>
+                                                    {isUnlocked && <Check className="w-5 h-5 text-green-500 ml-auto" />}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {giftTab === 'custom' && (
+                                <div className="space-y-6">
+                                    <div className="bg-purple-900/10 border border-purple-500/30 p-4 rounded-xl">
+                                        <h4 className="text-purple-300 font-bold uppercase text-xs tracking-widest mb-3 flex items-center gap-2">
+                                            <Sparkles className="w-4 h-4" /> Forjador de Títulos
+                                        </h4>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="text"
+                                                value={customTitleInput}
+                                                onChange={(e) => setCustomTitleInput(e.target.value)}
+                                                placeholder="Ej: Rey del Draft..."
+                                                className="flex-1 bg-black/40 border border-purple-500/50 rounded-lg px-4 py-2 text-white text-sm outline-none focus:border-purple-400"
+                                            />
+                                            <button 
+                                                onClick={handleCreateCustomTitle}
+                                                disabled={!customTitleInput.trim()}
+                                                className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <Plus className="w-4 h-4" /> Crear
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-gray-500 mt-2">
+                                            Este título será exclusivo para <strong>{giftingUser.name}</strong> y aparecerá en su selector de perfil.
+                                        </p>
+                                    </div>
+
+                                    {/* LIST EXISTING CUSTOM TITLES */}
+                                    {giftingUser.customCosmetics && giftingUser.customCosmetics.length > 0 && (
+                                        <div>
+                                            <h4 className="text-gray-400 font-bold uppercase text-xs tracking-widest mb-3">Títulos Creados</h4>
+                                            <div className="space-y-2">
+                                                {giftingUser.customCosmetics.map(cosmetic => (
+                                                    <div key={cosmetic.id} className="flex items-center justify-between p-3 bg-[#0f1d36] rounded-lg border border-gray-700">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="p-2 bg-purple-900/30 rounded-full text-purple-400">
+                                                                <Crown className="w-4 h-4" />
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-white font-bold text-sm block">{cosmetic.label}</span>
+                                                                <span className="text-[10px] text-gray-500 uppercase">Personalizado</span>
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => handleDeleteCustomTitle(cosmetic.id)}
+                                                            className="p-2 hover:bg-red-900/30 text-gray-500 hover:text-red-400 rounded-lg transition-colors"
+                                                            title="Eliminar"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
 

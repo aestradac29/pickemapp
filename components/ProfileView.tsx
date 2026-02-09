@@ -5,7 +5,7 @@ import { dataService } from '../services/dataService';
 import { getChampions } from '../services/riotService';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { PenLine, Save, Loader2, CheckCircle2, User as UserIcon, Trophy, Sparkles, Swords, Medal, AlertCircle, Link, Image as ImageIcon, Gift, Lock, Star, Crown, CircleDashed, LayoutTemplate, Share2, Copy, Download, Camera, Zap, Eye } from 'lucide-react';
-import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS } from '../constants';
+import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, SPECIAL_REWARDS } from '../constants';
 import html2canvas from 'html2canvas';
 
 interface ProfileViewProps {
@@ -313,7 +313,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
         
         // Calculate dynamic level with multiplier
         const currentLevel = Math.floor((user.score * XP_MULTIPLIER) / XP_PER_LEVEL) + 1;
-        if (currentLevel < reward.level) return;
+        const isManuallyUnlocked = user.unlockedCosmetics?.includes(reward.id);
+
+        if (currentLevel < reward.level && !isManuallyUnlocked) return;
 
         setEquippingId(reward.id);
         const updates: any = {};
@@ -363,20 +365,51 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
         }
     };
 
-    // Transform champions into Title Options
+    // Transform champions into Title Options (Includes Unlocked Special Titles & Custom Titles)
     const titleOptions: Option[] = useMemo(() => {
-        return championOptions.map(c => ({
+        const baseOptions = championOptions.map(c => ({
             id: c.subLabel || c.label, 
             label: c.subLabel || 'Campeón',
             subLabel: `Título de ${c.label}`,
             image: c.image,
             color: c.color
-        })).sort((a, b) => a.label.localeCompare(b.label));
-    }, [championOptions]);
+        }));
 
-    // Transform Loaded Teams into Banner Options
+        // Inject Special Titles if Unlocked
+        if (user) {
+            // 1. Defined Special Rewards
+            if (user.unlockedCosmetics) {
+                SPECIAL_REWARDS.filter(r => r.type === 'title' && user.unlockedCosmetics?.includes(r.id)).forEach(reward => {
+                    baseOptions.unshift({
+                        id: reward.label,
+                        label: reward.label,
+                        subLabel: 'Recompensa Especial',
+                        color: '#c8aa6e'
+                    });
+                });
+            }
+
+            // 2. Custom Titles (New)
+            if (user.customCosmetics) {
+                user.customCosmetics.forEach(custom => {
+                    if (custom.type === 'title') {
+                        baseOptions.unshift({
+                            id: custom.label,
+                            label: custom.label,
+                            subLabel: custom.description || 'Título Personalizado',
+                            color: '#a855f7' // Purple for Custom
+                        });
+                    }
+                });
+            }
+        }
+
+        return baseOptions.sort((a, b) => a.label.localeCompare(b.label));
+    }, [championOptions, user]);
+
+    // Transform Loaded Teams into Banner Options (Includes Unlocked Special Banners)
     const bannerOptions: Option[] = useMemo(() => {
-        return teams.map(team => ({
+        const baseOptions = teams.map(team => ({
             id: `banner_${team.id}`, 
             label: `Estandarte ${team.shortName}`,
             subLabel: team.name,
@@ -384,7 +417,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
             color: team.color,
             imageClassName: ''
         }));
-    }, [teams]);
+
+        // Inject Special Banners if Unlocked
+        if (user && user.unlockedCosmetics) {
+            SPECIAL_REWARDS.filter(r => r.type === 'banner' && user.unlockedCosmetics?.includes(r.id)).forEach(reward => {
+                baseOptions.unshift({
+                    id: reward.id,
+                    label: reward.label,
+                    subLabel: 'Estandarte Exclusivo',
+                    color: '#c8aa6e' // Or dynamic based on style
+                });
+            });
+        }
+
+        return baseOptions;
+    }, [teams, user]);
 
     const handleAvatarChange = (champId: string) => {
         const selected = championOptions.find(c => c.id === champId);
@@ -718,7 +765,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                     <div className="flex items-center min-w-max px-4">
                         {LEVEL_REWARDS.map((reward, idx) => {
                             const isUnlocked = level >= reward.level;
-                            const isMajor = reward.type === 'frame' || reward.type === 'banner';
+                            const isManuallyUnlocked = user.unlockedCosmetics?.includes(reward.id);
                             
                             // Check if equipped
                             const isEquipped = (reward.type === 'frame' && user.frame === reward.id) || 
@@ -740,24 +787,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                                         <div className={`h-1 w-8 sm:w-16 transition-colors duration-500 rounded-full mx-1 ${level >= reward.level ? 'bg-gradient-to-r from-[#c8aa6e]/50 to-[#c8aa6e]' : 'bg-gray-800'}`}></div>
                                     )}
 
-                                    <div className={`relative flex flex-col items-center ${isMajor ? '-my-4' : ''}`}>
+                                    <div className={`relative flex flex-col items-center ${reward.type === 'frame' || reward.type === 'banner' ? '-my-4' : ''}`}>
                                         {/* Card/Node */}
                                         <div className={`
                                             relative flex flex-col items-center justify-center transition-all duration-300 overflow-hidden
-                                            ${isMajor 
+                                            ${(reward.type === 'frame' || reward.type === 'banner')
                                                 ? `h-32 w-24 rounded-lg border-2 shadow-lg ${isEquipped ? 'scale-105' : ''}` 
                                                 : `h-12 w-12 rounded-full border-2 ${isEquipped ? 'scale-110' : ''}`
                                             }
                                             ${isEquipped 
                                                 ? 'border-[#c8aa6e] shadow-[0_0_15px_rgba(200,170,110,0.4)]' 
-                                                : isUnlocked 
+                                                : (isUnlocked || isManuallyUnlocked)
                                                     ? 'border-blue-500/50 hover:border-blue-400' 
                                                     : 'border-gray-800 opacity-90'
                                             }
-                                            ${isMajor && reward.type !== 'banner' ? 'bg-[#050a14]' : ''}
-                                            ${isMajor && reward.type === 'banner' ? cardStyle.className : ''}
-                                        `} style={isMajor && reward.type === 'banner' ? cardStyle.style : {}}>
-                                            {isMajor ? (
+                                            ${(reward.type === 'frame' || reward.type === 'banner') && reward.type !== 'banner' ? 'bg-[#050a14]' : ''}
+                                            ${(reward.type === 'frame' || reward.type === 'banner') && reward.type === 'banner' ? cardStyle.className : ''}
+                                        `} style={(reward.type === 'frame' || reward.type === 'banner') && reward.type === 'banner' ? cardStyle.style : {}}>
+                                            {(reward.type === 'frame' || reward.type === 'banner') ? (
                                                 /* MAJOR REWARD CONTENT */
                                                 <div className="flex flex-col items-center justify-center h-full w-full relative z-10 p-2">
                                                     {/* Frame Preview Logic */}
@@ -769,14 +816,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                                                         // Icon for Banners - Now handled by BannerRenderer logic or fallback icon
                                                         <div className="w-full h-full relative">
                                                             <div className="absolute inset-0 flex items-center justify-center">
-                                                                <Icon className={`w-8 h-8 drop-shadow-md ${isUnlocked ? 'text-white' : 'text-white/50'}`} />
+                                                                <Icon className={`w-8 h-8 drop-shadow-md ${(isUnlocked || isManuallyUnlocked) ? 'text-white' : 'text-white/50'}`} />
                                                             </div>
                                                         </div>
                                                     )}
                                                     
                                                     {/* Internal Label for Major Items (Inside Card) */}
                                                     <div className="absolute bottom-0 left-0 w-full bg-black/60 backdrop-blur-sm py-1">
-                                                        <div className={`text-[7px] text-center font-bold uppercase tracking-wider ${isUnlocked ? 'text-gray-200' : 'text-gray-500'}`}>
+                                                        <div className={`text-[7px] text-center font-bold uppercase tracking-wider ${(isUnlocked || isManuallyUnlocked) ? 'text-gray-200' : 'text-gray-500'}`}>
                                                             {reward.label.replace('Estandarte ', '').replace('Marco ', '')}
                                                         </div>
                                                     </div>
@@ -788,7 +835,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                                                         <CheckCircle2 className="w-5 h-5 text-[#c8aa6e]" />
                                                     ) : (
                                                         // Show icon even if locked
-                                                        <Icon className={`w-5 h-5 ${isUnlocked ? 'text-blue-400' : 'text-gray-500'}`} />
+                                                        <Icon className={`w-5 h-5 ${(isUnlocked || isManuallyUnlocked) ? 'text-blue-400' : 'text-gray-500'}`} />
                                                     )}
                                                 </div>
                                             )}
@@ -796,8 +843,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
 
                                         {/* Level Badge */}
                                         <div className={`
-                                            absolute ${isMajor ? '-top-3' : '-top-5'} left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded border z-20 whitespace-nowrap
-                                            ${isUnlocked 
+                                            absolute ${(reward.type === 'frame' || reward.type === 'banner') ? '-top-3' : '-top-5'} left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded border z-20 whitespace-nowrap
+                                            ${(isUnlocked || isManuallyUnlocked)
                                                 ? 'bg-[#0a1428] border-blue-500/50 text-blue-300' 
                                                 : 'bg-[#050a14] border-gray-800 text-gray-600'
                                             }
@@ -806,16 +853,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                                         </div>
 
                                         {/* Unified Action Footer (Label + Equip/Blocked Button) */}
-                                        <div className={`absolute ${isMajor ? '-bottom-7' : '-bottom-10'} left-1/2 -translate-x-1/2 w-28 text-center flex flex-col items-center`}>
+                                        <div className={`absolute ${(reward.type === 'frame' || reward.type === 'banner') ? '-bottom-7' : '-bottom-10'} left-1/2 -translate-x-1/2 w-28 text-center flex flex-col items-center`}>
                                             {/* Label only for Minor items (Major have internal label) */}
-                                            {!isMajor && (
-                                                <span className={`text-[8px] font-bold uppercase truncate w-full block mb-1 ${isUnlocked ? 'text-gray-400' : 'text-gray-600'}`}>
+                                            {!(reward.type === 'frame' || reward.type === 'banner') && (
+                                                <span className={`text-[8px] font-bold uppercase truncate w-full block mb-1 ${(isUnlocked || isManuallyUnlocked) ? 'text-gray-400' : 'text-gray-600'}`}>
                                                     {reward.label}
                                                 </span>
                                             )}
                                             
                                             {/* Action Button (Only if Own Profile) */}
-                                            {isOwnProfile && isUnlocked ? (
+                                            {isOwnProfile && (isUnlocked || isManuallyUnlocked) ? (
                                                 <button
                                                     onClick={() => handleEquipReward(reward)}
                                                     disabled={isEquipped}
@@ -832,9 +879,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                                             ) : (
                                                 <div className={`
                                                     text-[7px] font-bold px-2 py-0.5 rounded border uppercase whitespace-nowrap
-                                                    ${isUnlocked ? 'bg-blue-900/20 text-blue-400 border-blue-500/30' : 'bg-black/50 text-red-400/80 border-red-900/30'}
+                                                    ${(isUnlocked || isManuallyUnlocked) ? 'bg-blue-900/20 text-blue-400 border-blue-500/30' : 'bg-black/50 text-red-400/80 border-red-900/30'}
                                                 `}>
-                                                    {isUnlocked ? 'DESBLOQUEADO' : 'BLOQUEADO'}
+                                                    {(isUnlocked || isManuallyUnlocked) ? 'DESBLOQUEADO' : 'BLOQUEADO'}
                                                 </div>
                                             )}
                                         </div>
