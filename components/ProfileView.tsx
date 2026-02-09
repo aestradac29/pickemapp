@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User, Team } from '../types';
+import { User, Team, Stage } from '../types';
 import { dataService } from '../services/dataService';
 import { getChampions } from '../services/riotService';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
@@ -232,6 +232,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
     const [championOptions, setChampionOptions] = useState<Option[]>([]);
     const [showShareModal, setShowShareModal] = useState(false);
     
+    // Dynamic Max Scores
+    const [maxScores, setMaxScores] = useState({ matchday: 0, ranking: 0, playoffs: 0 });
+
     // Form State
     const [editForm, setEditForm] = useState({
         title: '',
@@ -255,15 +258,34 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
     const loadData = async () => {
         setIsLoading(true);
         try {
-            // Load champions, teams, and user profile in parallel
-            const [champs, teamsMap, users] = await Promise.all([
+            // Load champions, teams, user profile AND matches in parallel
+            const [champs, teamsMap, users, allMatches] = await Promise.all([
                 getChampions(),
                 dataService.getTeams(),
-                dataService.getAllUsers()
+                dataService.getAllUsers(),
+                dataService.getMatches()
             ]);
 
             setChampionOptions(champs.sort((a, b) => a.label.localeCompare(b.label)));
             setTeams(Object.values(teamsMap));
+
+            // --- DYNAMIC MAX SCORE CALCULATION ---
+            // 1. Max Matchday: Count all matches in GROUPS stage
+            const matchdayMax = allMatches.filter(m => m.stage === Stage.GROUPS).length;
+
+            // 2. Max Ranking: Teams Count * 6 (Perfect Hit)
+            const rankingMax = Object.keys(teamsMap).length * 6;
+
+            // 3. Max Playoffs: Sum of weighted rounds
+            const playoffMatches = allMatches.filter(m => m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS);
+            const pointsPerRound: Record<number, number> = { 1: 3, 2: 4, 3: 6, 4: 8, 5: 10 };
+            const playoffsMax = playoffMatches.reduce((acc, m) => acc + (pointsPerRound[m.day || 1] || 3), 0);
+
+            setMaxScores({ 
+                matchday: matchdayMax || 55, // Fallback if no matches
+                ranking: rankingMax || 60,   // Fallback if no teams
+                playoffs: playoffsMax || 66  // Fallback if no playoffs
+            });
 
             if (viewingUserId) {
                 const viewingUser = users.find(u => u.id === viewingUserId);
@@ -942,14 +964,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                     Desglose de Puntuación
                 </h3>
                 
-                {/* Matchday: 11 Days * 5 Matches = 55 Pts Max */}
-                <BreakdownBar label="Predicciones Jornada (Matchday)" value={user.scoreBreakdown.matchday} max={55} color="bg-blue-500" />
+                {/* Matchday: Count matches in GROUPS stage */}
+                <BreakdownBar 
+                    label="Predicciones Jornada (Matchday)" 
+                    value={user.scoreBreakdown.matchday} 
+                    max={maxScores.matchday} 
+                    color="bg-blue-500" 
+                />
                 
-                {/* Ranking: 10 Teams * 6 Pts (Exact) = 60 Pts Max */}
-                <BreakdownBar label="Ranking Winter 2026" value={user.scoreBreakdown.ranking} max={60} color="bg-green-500" />
+                {/* Ranking: Count teams * 6 */}
+                <BreakdownBar 
+                    label="Ranking Winter 2026" 
+                    value={user.scoreBreakdown.ranking} 
+                    max={maxScores.ranking} 
+                    color="bg-green-500" 
+                />
                 
-                {/* Playoffs: Calculated based on bracket structure (~66 Pts Max) */}
-                <BreakdownBar label="Playoffs" value={user.scoreBreakdown.playoffs} max={66} color="bg-red-500" />
+                {/* Playoffs: Sum weighted rounds */}
+                <BreakdownBar 
+                    label="Playoffs" 
+                    value={user.scoreBreakdown.playoffs} 
+                    max={maxScores.playoffs} 
+                    color="bg-red-500" 
+                />
                 
                 <div className="mt-6 pt-6 border-t border-gray-800 grid grid-cols-2 gap-4">
                     <div className="bg-[#0a1428] p-3 rounded border border-gray-700 flex flex-col justify-center">
