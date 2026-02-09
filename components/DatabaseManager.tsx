@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Player, Team, Role, Match, Stage } from '../types';
 import { dataService } from '../services/dataService';
-import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download, TrendingUp, History } from 'lucide-react';
+import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download, TrendingUp, History, Hash } from 'lucide-react';
 import { ROLE_ICONS, COUNTRIES, FANTASY_SCHEDULE } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
@@ -11,7 +11,7 @@ export const DatabaseManager: React.FC = () => {
     // Data State
     const [players, setPlayers] = useState<Player[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
-    const [allMatches, setAllMatches] = useState<Match[]>([]); // Necesario para la simulación
+    const [allMatches, setAllMatches] = useState<Match[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Editing State
@@ -31,16 +31,25 @@ export const DatabaseManager: React.FC = () => {
         newCost: number, 
         inputCost: number,
         found: boolean, 
-        originalName: string 
+        originalName: string,
+        path?: number[] // Para mostrar la evolución visual
     }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     
     // Simulation Mode State
     const [isSimulationMode, setIsSimulationMode] = useState(false);
+    const [simulationTargetRound, setSimulationTargetRound] = useState(4); // Por defecto simular hasta inicio de J4
 
     useEffect(() => {
         loadData();
     }, []);
+
+    // Re-analizar texto si cambia el modo o la ronda objetivo
+    useEffect(() => {
+        if (importText) {
+            parseImportText();
+        }
+    }, [isSimulationMode, simulationTargetRound]);
 
     const loadData = async () => {
         setIsLoading(true);
@@ -48,7 +57,7 @@ export const DatabaseManager: React.FC = () => {
             const [p, tMap, matches] = await Promise.all([
                 dataService.getPlayers(),
                 dataService.getTeams(),
-                dataService.getMatches() // Cargar partidos para la simulación
+                dataService.getMatches()
             ]);
             setPlayers(p);
             setTeams(Object.values(tMap));
@@ -110,17 +119,20 @@ export const DatabaseManager: React.FC = () => {
 
     // --- PRICE IMPORT & SIMULATION LOGIC ---
     
-    // Función auxiliar para simular la evolución del precio de J1 a J4
-    const simulatePriceToRound4 = (player: Player, initialPrice: number) => {
+    // Simula la evolución secuencial (J1 -> J2 -> J3...)
+    const simulatePriceEvolution = (player: Player, initialPrice: number): { finalPrice: number, path: number[] } => {
         let simulatedCost = initialPrice;
         let cumulativePoints = 0;
         let cumulativeGames = 0;
+        const path: number[] = [initialPrice];
 
-        // Iterar Rondas 1, 2 y 3 (para obtener el precio de inicio de J4)
-        for (let r = 1; r < 4; r++) {
+        // Iterar desde J1 hasta la ronda ANTERIOR a la objetivo
+        // Ejemplo: Si objetivo es J4, simulamos J1, J2, J3.
+        for (let r = 1; r < simulationTargetRound; r++) {
             const roundConfig = FANTASY_SCHEDULE.find(sch => sch.id === r);
             if (!roundConfig) continue;
 
+            // Obtener partidos SOLO de esa ronda
             const roundMatches = allMatches.filter(m => 
                 m.isCompleted && 
                 m.stats && 
@@ -140,10 +152,14 @@ export const DatabaseManager: React.FC = () => {
             });
 
             if (gamesInRound > 0) {
+                // Acumular estadísticas históricas
                 cumulativePoints += pointsInRound;
                 cumulativeGames += gamesInRound;
 
+                // Calcular media acumulada HASTA ESTE PUNTO
                 const currentTotalAvg = cumulativePoints / cumulativeGames;
+                
+                // Fórmula de precio
                 const targetPrice = currentTotalAvg * 18;
 
                 let change = 0;
@@ -155,9 +171,15 @@ export const DatabaseManager: React.FC = () => {
 
                 simulatedCost = Math.round(simulatedCost + change);
                 simulatedCost = Math.max(150, Math.min(550, simulatedCost));
+                
+                // Guardar hito en el camino
+                path.push(simulatedCost);
+            } else {
+                // Si no jugó, el precio se mantiene (hito igual al anterior)
+                path.push(simulatedCost);
             }
         }
-        return simulatedCost;
+        return { finalPrice: simulatedCost, path };
     };
 
     const parseImportText = () => {
@@ -179,18 +201,22 @@ export const DatabaseManager: React.FC = () => {
                 const player = players.find(p => p.name.toLowerCase() === rawName.toLowerCase());
 
                 if (player) {
-                    // Si el modo simulación está activo, el precio de entrada es J1, y calculamos J4.
-                    // Si no, el precio de entrada es el precio final directo.
-                    const finalPrice = isSimulationMode 
-                        ? simulatePriceToRound4(player, inputPrice) 
-                        : inputPrice;
+                    let finalPrice = inputPrice;
+                    let path: number[] = [];
+
+                    if (isSimulationMode) {
+                        const result = simulatePriceEvolution(player, inputPrice);
+                        finalPrice = result.finalPrice;
+                        path = result.path;
+                    }
 
                     updates.push({
                         player: player,
-                        inputCost: inputPrice, // Lo que escribió el usuario (Precio J1 o Directo)
-                        newCost: finalPrice,   // Lo que se guardará (Precio J4 Calculado o Directo)
+                        inputCost: inputPrice,
+                        newCost: finalPrice,
                         found: true,
-                        originalName: rawName
+                        originalName: rawName,
+                        path: path
                     });
                 } else {
                     updates.push({
@@ -212,7 +238,7 @@ export const DatabaseManager: React.FC = () => {
         if (validUpdates.length === 0) return;
 
         const confirmMsg = isSimulationMode 
-            ? `¿Aplicar precios SIMULADOS para J4 a ${validUpdates.length} jugadores?`
+            ? `¿Aplicar precios SIMULADOS (llegada a J${simulationTargetRound}) a ${validUpdates.length} jugadores?`
             : `¿Aplicar precios manuales a ${validUpdates.length} jugadores?`;
 
         if (!window.confirm(confirmMsg)) return;
@@ -698,8 +724,8 @@ export const DatabaseManager: React.FC = () => {
                             Pega aquí una lista de nombres y precios.
                         </p>
                         
-                        {/* TOGGLE SIMULATION MODE */}
-                        <div className="mt-4 flex items-center justify-center">
+                        {/* TOGGLE SIMULATION MODE & ROUND SELECTOR */}
+                        <div className="mt-4 flex flex-col md:flex-row items-center gap-4 bg-[#0f1d36] p-3 rounded-lg border border-gray-700">
                             <label className={`
                                 flex items-center gap-3 px-4 py-2 rounded-lg border cursor-pointer transition-all select-none
                                 ${isSimulationMode 
@@ -716,19 +742,34 @@ export const DatabaseManager: React.FC = () => {
                                 {isSimulationMode ? <TrendingUp className="w-5 h-5 text-purple-400" /> : <History className="w-5 h-5" />}
                                 <div className="text-left">
                                     <span className="block text-xs font-bold uppercase tracking-wider">
-                                        {isSimulationMode ? 'Simular Evolución J1 -> J4' : 'Importación Directa'}
+                                        {isSimulationMode ? 'Modo Simulación' : 'Modo Directo'}
                                     </span>
                                     <span className="block text-[9px] opacity-70">
                                         {isSimulationMode 
-                                            ? 'Input: Precio J1 => Output: Precio J4 Calculado' 
-                                            : 'Input: Precio Final => Output: Precio Final'}
+                                            ? 'Calcula evolución round a round' 
+                                            : 'Sobrescribe precio actual'}
                                     </span>
                                 </div>
                             </label>
+
+                            {isSimulationMode && (
+                                <div className="flex items-center gap-2 border-l border-gray-600 pl-4 animate-in fade-in">
+                                    <span className="text-xs font-bold text-purple-300 uppercase">Hasta el inicio de:</span>
+                                    <select 
+                                        value={simulationTargetRound}
+                                        onChange={(e) => setSimulationTargetRound(Number(e.target.value))}
+                                        className="bg-black border border-purple-500/50 text-white text-xs rounded px-2 py-1 outline-none"
+                                    >
+                                        {FANTASY_SCHEDULE.map(r => (
+                                            <option key={r.id} value={r.id}>{r.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-4 bg-black/40 p-2 rounded border border-gray-700 text-xs font-mono text-gray-400">
-                            Ejemplo:<br/>
+                            Ejemplo (Input: Precio J1):<br/>
                             Hans Sama 300<br/>
                             Caps: 350
                         </div>
@@ -740,7 +781,7 @@ export const DatabaseManager: React.FC = () => {
                         <div className="flex flex-col gap-4">
                             <textarea 
                                 className="w-full h-64 bg-[#050a14] border border-gray-700 rounded-lg p-4 text-white text-sm font-mono focus:border-green-500 outline-none resize-none"
-                                placeholder={`Pega tu lista aquí (${isSimulationMode ? 'Precios J1' : 'Precios Finales'})...`}
+                                placeholder={`Pega tu lista aquí (${isSimulationMode ? 'Precios BASE/J1' : 'Precios Finales'})...`}
                                 value={importText}
                                 onChange={(e) => setImportText(e.target.value)}
                             />
@@ -779,43 +820,54 @@ export const DatabaseManager: React.FC = () => {
                                     </div>
                                 ) : (
                                     pendingUpdates.map((u, idx) => (
-                                        <div key={idx} className={`flex items-center justify-between p-2 rounded border ${u.found ? 'bg-green-900/10 border-green-900/30' : 'bg-red-900/10 border-red-900/30'}`}>
-                                            <div className="flex items-center gap-2">
-                                                {u.found ? (
-                                                    <Check className="w-3 h-3 text-green-500" />
-                                                ) : (
-                                                    <AlertTriangle className="w-3 h-3 text-red-500" />
-                                                )}
-                                                <div className="flex flex-col">
-                                                    <span className={`text-xs font-bold ${u.found ? 'text-white' : 'text-red-400 line-through'}`}>
-                                                        {u.found ? u.player?.name : u.originalName}
-                                                    </span>
-                                                    {!u.found && <span className="text-[9px] text-red-500">No encontrado</span>}
+                                        <div key={idx} className={`flex flex-col p-2 rounded border ${u.found ? 'bg-green-900/10 border-green-900/30' : 'bg-red-900/10 border-red-900/30'}`}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    {u.found ? (
+                                                        <Check className="w-3 h-3 text-green-500" />
+                                                    ) : (
+                                                        <AlertTriangle className="w-3 h-3 text-red-500" />
+                                                    )}
+                                                    <div className="flex flex-col">
+                                                        <span className={`text-xs font-bold ${u.found ? 'text-white' : 'text-red-400 line-through'}`}>
+                                                            {u.found ? u.player?.name : u.originalName}
+                                                        </span>
+                                                        {!u.found && <span className="text-[9px] text-red-500">No encontrado</span>}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            
-                                            <div className="flex items-center gap-3">
-                                                {u.found && (
-                                                    <span className="text-[10px] text-gray-500 line-through mr-1">${u.player.cost}</span>
-                                                )}
                                                 
-                                                {isSimulationMode && (
-                                                    <span className="text-xs text-purple-300 font-mono mr-1" title="Precio Inicial (Input)">
-                                                        [${u.inputCost}]
-                                                    </span>
-                                                )}
+                                                <div className="flex items-center gap-3">
+                                                    {u.found && (
+                                                        <span className="text-[10px] text-gray-500 line-through mr-1">${u.player.cost}</span>
+                                                    )}
+                                                    
+                                                    {isSimulationMode && (
+                                                        <span className="text-xs text-purple-300 font-mono mr-1" title="Precio Inicial (Input)">
+                                                            [${u.inputCost}]
+                                                        </span>
+                                                    )}
 
-                                                <div className="flex items-center gap-1">
-                                                    <ArrowRight className="w-3 h-3 text-gray-600" />
-                                                    <span className="text-sm font-bold text-green-400">${u.newCost}</span>
+                                                    <div className="flex items-center gap-1">
+                                                        <ArrowRight className="w-3 h-3 text-gray-600" />
+                                                        <span className="text-sm font-bold text-green-400">${u.newCost}</span>
+                                                    </div>
                                                 </div>
-                                                
-                                                {u.found && u.player && (
-                                                    <span className={`text-[10px] font-bold ${u.newCost > u.player.cost ? 'text-green-500' : u.newCost < u.player.cost ? 'text-red-500' : 'text-gray-500'}`}>
-                                                        {u.newCost > u.player.cost ? '+' : ''}{u.newCost - u.player.cost}
-                                                    </span>
-                                                )}
                                             </div>
+
+                                            {/* SIMULATION PATH VISUALIZER */}
+                                            {u.path && u.path.length > 1 && (
+                                                <div className="mt-2 pl-6 flex flex-wrap items-center gap-1">
+                                                    <Hash className="w-3 h-3 text-gray-600" />
+                                                    {u.path.map((price, i) => (
+                                                        <React.Fragment key={i}>
+                                                            {i > 0 && <span className="text-gray-600 text-[9px]">→</span>}
+                                                            <span className={`text-[9px] font-mono ${i === u.path!.length - 1 ? 'text-green-400 font-bold' : 'text-gray-400'}`}>
+                                                                {price}
+                                                            </span>
+                                                        </React.Fragment>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     ))
                                 )}
