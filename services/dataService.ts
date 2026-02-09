@@ -996,13 +996,38 @@ export const dataService = {
                     equippedBadges: userData.equippedBadges || [],
                     score: globalScore,
                     scoreBreakdown: breakdown,
-                    rank: 0, 
+                    rank: 0, // Placeholder, calculated below
                     pointsHistory: pointsHistory, 
                     fantasyHistory: fantasyHistory
                 };
             }));
             
-            return users.sort((a, b) => b.score - a.score);
+            // SORTING LOGIC: Total Score > Matchday Hits (Tiebreaker)
+            users.sort((a, b) => {
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+                return b.scoreBreakdown.matchday - a.scoreBreakdown.matchday;
+            });
+
+            // ASSIGN RANKS (Dense Ranking: 1, 2, 2, 4...)
+            for (let i = 0; i < users.length; i++) {
+                if (i > 0) {
+                    const prev = users[i-1];
+                    const curr = users[i];
+                    
+                    // Check if scores are identical including tie-breaker
+                    if (prev.score === curr.score && prev.scoreBreakdown.matchday === curr.scoreBreakdown.matchday) {
+                        curr.rank = prev.rank;
+                    } else {
+                        curr.rank = i + 1;
+                    }
+                } else {
+                    users[i].rank = 1;
+                }
+            }
+            
+            return users;
 
         } catch (e) {
             console.error("Error fetching all users:", e);
