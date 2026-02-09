@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Player, Team, Role } from '../types';
+import { Player, Team, Role, Match, Stage } from '../types';
 import { dataService } from '../services/dataService';
-import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download } from 'lucide-react';
-import { ROLE_ICONS, COUNTRIES } from '../constants';
+import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download, TrendingUp, History } from 'lucide-react';
+import { ROLE_ICONS, COUNTRIES, FANTASY_SCHEDULE } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'prices'>('players');
@@ -11,6 +11,7 @@ export const DatabaseManager: React.FC = () => {
     // Data State
     const [players, setPlayers] = useState<Player[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
+    const [allMatches, setAllMatches] = useState<Match[]>([]); // Necesario para la simulación
     const [isLoading, setIsLoading] = useState(true);
 
     // Editing State
@@ -25,8 +26,17 @@ export const DatabaseManager: React.FC = () => {
 
     // Price Import State
     const [importText, setImportText] = useState("");
-    const [pendingUpdates, setPendingUpdates] = useState<{ player: Player, newCost: number, found: boolean, originalName: string }[]>([]);
+    const [pendingUpdates, setPendingUpdates] = useState<{ 
+        player: Player, 
+        newCost: number, 
+        inputCost: number,
+        found: boolean, 
+        originalName: string 
+    }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // Simulation Mode State
+    const [isSimulationMode, setIsSimulationMode] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -35,12 +45,14 @@ export const DatabaseManager: React.FC = () => {
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const [p, tMap] = await Promise.all([
+            const [p, tMap, matches] = await Promise.all([
                 dataService.getPlayers(),
-                dataService.getTeams()
+                dataService.getTeams(),
+                dataService.getMatches() // Cargar partidos para la simulación
             ]);
             setPlayers(p);
             setTeams(Object.values(tMap));
+            setAllMatches(matches);
         } catch (e) {
             console.error(e);
         } finally {
@@ -96,7 +108,58 @@ export const DatabaseManager: React.FC = () => {
         }
     };
 
-    // --- PRICE IMPORT LOGIC ---
+    // --- PRICE IMPORT & SIMULATION LOGIC ---
+    
+    // Función auxiliar para simular la evolución del precio de J1 a J4
+    const simulatePriceToRound4 = (player: Player, initialPrice: number) => {
+        let simulatedCost = initialPrice;
+        let cumulativePoints = 0;
+        let cumulativeGames = 0;
+
+        // Iterar Rondas 1, 2 y 3 (para obtener el precio de inicio de J4)
+        for (let r = 1; r < 4; r++) {
+            const roundConfig = FANTASY_SCHEDULE.find(sch => sch.id === r);
+            if (!roundConfig) continue;
+
+            const roundMatches = allMatches.filter(m => 
+                m.isCompleted && 
+                m.stats && 
+                m.stats[player.id] &&
+                (roundConfig.stage === Stage.GROUPS ? m.stage === Stage.GROUPS : m.stage !== Stage.GROUPS) &&
+                roundConfig.matchdays.includes(m.day || 0)
+            );
+
+            let pointsInRound = 0;
+            let gamesInRound = 0;
+
+            roundMatches.forEach(m => {
+                if (m.stats && m.stats[player.id]) {
+                    pointsInRound += m.stats[player.id].totalPoints;
+                    gamesInRound++;
+                }
+            });
+
+            if (gamesInRound > 0) {
+                cumulativePoints += pointsInRound;
+                cumulativeGames += gamesInRound;
+
+                const currentTotalAvg = cumulativePoints / cumulativeGames;
+                const targetPrice = currentTotalAvg * 18;
+
+                let change = 0;
+                if (targetPrice > simulatedCost) {
+                    change = Math.min(50, Math.ceil((targetPrice - simulatedCost) * 0.2)); 
+                } else if (targetPrice < simulatedCost) {
+                    change = Math.max(-50, Math.floor((targetPrice - simulatedCost) * 0.1)); 
+                }
+
+                simulatedCost = Math.round(simulatedCost + change);
+                simulatedCost = Math.max(150, Math.min(550, simulatedCost));
+            }
+        }
+        return simulatedCost;
+    };
+
     const parseImportText = () => {
         if (!importText.trim()) return;
 
@@ -106,32 +169,34 @@ export const DatabaseManager: React.FC = () => {
         lines.forEach(line => {
             const trimmed = line.trim();
             if (!trimmed) return;
-
-            // Intentar separar el nombre del precio. 
-            // Buscamos el último número de la línea como precio.
-            // Ej: "Hans Sama 300" -> Name: "Hans Sama", Price: 300
-            // Ej: "Caps: 350" -> Name: "Caps", Price: 350
             
             const match = trimmed.match(/^(.*?)[ \t:;]+(\d+)$/);
             
             if (match) {
-                const rawName = match[1].trim().replace(/[:;]/g, ''); // Limpiar separadores extra
-                const price = parseInt(match[2]);
+                const rawName = match[1].trim().replace(/[:;]/g, ''); 
+                const inputPrice = parseInt(match[2]);
 
-                // Buscar jugador (Case insensitive)
                 const player = players.find(p => p.name.toLowerCase() === rawName.toLowerCase());
 
                 if (player) {
+                    // Si el modo simulación está activo, el precio de entrada es J1, y calculamos J4.
+                    // Si no, el precio de entrada es el precio final directo.
+                    const finalPrice = isSimulationMode 
+                        ? simulatePriceToRound4(player, inputPrice) 
+                        : inputPrice;
+
                     updates.push({
                         player: player,
-                        newCost: price,
+                        inputCost: inputPrice, // Lo que escribió el usuario (Precio J1 o Directo)
+                        newCost: finalPrice,   // Lo que se guardará (Precio J4 Calculado o Directo)
                         found: true,
                         originalName: rawName
                     });
                 } else {
                     updates.push({
                         player: null,
-                        newCost: price,
+                        inputCost: inputPrice,
+                        newCost: inputPrice,
                         found: false,
                         originalName: rawName
                     });
@@ -146,16 +211,18 @@ export const DatabaseManager: React.FC = () => {
         const validUpdates = pendingUpdates.filter(u => u.found && u.player);
         if (validUpdates.length === 0) return;
 
-        if (!window.confirm(`¿Aplicar nuevos precios a ${validUpdates.length} jugadores?`)) return;
+        const confirmMsg = isSimulationMode 
+            ? `¿Aplicar precios SIMULADOS para J4 a ${validUpdates.length} jugadores?`
+            : `¿Aplicar precios manuales a ${validUpdates.length} jugadores?`;
+
+        if (!window.confirm(confirmMsg)) return;
 
         setIsSaving(true);
         try {
-            // Preparar payload para update masivo
             const bulkData = validUpdates.map(u => ({
                 id: u.player.id,
                 data: {
                     cost: u.newCost,
-                    // Calcular cambio de precio automáticamente si existe precio anterior
                     priceChange: u.player.cost ? u.newCost - u.player.cost : 0
                 }
             }));
@@ -619,7 +686,7 @@ export const DatabaseManager: React.FC = () => {
                 </div>
             )}
 
-            {/* --- PRICES IMPORT VIEW (NEW) --- */}
+            {/* --- PRICES IMPORT VIEW --- */}
             {activeTab === 'prices' && (
                 <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl p-6">
                     <div className="flex flex-col items-center justify-center text-center mb-8">
@@ -628,14 +695,42 @@ export const DatabaseManager: React.FC = () => {
                         </div>
                         <h2 className="text-xl font-bold text-white mb-2">Importar Precios Masivamente</h2>
                         <p className="text-gray-400 text-sm max-w-lg">
-                            Pega aquí una lista de nombres y precios para actualizarlos de golpe.
-                            El sistema detectará automáticamente el nombre del jugador y el precio al final de la línea.
+                            Pega aquí una lista de nombres y precios.
                         </p>
+                        
+                        {/* TOGGLE SIMULATION MODE */}
+                        <div className="mt-4 flex items-center justify-center">
+                            <label className={`
+                                flex items-center gap-3 px-4 py-2 rounded-lg border cursor-pointer transition-all select-none
+                                ${isSimulationMode 
+                                    ? 'bg-purple-900/30 border-purple-500 text-purple-300' 
+                                    : 'bg-gray-800 border-gray-700 text-gray-400'
+                                }
+                            `}>
+                                <input 
+                                    type="checkbox" 
+                                    className="hidden" 
+                                    checked={isSimulationMode}
+                                    onChange={(e) => setIsSimulationMode(e.target.checked)}
+                                />
+                                {isSimulationMode ? <TrendingUp className="w-5 h-5 text-purple-400" /> : <History className="w-5 h-5" />}
+                                <div className="text-left">
+                                    <span className="block text-xs font-bold uppercase tracking-wider">
+                                        {isSimulationMode ? 'Simular Evolución J1 -> J4' : 'Importación Directa'}
+                                    </span>
+                                    <span className="block text-[9px] opacity-70">
+                                        {isSimulationMode 
+                                            ? 'Input: Precio J1 => Output: Precio J4 Calculado' 
+                                            : 'Input: Precio Final => Output: Precio Final'}
+                                    </span>
+                                </div>
+                            </label>
+                        </div>
+
                         <div className="mt-4 bg-black/40 p-2 rounded border border-gray-700 text-xs font-mono text-gray-400">
                             Ejemplo:<br/>
                             Hans Sama 300<br/>
-                            Caps: 350<br/>
-                            Yike 280
+                            Caps: 350
                         </div>
                     </div>
 
@@ -645,7 +740,7 @@ export const DatabaseManager: React.FC = () => {
                         <div className="flex flex-col gap-4">
                             <textarea 
                                 className="w-full h-64 bg-[#050a14] border border-gray-700 rounded-lg p-4 text-white text-sm font-mono focus:border-green-500 outline-none resize-none"
-                                placeholder="Pega tu lista aquí..."
+                                placeholder={`Pega tu lista aquí (${isSimulationMode ? 'Precios J1' : 'Precios Finales'})...`}
                                 value={importText}
                                 onChange={(e) => setImportText(e.target.value)}
                             />
@@ -701,12 +796,20 @@ export const DatabaseManager: React.FC = () => {
                                             
                                             <div className="flex items-center gap-3">
                                                 {u.found && (
-                                                    <span className="text-xs text-gray-500 line-through">${u.player?.cost}</span>
+                                                    <span className="text-[10px] text-gray-500 line-through mr-1">${u.player.cost}</span>
                                                 )}
+                                                
+                                                {isSimulationMode && (
+                                                    <span className="text-xs text-purple-300 font-mono mr-1" title="Precio Inicial (Input)">
+                                                        [${u.inputCost}]
+                                                    </span>
+                                                )}
+
                                                 <div className="flex items-center gap-1">
                                                     <ArrowRight className="w-3 h-3 text-gray-600" />
                                                     <span className="text-sm font-bold text-green-400">${u.newCost}</span>
                                                 </div>
+                                                
                                                 {u.found && u.player && (
                                                     <span className={`text-[10px] font-bold ${u.newCost > u.player.cost ? 'text-green-500' : u.newCost < u.player.cost ? 'text-red-500' : 'text-gray-500'}`}>
                                                         {u.newCost > u.player.cost ? '+' : ''}{u.newCost - u.player.cost}
