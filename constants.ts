@@ -1,6 +1,6 @@
 
 import { Team, Region, Match, Stage, User, Role, Player } from './types';
-import { Sparkles, Trophy, Flame, Eye, Crown, Zap, Target, Shield, Clock, Map, Gem, Share2, Star, Award, Medal } from 'lucide-react';
+import { Sparkles, Trophy, Flame, Eye, Crown, Zap, Target, Shield, Clock, Map, Gem, Share2 } from 'lucide-react';
 
 // Role Icons (Official LoL Assets - SVG versions from CommunityDragon for best quality)
 export const ROLE_ICONS: Record<Role, string> = {
@@ -84,10 +84,6 @@ export const BANNER_STYLES: Record<string, string> = {
     'banner_targon': 'bg-gradient-to-r from-indigo-900 via-purple-800 to-blue-900 bg-[length:200%_200%] animate-gradient-x', 
     'banner_void': 'bg-gradient-to-r from-violet-950 via-fuchsia-900 to-indigo-950 bg-[length:200%_200%] animate-gradient-x',
     
-    // --- SPECIAL REWARDS ---
-    'banner_pioneer': 'bg-gradient-to-r from-[#bf953f] via-[#fcf6ba] to-[#b38728] animate-shimmer', // Golden Metallic for Pioneers
-    'banner_legend': 'bg-gradient-to-r from-[#432371] via-[#faae7b] to-[#432371] bg-[length:200%_200%] animate-gradient-x', // Legendary
-
     // --- TEAM SPECIFIC BANNERS (Adjusted for better visibility) ---
     // Vitality: Lighter yellow start, fading to dark olive/black.
     'banner_vit': 'bg-gradient-to-r from-[#ccb400] via-[#4a4200] to-black', 
@@ -114,15 +110,6 @@ export const BANNER_STYLES: Record<string, string> = {
 
     'default': 'bg-gradient-to-r from-[#0f1d36] to-[#0a1428]'
 };
-
-// Manual Rewards List for Admin Panel
-export const SPECIAL_REWARDS = [
-    { id: 'banner_pioneer', label: 'Estandarte Pionero', type: 'banner', icon: Crown, description: 'Para los 8 fundadores originales.' },
-    { id: 'banner_legend', label: 'Estandarte Leyenda', type: 'banner', icon: Star, description: 'Por hazañas excepcionales.' },
-    { id: 'title_founder', label: 'Fundador', type: 'title', icon: Medal, description: 'Título exclusivo de pioneros.' },
-    { id: 'title_vip', label: 'VIP', type: 'title', icon: Gem, description: 'Usuario destacado.' },
-    { id: 'title_analyst', label: 'Analista Jefe', type: 'title', icon: Award, description: 'Experto en predicciones.' },
-];
 
 // Achievement Badges (Updated List based on User Request)
 export const BADGE_DEFINITIONS: Record<string, { label: string, icon: any, color: string, description: string }> = {

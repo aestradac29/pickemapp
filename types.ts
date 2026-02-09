@@ -133,13 +133,6 @@ export interface FantasyTeamState {
     score?: number; // Score for this specific round
 }
 
-export interface CustomCosmetic {
-    id: string;
-    label: string;
-    type: 'title'; // Extensible to 'banner' later if needed
-    description?: string;
-}
-
 export interface User {
   id: string;
   name: string;
@@ -150,8 +143,6 @@ export interface User {
   badges?: string[]; // New: Unlocked Achievement Badges IDs
   badgeProgress?: Record<string, { current: number, target: number }>; // New: Progress for achievements
   equippedBadges?: string[]; // New: Currently equipped badges (Max 3)
-  unlockedCosmetics?: string[]; // New: Special manual unlocks (Pioneer, Founder, etc.)
-  customCosmetics?: CustomCosmetic[]; // New: Unique custom items created for this user
   score: number; // Global Score (Matchday + Ranking + Playoffs)
   scoreBreakdown: {
     matchday: number;
