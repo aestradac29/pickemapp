@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Player, Team, Role, Match, Stage, User, CustomCosmetic } from '../types';
 import { dataService } from '../services/dataService';
-import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download, TrendingUp, History, Hash, Gift, Medal, Crown, Sparkles, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download, TrendingUp, History, Hash, Gift, Medal, Crown, Sparkles, Plus, Trash2, Globe } from 'lucide-react';
 import { ROLE_ICONS, COUNTRIES, FANTASY_SCHEDULE, SPECIAL_REWARDS, BADGE_DEFINITIONS } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
@@ -22,6 +22,7 @@ export const DatabaseManager: React.FC = () => {
     
     // Gift Modal State
     const [giftingUser, setGiftingUser] = useState<User | null>(null);
+    const [isMassGifting, setIsMassGifting] = useState(false); // New state for Mass Gifting
     const [giftTab, setGiftTab] = useState<'cosmetics' | 'badges' | 'custom'>('cosmetics');
     const [customTitleInput, setCustomTitleInput] = useState("");
     
@@ -211,6 +212,81 @@ export const DatabaseManager: React.FC = () => {
             setUsers(uList);
         } catch (e) {
             console.error("Error deleting custom title", e);
+        }
+    };
+
+    // --- MASS GIFTING LOGIC ---
+    const handleMassGift = async (rewardId: string, type: 'cosmetic' | 'badge', label: string) => {
+        const count = users.length;
+        if (!window.confirm(`¿Seguro que quieres entregar "${label}" a TODOS los ${count} usuarios?`)) return;
+
+        setIsSaving(true);
+        try {
+            const updates = users.map(user => {
+                let updateData: any = {};
+                if (type === 'badge') {
+                    const current = user.badges || [];
+                    if (!current.includes(rewardId)) {
+                        updateData.badges = [...current, rewardId];
+                    }
+                } else {
+                    const current = user.unlockedCosmetics || [];
+                    if (!current.includes(rewardId)) {
+                        updateData.unlockedCosmetics = [...current, rewardId];
+                    }
+                }
+                
+                if (Object.keys(updateData).length > 0) {
+                    return dataService.updateUserProfile(user.id, updateData);
+                }
+                return Promise.resolve();
+            });
+
+            await Promise.all(updates);
+            alert(`¡Éxito! Se ha entregado "${label}" a todos los usuarios.`);
+            // Refresh
+            const uList = await dataService.getAllUsers();
+            setUsers(uList);
+        } catch (e) {
+            console.error("Mass gift error", e);
+            alert("Error durante el regalo masivo.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleMassCustomGift = async () => {
+        if (!customTitleInput.trim()) return;
+        const count = users.length;
+        if (!window.confirm(`¿Crear el título "${customTitleInput}" para TODOS los ${count} usuarios?`)) return;
+
+        setIsSaving(true);
+        try {
+            const newTitle: CustomCosmetic = {
+                id: `global_custom_${Date.now()}`,
+                label: customTitleInput.trim(),
+                type: 'title',
+                description: 'Recompensa Global'
+            };
+
+            const updates = users.map(user => {
+                const current = user.customCosmetics || [];
+                // Check if already has a title with exact same label to avoid dupes? No, ID unique.
+                return dataService.updateUserProfile(user.id, { 
+                    customCosmetics: [...current, newTitle] 
+                });
+            });
+
+            await Promise.all(updates);
+            setCustomTitleInput("");
+            alert("¡Títulos globales entregados!");
+            const uList = await dataService.getAllUsers();
+            setUsers(uList);
+        } catch (e) {
+            console.error("Mass custom gift error", e);
+            alert("Error.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -819,6 +895,24 @@ export const DatabaseManager: React.FC = () => {
             {/* --- USERS & GIFTING VIEW --- */}
             {activeTab === 'users' && (
                 <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
+                    <div className="p-4 bg-[#0f1923] border-b border-gray-700 flex justify-between items-center">
+                        <span className="text-gray-400 font-bold uppercase text-xs tracking-wider">
+                            Lista de Usuarios
+                        </span>
+                        
+                        {/* Mass Gift Button */}
+                        <button 
+                            onClick={() => {
+                                setGiftingUser(users[0]); // Hack to open modal with a valid user context, but we use special state
+                                setIsMassGifting(true);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg font-bold text-xs uppercase shadow-lg transition-all transform hover:scale-105"
+                        >
+                            <Globe className="w-4 h-4" />
+                            Regalo a Todos
+                        </button>
+                    </div>
+
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm text-gray-300">
                             <thead className="bg-[#1a2c4e] text-gray-400 uppercase font-bold text-xs">
@@ -873,7 +967,10 @@ export const DatabaseManager: React.FC = () => {
                                             {/* ACTIONS */}
                                             <td className="p-4 text-right">
                                                 <button 
-                                                    onClick={() => setGiftingUser(user)}
+                                                    onClick={() => {
+                                                        setGiftingUser(user);
+                                                        setIsMassGifting(false);
+                                                    }}
                                                     className="flex items-center gap-2 px-3 py-1.5 bg-[#c8aa6e]/10 border border-[#c8aa6e]/50 text-[#c8aa6e] rounded-lg hover:bg-[#c8aa6e] hover:text-[#0a1428] transition-all ml-auto text-xs font-bold uppercase"
                                                 >
                                                     <Gift className="w-3 h-3" /> Regalar
@@ -1071,12 +1168,15 @@ export const DatabaseManager: React.FC = () => {
             {giftingUser && (
                 <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                     <div className="w-full max-w-2xl bg-[#091428] border-2 border-[#c8aa6e] rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                        <div className="p-4 bg-[#0f1d36] border-b border-gray-700 flex justify-between items-center">
+                        <div className={`p-4 ${isMassGifting ? 'bg-purple-900/30' : 'bg-[#0f1d36]'} border-b border-gray-700 flex justify-between items-center`}>
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                <Gift className="w-5 h-5 text-[#c8aa6e]" />
-                                Regalar Recompensas a <span className="text-[#c8aa6e]">{giftingUser.name}</span>
+                                {isMassGifting ? <Globe className="w-5 h-5 text-purple-400" /> : <Gift className="w-5 h-5 text-[#c8aa6e]" />}
+                                {isMassGifting 
+                                    ? `Regalo Global a ${users.length} Usuarios`
+                                    : <>Regalar Recompensas a <span className="text-[#c8aa6e]">{giftingUser.name}</span></>
+                                }
                             </h3>
-                            <button onClick={() => setGiftingUser(null)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+                            <button onClick={() => { setGiftingUser(null); setIsMassGifting(false); }} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
                         </div>
                         
                         <div className="p-2 bg-[#050a14] flex gap-2 justify-center border-b border-gray-800">
@@ -1106,18 +1206,19 @@ export const DatabaseManager: React.FC = () => {
                                     <p className="text-sm text-gray-400 mb-4 text-center">Desbloquea estandartes o títulos exclusivos que no dependen del nivel.</p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {SPECIAL_REWARDS.map(reward => {
-                                            const isUnlocked = giftingUser.unlockedCosmetics?.includes(reward.id);
+                                            const isUnlocked = !isMassGifting && giftingUser.unlockedCosmetics?.includes(reward.id);
                                             const Icon = reward.icon;
                                             return (
                                                 <button
                                                     key={reward.id}
-                                                    onClick={() => handleToggleCosmetic(reward.id, reward.type as any)}
+                                                    onClick={() => isMassGifting ? handleMassGift(reward.id, 'cosmetic', reward.label) : handleToggleCosmetic(reward.id, reward.type as any)}
                                                     className={`
                                                         flex items-center gap-3 p-3 rounded-lg border text-left transition-all
                                                         ${isUnlocked 
                                                             ? 'bg-[#c8aa6e]/20 border-[#c8aa6e] ring-1 ring-[#c8aa6e]/50' 
                                                             : 'bg-[#0f1d36] border-gray-700 hover:border-gray-500'
                                                         }
+                                                        ${isMassGifting ? 'hover:bg-purple-900/20' : ''}
                                                     `}
                                                 >
                                                     <div className={`p-2 rounded-full ${isUnlocked ? 'bg-[#c8aa6e] text-[#0a1428]' : 'bg-gray-800 text-gray-500'}`}>
@@ -1129,6 +1230,7 @@ export const DatabaseManager: React.FC = () => {
                                                         <div className="text-[10px] text-gray-600 mt-1">{reward.description}</div>
                                                     </div>
                                                     {isUnlocked && <Check className="w-5 h-5 text-[#c8aa6e] ml-auto" />}
+                                                    {isMassGifting && <Globe className="w-4 h-4 text-purple-500 ml-auto opacity-50" />}
                                                 </button>
                                             );
                                         })}
@@ -1141,18 +1243,19 @@ export const DatabaseManager: React.FC = () => {
                                     <p className="text-sm text-gray-400 mb-4 text-center">Otorga insignias manualmente (ej: MVP Fantasy).</p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {Object.entries(BADGE_DEFINITIONS).map(([id, def]) => {
-                                            const isUnlocked = giftingUser.badges?.includes(id);
+                                            const isUnlocked = !isMassGifting && giftingUser.badges?.includes(id);
                                             const Icon = def.icon;
                                             return (
                                                 <button
                                                     key={id}
-                                                    onClick={() => handleToggleBadge(id)}
+                                                    onClick={() => isMassGifting ? handleMassGift(id, 'badge', def.label) : handleToggleBadge(id)}
                                                     className={`
                                                         flex items-center gap-3 p-3 rounded-lg border text-left transition-all
                                                         ${isUnlocked 
                                                             ? 'bg-green-900/20 border-green-500 ring-1 ring-green-500/30' 
                                                             : 'bg-[#0f1d36] border-gray-700 hover:border-gray-500'
                                                         }
+                                                        ${isMassGifting ? 'hover:bg-purple-900/20' : ''}
                                                     `}
                                                 >
                                                     <div className={`p-2 rounded-full ${isUnlocked ? 'bg-green-500 text-[#0a1428]' : 'bg-gray-800 text-gray-500'}`}>
@@ -1163,6 +1266,7 @@ export const DatabaseManager: React.FC = () => {
                                                         <div className="text-[10px] text-gray-600 mt-1">{def.description}</div>
                                                     </div>
                                                     {isUnlocked && <Check className="w-5 h-5 text-green-500 ml-auto" />}
+                                                    {isMassGifting && <Globe className="w-4 h-4 text-purple-500 ml-auto opacity-50" />}
                                                 </button>
                                             );
                                         })}
@@ -1174,7 +1278,7 @@ export const DatabaseManager: React.FC = () => {
                                 <div className="space-y-6">
                                     <div className="bg-purple-900/10 border border-purple-500/30 p-4 rounded-xl">
                                         <h4 className="text-purple-300 font-bold uppercase text-xs tracking-widest mb-3 flex items-center gap-2">
-                                            <Sparkles className="w-4 h-4" /> Forjador de Títulos
+                                            <Sparkles className="w-4 h-4" /> {isMassGifting ? 'Forjador Global' : 'Forjador de Títulos'}
                                         </h4>
                                         <div className="flex gap-2">
                                             <input 
@@ -1185,7 +1289,7 @@ export const DatabaseManager: React.FC = () => {
                                                 className="flex-1 bg-black/40 border border-purple-500/50 rounded-lg px-4 py-2 text-white text-sm outline-none focus:border-purple-400"
                                             />
                                             <button 
-                                                onClick={handleCreateCustomTitle}
+                                                onClick={isMassGifting ? handleMassCustomGift : handleCreateCustomTitle}
                                                 disabled={!customTitleInput.trim()}
                                                 className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
@@ -1193,12 +1297,15 @@ export const DatabaseManager: React.FC = () => {
                                             </button>
                                         </div>
                                         <p className="text-[10px] text-gray-500 mt-2">
-                                            Este título será exclusivo para <strong>{giftingUser.name}</strong> y aparecerá en su selector de perfil.
+                                            {isMassGifting 
+                                                ? "Este título se añadirá a TODOS los usuarios registrados como recompensa única."
+                                                : <span>Este título será exclusivo para <strong>{giftingUser.name}</strong> y aparecerá en su selector de perfil.</span>
+                                            }
                                         </p>
                                     </div>
 
                                     {/* LIST EXISTING CUSTOM TITLES */}
-                                    {giftingUser.customCosmetics && giftingUser.customCosmetics.length > 0 && (
+                                    {!isMassGifting && giftingUser.customCosmetics && giftingUser.customCosmetics.length > 0 && (
                                         <div>
                                             <h4 className="text-gray-400 font-bold uppercase text-xs tracking-widest mb-3">Títulos Creados</h4>
                                             <div className="space-y-2">
