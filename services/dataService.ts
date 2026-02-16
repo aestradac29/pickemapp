@@ -302,6 +302,8 @@ export const dataService = {
                             lastMatchPoints = s.totalPoints;
                         }
 
+                        // For average calculation, we treat a BO3 series as "1 Unit" of stats in this aggregation loop
+                        // because match.stats[player.id] contains the aggregated (previously averaged, now summed) stats for that match.
                         gamesPlayed++;
 
                         if (!highlight) {
@@ -570,8 +572,8 @@ export const dataService = {
         const match = allMatches[index];
 
         // 2. Aggregate Stats Logic (Normalization)
-        // We will sum up all raw stats to store them for posterity, but calculate the "totalPoints" as an AVERAGE.
-        // This effectively replaces the multiplier system.
+        // We will sum up all raw stats to store them for posterity.
+        // ** CHANGE **: totalPoints is now the SUM of all games, not average.
         const aggregatedStats: Record<string, PlayerGameStats> = {};
         
         // Iterate through all players involved
@@ -610,12 +612,11 @@ export const dataService = {
                     if (pStats.firstBlood) summedStats.firstBlood = true;
                     if (pStats.firstDragon) summedStats.firstDragon = true;
 
-                    // Role specifics: Average or Sum? Usually Sum for these milestones works best or recalculate.
-                    // For simplicity, we just sum for display, but points are calculated per game below.
+                    // Role specifics: Sum
                     summedStats.dragonsKilled += pStats.dragonsKilled;
                     summedStats.baronsKilled += pStats.baronsKilled;
                     
-                    // Averages for these metrics
+                    // Averages for these metrics (purely for display/reference, not for point calc)
                     summedStats.teamDamagePercentage += pStats.teamDamagePercentage;
                     summedStats.damagePerMinute += pStats.damagePerMinute;
                     summedStats.visionScore += pStats.visionScore;
@@ -634,15 +635,14 @@ export const dataService = {
             });
 
             if (gamesPlayed > 0) {
-                // Normalize aggregated stats for display
+                // Normalize aggregated stats for display (averages)
                 summedStats.teamDamagePercentage /= gamesPlayed;
                 summedStats.damagePerMinute /= gamesPlayed;
-                // Vision score is cumulative usually, but let's keep it clean
+                // Vision score is cumulative usually, but let's keep it simple for display
                 
-                // CRITICAL: Final Score is AVERAGE of games played
-                // This replaces the multiplier. 
-                // E.g. (Game 1 Score + Game 2 Score) / 2
-                summedStats.totalPoints = parseFloat((totalScore / gamesPlayed).toFixed(2));
+                // CRITICAL CHANGE: Final Score is SUM of games played in the series
+                // Used for Fantasy BO3/BO5 scoring
+                summedStats.totalPoints = parseFloat(totalScore.toFixed(2));
                 
                 aggregatedStats[player.id] = summedStats;
             }

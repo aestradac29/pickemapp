@@ -898,6 +898,12 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
   // Flag to indicate we are viewing a past round (where prices should be historical)
   const isHistoricalView = viewRoundId < activeConfigRound;
 
+  // Determine correct round label
+  const currentRoundConfig = FANTASY_SCHEDULE.find(r => r.id === viewRoundId);
+  const dynamicRoundLabel = currentRoundConfig 
+      ? (currentRoundConfig.stage === Stage.GROUPS ? `Puntos J${currentRoundConfig.matchdays.join('-')}` : `Puntos ${currentRoundConfig.label}`) 
+      : `Puntos R${viewRoundId}`;
+
   return (
     <div className="w-[98%] max-w-[2400px] mx-auto animate-in fade-in pb-20 pt-4 relative">
         
@@ -1104,7 +1110,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                                 opponents={getOpponentsForPlayer(myTeam[role].playerId)}
                                 locked={isViewLocked}
                                 roundPoints={myTeam[role].playerId ? roundPointsMap[myTeam[role].playerId!] : undefined}
-                                roundLabel={`Puntos J${FANTASY_SCHEDULE.find(r => r.id === viewRoundId)?.matchdays.join('-') || viewRoundId}`}
+                                roundLabel={dynamicRoundLabel}
                                 isHistorical={isHistoricalView}
                             />
                         ))}
