@@ -3,8 +3,8 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
 import { PlayoffBracket } from './PlayoffBracket';
 import { DaySelector } from './DaySelector';
-import { UserPrediction, Match, Team, Stage, Player } from '../types';
-import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, Trash, CirclePlus, GitMerge, List } from 'lucide-react';
+import { UserPrediction, Match, Team, Stage, Player, User } from '../types';
+import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, Trash, CirclePlus, GitMerge, List, User as UserIcon, LogOut } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { TEAMS } from '../constants';
 import { StatsEntryModal } from './StatsEntryModal';
@@ -47,10 +47,14 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
   const [allMatches, setAllMatches] = useState<Match[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]); // For User Selector
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
 
-  // Predictions
+  // Viewing State
+  const [viewingUserId, setViewingUserId] = useState<string | null>(currentUserId);
   const [predictions, setPredictions] = useState<UserPrediction[]>(initialPredictions);
+  const [isLoadingPicks, setIsLoadingPicks] = useState(false);
+
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
   
@@ -69,10 +73,16 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
   // Stats Viewer (User)
   const [viewStatsMatch, setViewStatsMatch] = useState<Match | null>(null);
 
-  // Sync state with props
+  // Derived state for Spectating
+  const isSpectating = viewingUserId !== currentUserId;
+  const viewingUser = allUsers.find(u => u.id === viewingUserId);
+
+  // Sync state with props only if viewing self
   useEffect(() => {
-    setPredictions(initialPredictions);
-  }, [initialPredictions]);
+    if (!isSpectating) {
+        setPredictions(initialPredictions);
+    }
+  }, [initialPredictions, isSpectating]);
 
   // Initial Data Load
   useEffect(() => {
@@ -80,16 +90,18 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
         setIsLoadingMatches(true);
         setNewMatch(null); 
         try {
-            const [fetchedMatches, teamsMap, config, playersList] = await Promise.all([
+            const [fetchedMatches, teamsMap, config, playersList, usersList] = await Promise.all([
                 dataService.getMatches(), 
                 dataService.getTeams(),
                 dataService.getDaysConfig(),
-                dataService.getPlayers()
+                dataService.getPlayers(),
+                dataService.getAllUsers()
             ]);
             
             setAllMatches(fetchedMatches);
             setAllTeams(Object.values(teamsMap));
             setAllPlayers(playersList);
+            setAllUsers(usersList);
             
             // Use specific Playoff keys
             setVisibleDays(config.playoffVisibleDays);
@@ -107,21 +119,74 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
     loadData();
   }, []);
 
+  // Fetch predictions when viewingUserId changes
+  useEffect(() => {
+      const fetchPicks = async () => {
+          if (!viewingUserId) return;
+          
+          if (viewingUserId === currentUserId) {
+              setPredictions(initialPredictions);
+              return;
+          }
+
+          setIsLoadingPicks(true);
+          try {
+              const userPicks = await dataService.getUserPredictions(viewingUserId);
+              setPredictions(userPicks);
+          } catch (e) {
+              console.error("Error fetching user picks", e);
+              setPredictions([]);
+          } finally {
+              setIsLoadingPicks(false);
+          }
+      };
+      fetchPicks();
+  }, [viewingUserId, currentUserId, initialPredictions]);
+
+  const isDayVisible = visibleDays.includes(currentDay);
+  const isManuallyClosed = closedDays.includes(currentDay);
+  
+  // Logic for Global Lock (Manual Only for flexibility)
+  const isGlobalPlayoffLock = useMemo(() => {
+      return closedDays.includes(1);
+  }, [closedDays]);
+
+  const isLockedForUser = isManuallyClosed || isGlobalPlayoffLock;
+
+  // VISIBILITY LOGIC FOR SPECTATING
+  const visiblePredictions = useMemo(() => {
+      if (!isSpectating) return predictions; // Viewing self: see all
+
+      return predictions.filter(p => {
+          const match = allMatches.find(m => m.id === p.matchId);
+          if (!match) return false;
+          
+          // Show prediction if match started OR global lock is active OR Admin
+          const hasStarted = new Date() >= new Date(match.startTime);
+          return hasStarted || isLockedForUser || isAdmin;
+      });
+  }, [predictions, allMatches, isSpectating, isLockedForUser, isAdmin]);
+
   // Filter matches for Bracket View (All Playoff matches)
   const bracketMatches = useMemo(() => {
       return allMatches.filter(m => m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS);
   }, [allMatches]);
+
+  // Filter matches for List View (By Round)
+  const listMatches = useMemo(() => {
+      return allMatches
+        .filter(m => (m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS) && m.day === currentDay)
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  }, [allMatches, currentDay]);
 
   // Helper to get Label matching the Bracket View
   const getBracketLabel = (match: Match) => {
         // Sort identically to PlayoffBracket.tsx
         const sortedMatches = [...bracketMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         
-        // 1. Identify Grand Final (Strict check + Overflow check)
         let grandFinal = sortedMatches.find(m => m.stage === Stage.FINALS);
         let winnersMatches = sortedMatches.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
         
-        // Fix for implicit final (same as PlayoffBracket.tsx)
         if (!grandFinal && winnersMatches.length > 7) {
             grandFinal = winnersMatches[winnersMatches.length - 1];
             winnersMatches = winnersMatches.slice(0, winnersMatches.length - 1);
@@ -129,15 +194,13 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
         if (match.id === grandFinal?.id) return "GRAN FINAL";
 
-        // Winners
         const wIndex = winnersMatches.findIndex(m => m.id === match.id);
         if (wIndex !== -1) {
-            if (wIndex < 4) return `R1 ${wIndex + 1}`; // Match 1, 2, 3, 4
-            if (wIndex < 6) return `R2 ${wIndex - 3}`; // Match 5, 6 -> 1, 2
+            if (wIndex < 4) return `R1 ${wIndex + 1}`; 
+            if (wIndex < 6) return `R2 ${wIndex - 3}`; 
             return `FINAL WINNERS`;
         }
 
-        // Losers
         const losersMatches = sortedMatches.filter(m => m.bracketStage === 'losers' && m.stage !== Stage.FINALS);
         const lIndex = losersMatches.findIndex(m => m.id === match.id);
         if (lIndex !== -1) {
@@ -147,17 +210,13 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
              return `L-FINAL`;
         }
 
-        return `PARTIDO ${match.id}`; // Fallback
+        return `PARTIDO ${match.id}`;
   };
 
-  // Filter matches for List View (By Round)
-  const listMatches = useMemo(() => {
-      return allMatches
-        .filter(m => (m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS) && m.day === currentDay)
-        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-  }, [allMatches, currentDay]);
-
   const checkUnsavedChanges = (day: number) => {
+    // Only check unsaved changes for current user
+    if (isSpectating) return false;
+
     const dayMatchIds = allMatches
         .filter(m => (m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS) && m.day === day && !m.id.startsWith('temp-'))
         .map(m => m.id);
@@ -175,25 +234,11 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
     });
   };
 
-  const isDayVisible = visibleDays.includes(currentDay);
-  const isManuallyClosed = closedDays.includes(currentDay);
-  
-  // Logic for Global Lock (Manual Only for flexibility)
-  const isGlobalPlayoffLock = useMemo(() => {
-      // Solo bloqueamos "globalmente" si el admin ha cerrado la jornada 1 manualmente.
-      // Ya NO bloqueamos por tiempo del primer partido, permitiendo picks individuales.
-      return closedDays.includes(1);
-  }, [closedDays]);
-
-  const isLockedForUser = isManuallyClosed || isGlobalPlayoffLock;
-
   const handleSelectWinner = (matchId: string, teamId: string) => {
-    if (isEditMode) return;
+    if (isEditMode || isSpectating) return; // Disable picking if spectating
     
-    // Validación individual de tiempo para seguridad
     const match = allMatches.find(m => m.id === matchId);
     if (match && !isAdmin) {
-        // Si el partido ya empezó, no permitir cambios aunque la jornada esté abierta
         if (new Date() >= new Date(match.startTime)) return;
     }
 
@@ -322,8 +367,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       setIsSavingStats(true);
       try {
           await dataService.saveMatchStatsAndCalculate(statsMatch.id, stats);
-          setStatsMatch(null); // Close modal
-          // Refresh matches to show updated state (e.g. green button?)
+          setStatsMatch(null); 
           const updated = await dataService.getMatches();
           setAllMatches(updated);
       } catch (e) {
@@ -339,7 +383,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           alert("Debes iniciar sesión para guardar.");
           return;
       }
-      if (isEditMode) return;
+      if (isEditMode || isSpectating) return;
       
       setIsSaving(true);
       isSavingRef.current = true;
@@ -374,11 +418,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
       try {
           await dataService.savePredictions(predsToSave);
-          
-          if (onPredictionsSaved) {
-              await onPredictionsSaved();
-          }
-
+          if (onPredictionsSaved) await onPredictionsSaved();
           setSaveStatus('success');
           setTimeout(() => setSaveStatus('idle'), 3000);
       } catch (error: any) {
@@ -415,6 +455,29 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+                {/* User Selector (For Viewing Others) */}
+                {!isEditMode && (
+                    <div className="flex items-center gap-2 bg-[#0f1923] p-1 pr-3 rounded-lg border border-gray-700 max-w-[200px] md:max-w-xs">
+                        <div className="w-8 h-8 rounded bg-black flex items-center justify-center overflow-hidden border border-gray-600 flex-shrink-0">
+                            {viewingUser?.avatar ? (
+                                <img src={viewingUser.avatar} className="w-full h-full object-cover" />
+                            ) : (
+                                <UserIcon className="w-4 h-4 text-gray-500" />
+                            )}
+                        </div>
+                        <select 
+                            value={viewingUserId || ''}
+                            onChange={(e) => setViewingUserId(e.target.value)}
+                            className="bg-transparent text-white text-xs sm:text-sm outline-none font-bold w-full truncate"
+                        >
+                            <option value={currentUserId || ''} className="bg-black text-[#c8aa6e]">Mis Predicciones</option>
+                            {allUsers.filter(u => u.id !== currentUserId).map(u => (
+                                <option key={u.id} value={u.id} className="bg-black">{u.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
                 {/* View Switcher (Hidden on Mobile) */}
                 {!isEditMode && (
                     <div className="hidden md:flex bg-[#0f1d36] p-1 rounded-lg border border-gray-700 items-center">
@@ -440,7 +503,6 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                         onClick={() => {
                             setIsEditMode(!isEditMode);
                             setNewMatch(null); 
-                            // Force list view on edit for easier management
                             if (!isEditMode) setViewMode('list');
                         }}
                         className={`
@@ -458,6 +520,27 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
             </div>
         </div>
 
+        {/* --- SPECTATOR BANNER --- */}
+        {isSpectating && (
+            <div className="mb-6 bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg flex items-center gap-3 animate-in slide-in-from-top-2 mx-4 sm:mx-0">
+                <Eye className="w-5 h-5 text-blue-400" />
+                <div>
+                    <p className="text-sm font-bold text-blue-200 uppercase">Modo Espectador</p>
+                    <p className="text-xs text-blue-300/70">
+                        Viendo predicciones de <span className="font-bold text-white">{viewingUser?.name}</span>. 
+                        Solo verás las de partidos ya iniciados.
+                    </p>
+                </div>
+                <button 
+                    onClick={() => setViewingUserId(currentUserId)}
+                    className="ml-auto p-2 bg-blue-900/40 hover:bg-blue-900/60 rounded-full border border-blue-500/30 text-blue-300 transition-colors"
+                    title="Volver a mi perfil"
+                >
+                    <LogOut className="w-4 h-4" />
+                </button>
+            </div>
+        )}
+
         {/* --- SCORING LEGEND --- */}
         {!isEditMode && (
             <div className="flex flex-wrap justify-center gap-2 mb-4 animate-in fade-in slide-in-from-top-2">
@@ -469,7 +552,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
             </div>
         )}
 
-        {/* Round Selector (Shown in List View, Admin Mode OR Mobile) */}
+        {/* Round Selector */}
         {(viewMode === 'list' || isEditMode) && (
             <div className="block md:block"> 
                 <DaySelector 
@@ -484,7 +567,6 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
             </div>
         )}
         
-        {/* Mobile-only DaySelector fallback if viewMode is bracket (since bracket is hidden on mobile) */}
         {viewMode === 'bracket' && !isEditMode && (
             <div className="block md:hidden">
                  <DaySelector 
@@ -550,10 +632,10 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       {/* CONTENT AREA */}
       <div className="animate-in fade-in duration-500">
         
-        {/* --- BRACKET VIEW (Desktop Only) --- */}
+        {/* --- BRACKET VIEW --- */}
         {viewMode === 'bracket' && !isEditMode && (
             <div className="hidden md:block overflow-x-auto">
-                 {isLoadingMatches ? (
+                 {(isLoadingMatches || isLoadingPicks) ? (
                      <div className="flex flex-col items-center justify-center py-20 text-[#c8aa6e]">
                         <Loader2 className="w-10 h-10 animate-spin mb-4" />
                         <p>Generando cuadro de competición...</p>
@@ -562,15 +644,15 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                      <PlayoffBracket 
                         matches={bracketMatches} 
                         teams={allTeams}
-                        predictions={predictions}
+                        predictions={visiblePredictions}
                         onSelectWinner={handleSelectWinner}
-                        isLocked={isGlobalPlayoffLock}
+                        isLocked={isGlobalPlayoffLock || isSpectating} 
                      />
                  )}
             </div>
         )}
 
-        {/* --- LIST VIEW (Mobile Always OR Desktop if selected) --- */}
+        {/* --- LIST VIEW --- */}
         <div className={viewMode === 'list' || isEditMode ? 'block' : 'block md:hidden'}>
             <div className="space-y-6">
                 {!isEditMode && (
@@ -585,7 +667,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                             </div>
                         )}
 
-                        {isDayVisible && isLockedForUser && (
+                        {isDayVisible && isLockedForUser && !isSpectating && (
                             <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-center justify-center gap-2 text-red-300 mb-6 animate-in slide-in-from-top-2 font-bold uppercase tracking-widest text-sm">
                                 <Lock className="w-4 h-4" />
                                 <span>Predicciones Cerradas</span>
@@ -615,10 +697,10 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                                     key={match.id} 
                                     match={match}
                                     teams={allTeams}
-                                    selectedWinnerId={predictions.find(p => p.matchId === match.id)?.predictedWinnerId}
+                                    selectedWinnerId={visiblePredictions.find(p => p.matchId === match.id)?.predictedWinnerId}
                                     onSelectWinner={handleSelectWinner}
                                     isEditing={isEditMode}
-                                    isDayLocked={isLockedForUser} 
+                                    isDayLocked={isLockedForUser || isSpectating} 
                                     customTitle={getBracketLabel(match)} 
                                     onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
                                     onDelete={() => handleAdminDelete(match.id)}
@@ -662,7 +744,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       </div>
 
       {/* Footer Action (Save Button) */}
-      {!isEditMode && !isLockedForUser && (
+      {!isEditMode && !isLockedForUser && !isSpectating && (
           <div className="fixed bottom-8 left-0 right-0 px-4 flex flex-col items-center pointer-events-none z-40 gap-2">
             
             {saveStatus === 'error' && errorMessage && (
