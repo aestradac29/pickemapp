@@ -322,24 +322,33 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     const playersB = allPlayers.filter(p => p.teamId === teamB.id);
     const matchPlayers = [...playersA, ...playersB];
 
-    // Initialize logic
+    // Initialize logic (FIXED)
     useEffect(() => {
-        // If match already has detailed games data, load it
-        if (match.games && match.games.length > 0) {
-            const loadedData: Record<number, any> = {};
-            match.games.forEach(g => {
-                loadedData[g.id] = { winnerId: g.winnerId, stats: g.stats };
-            });
-            setGamesData(loadedData);
-        } else {
-            const initialData: Record<number, any> = {};
-            
-            for (let i = 1; i <= numGames; i++) {
-                const useExistingStats = (i === 1 && numGames === 1 && match.stats);
+        const initialData: Record<number, any> = {};
+        
+        // Helper to find existing game data in match object
+        const getExistingGame = (id: number) => match.games?.find(g => g.id === id);
+
+        for (let i = 1; i <= numGames; i++) {
+            const existingGame = getExistingGame(i);
+
+            if (existingGame) {
+                // Load existing data if available
+                initialData[i] = { 
+                    winnerId: existingGame.winnerId, 
+                    stats: existingGame.stats 
+                };
+            } else {
+                // Initialize New / Empty Structure
+                
+                // Legacy fallback: Only if NO match.games exist at all, and it's game 1, and match.stats exists.
+                // This covers cases where data was saved before multi-game support.
+                const isLegacyStatsAvailable = (!match.games || match.games.length === 0) && match.stats;
+                const useLegacyStats = i === 1 && isLegacyStatsAvailable;
                 
                 const statsMap: Record<string, PlayerGameStats> = {};
                 matchPlayers.forEach(p => {
-                    if (useExistingStats && match.stats && match.stats[p.id]) {
+                    if (useLegacyStats && match.stats && match.stats[p.id]) {
                         statsMap[p.id] = { ...match.stats[p.id] };
                     } else {
                         statsMap[p.id] = {
@@ -354,13 +363,13 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                 });
                 
                 initialData[i] = {
-                    winnerId: useExistingStats ? match.winnerId || null : null,
+                    winnerId: useLegacyStats ? match.winnerId || null : null,
                     stats: statsMap
                 };
             }
-            setGamesData(initialData);
         }
-    }, [match, numGames]);
+        setGamesData(initialData);
+    }, [match, numGames]); // Dependency on match ensures re-init if match prop updates
 
     const handleStatChange = (playerId: string, field: keyof PlayerGameStats, value: any) => {
         setGamesData(prev => {
@@ -496,6 +505,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     };
 
     // Current View Helpers
+    // Safe access with fallback
     const currentStats = gamesData[activeGame]?.stats || {};
     const currentWinner = gamesData[activeGame]?.winnerId;
 
