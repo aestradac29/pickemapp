@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { dataService } from '../services/dataService';
 import { Player, Team, Match, Role, Stage, PlayerGameStats } from '../types';
 import { ROLE_ICONS } from '../constants';
-import { Loader2, Crown, Star, Medal, Trophy, Calendar, Users, Skull, TrendingDown, AlertTriangle } from 'lucide-react';
+import { Loader2, Crown, Star, Medal, Trophy, Calendar, Users, Skull, TrendingDown, AlertTriangle, Swords } from 'lucide-react';
 import { DaySelector } from './DaySelector';
 
 interface ScoredPlayer extends Player {
@@ -11,20 +11,20 @@ interface ScoredPlayer extends Player {
 }
 
 export const HallOfFame: React.FC = () => {
+    const [viewMode, setViewMode] = useState<'GROUPS' | 'PLAYOFFS'>('GROUPS');
     const [currentDay, setCurrentDay] = useState(1);
+    
     const [matches, setMatches] = useState<Match[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
     const [teams, setTeams] = useState<Record<string, Team>>({});
+    const [config, setConfig] = useState<any>({});
     const [loading, setLoading] = useState(true);
-    
-    // Available days based on config AND data existence
-    const [availableDays, setAvailableDays] = useState<number[]>([]);
 
     useEffect(() => {
         const load = async () => {
             setLoading(true);
             try {
-                const [m, p, t, config] = await Promise.all([
+                const [m, p, t, conf] = await Promise.all([
                     dataService.getMatches(),
                     dataService.getPlayers(),
                     dataService.getTeams(),
@@ -34,17 +34,10 @@ export const HallOfFame: React.FC = () => {
                 setMatches(m);
                 setPlayers(p);
                 setTeams(t);
+                setConfig(conf);
                 
-                // Calculate days that have completed matches
-                const daysWithResults = new Set(m.filter(match => match.isCompleted && match.stage === Stage.GROUPS).map(match => match.day || 0));
-                
-                // Merge configured visible days with days that have results (so we can see history even if "closed" in admin)
-                const combinedDays = Array.from(new Set([...(config.visibleDays || [1]), ...Array.from(daysWithResults)]));
-                const sortedDays = combinedDays.filter(d => d > 0).sort((a, b) => a - b);
-                
-                setAvailableDays(sortedDays);
-                
-                // Removed logic that auto-selected the last day. Now defaults to 1.
+                // Smart init: If playoffs are accessible and have data, default to playoff view? 
+                // Let's keep default as GROUPS for now unless specified.
             } catch (e) {
                 console.error(e);
             } finally {
@@ -54,10 +47,54 @@ export const HallOfFame: React.FC = () => {
         load();
     }, []);
 
-    // Logic: Calculate points for the selected day
+    // Filter available days based on View Mode
+    const availableDays = useMemo(() => {
+        const relevantMatches = matches.filter(m => 
+            viewMode === 'GROUPS' 
+                ? m.stage === Stage.GROUPS 
+                : (m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS)
+        );
+
+        // Days that have completed matches with stats
+        const daysWithResults = new Set(relevantMatches.filter(match => match.isCompleted).map(match => match.day || 0));
+        
+        // Merge with configured visible days
+        const configVisible = viewMode === 'GROUPS' ? (config.visibleDays || [1]) : (config.playoffVisibleDays || [1]);
+        
+        const combinedDays = Array.from(new Set([...configVisible, ...Array.from(daysWithResults)]));
+        return combinedDays.filter(d => d > 0).sort((a, b) => a - b);
+    }, [matches, config, viewMode]);
+
+    // Reset day when switching modes
+    useEffect(() => {
+        if (availableDays.length > 0) {
+            // Default to the last available day usually, but let's stick to 1 or logic
+            // If the currentDay is not in the new list, reset to 1
+            if (!availableDays.includes(currentDay)) {
+                setCurrentDay(availableDays[0] || 1);
+            }
+        } else {
+            setCurrentDay(1);
+        }
+    }, [viewMode, availableDays]);
+
+    // Logic: Calculate points for the selected day/round
     const dayStats = useMemo(() => {
         const stats: ScoredPlayer[] = [];
-        const dayMatches = matches.filter(m => m.day === currentDay && m.stage === Stage.GROUPS && m.isCompleted);
+        
+        const dayMatches = matches.filter(m => 
+            m.day === currentDay && 
+            m.isCompleted && 
+            (viewMode === 'GROUPS' ? m.stage === Stage.GROUPS : (m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS))
+        );
+
+        // Identify Teams that ACTUALLY played.
+        // This is crucial for Playoffs to avoid showing eliminated players with 0 points in the Hall of Shame.
+        const activeTeamIds = new Set<string>();
+        dayMatches.forEach(m => {
+            activeTeamIds.add(m.teamA.id);
+            activeTeamIds.add(m.teamB.id);
+        });
 
         // Map containing points per player ID for this day
         const pointsMap: Record<string, number> = {};
@@ -74,16 +111,17 @@ export const HallOfFame: React.FC = () => {
 
         // Merge with player info
         players.forEach(p => {
-            if (pointsMap[p.id] !== undefined) {
+            // ONLY include player if their team played this round OR if they have points recorded (subs check)
+            if (activeTeamIds.has(p.teamId) || pointsMap[p.id] !== undefined) {
                 stats.push({
                     ...p,
-                    dayPoints: pointsMap[p.id]
+                    dayPoints: pointsMap[p.id] || 0
                 });
             }
         });
 
         return stats.sort((a, b) => b.dayPoints - a.dayPoints);
-    }, [matches, players, currentDay]);
+    }, [matches, players, currentDay, viewMode]);
 
     // --- HALL OF FAME (BEST) ---
     const top3Overall = dayStats.slice(0, 3);
@@ -138,10 +176,30 @@ export const HallOfFame: React.FC = () => {
                 <h2 className="text-3xl font-bold text-white uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-[#c8aa6e] via-[#f0e6d2] to-[#c8aa6e] drop-shadow-sm">
                     Hall of Fame
                 </h2>
-                <p className="text-[#c8aa6e]/70 text-sm font-bold uppercase tracking-wide mt-1">Los mejores (y peores) de la Jornada {currentDay}</p>
+                <p className="text-[#c8aa6e]/70 text-sm font-bold uppercase tracking-wide mt-1">
+                    {viewMode === 'GROUPS' ? `Jornada ${currentDay}` : `Ronda ${currentDay}`}
+                </p>
             </div>
 
-            {/* Day Selector - Passing availableDays as activeDays to remove the "Eye" from past days */}
+            {/* Stage Selector */}
+            <div className="flex justify-center mb-6">
+                <div className="bg-[#0f1d36] p-1 rounded-lg border border-gray-700 inline-flex">
+                    <button 
+                        onClick={() => setViewMode('GROUPS')}
+                        className={`flex items-center gap-2 px-6 py-2 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'GROUPS' ? 'bg-[#c8aa6e] text-[#0a1428] shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <Swords className="w-4 h-4" /> Fase Regular
+                    </button>
+                    <button 
+                        onClick={() => setViewMode('PLAYOFFS')}
+                        className={`flex items-center gap-2 px-6 py-2 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'PLAYOFFS' ? 'bg-[#c8aa6e] text-[#0a1428] shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <Trophy className="w-4 h-4" /> Playoffs
+                    </button>
+                </div>
+            </div>
+
+            {/* Day/Round Selector */}
             <div className="mb-8">
                 <DaySelector 
                     days={availableDays}
@@ -149,7 +207,8 @@ export const HallOfFame: React.FC = () => {
                     onSelect={setCurrentDay}
                     isEditMode={false}
                     checkUnsaved={() => false}
-                    activeDays={availableDays} // Ensure selected/past days are treated as "active" visibility-wise
+                    activeDays={availableDays}
+                    labelPrefix={viewMode === 'GROUPS' ? 'Jornada' : 'Ronda'}
                 />
             </div>
 
@@ -158,7 +217,7 @@ export const HallOfFame: React.FC = () => {
                     <Calendar className="w-12 h-12 mb-4 opacity-50" />
                     <h3 className="text-lg font-bold text-gray-400 mb-1">Sin Datos</h3>
                     <p className="uppercase tracking-widest text-xs font-bold text-[#c8aa6e]">
-                        La jornada {currentDay} aún no ha finalizado
+                        La {viewMode === 'GROUPS' ? 'jornada' : 'ronda'} {currentDay} aún no ha finalizado
                     </p>
                 </div>
             ) : (
@@ -169,7 +228,7 @@ export const HallOfFame: React.FC = () => {
                     <div className="mb-20 relative">
                         <div className="absolute top-1/2 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#c8aa6e]/20 to-transparent"></div>
                         <h3 className="text-center text-xl font-bold text-[#c8aa6e] uppercase tracking-widest mb-8 relative inline-block bg-[#0a1428] px-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
-                            <Star className="w-5 h-5 fill-current" /> MVP de la Jornada
+                            <Star className="w-5 h-5 fill-current" /> MVP de la {viewMode === 'GROUPS' ? 'Jornada' : 'Ronda'}
                         </h3>
 
                         {/* PODIUM FAME */}
