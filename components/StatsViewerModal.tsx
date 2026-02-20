@@ -225,13 +225,13 @@ export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA
         currentWinnerId = match.winnerId || null;
     }
 
-    const playersA = allPlayers.filter(p => p.teamId === teamA.id);
-    const playersB = allPlayers.filter(p => p.teamId === teamB.id);
+    const playersA = teamA?.id ? allPlayers.filter(p => p.teamId === teamA.id) : [];
+    const playersB = teamB?.id ? allPlayers.filter(p => p.teamId === teamB.id) : [];
 
     // --- Helper to calculate Team KDA totals ---
     const getTeamKDA = (teamPlayers: Player[]) => {
         return teamPlayers.reduce((acc, p) => {
-            const s = currentStats[p.id];
+            const s = p.id ? currentStats[p.id] : null;
             if (s) {
                 acc.k += s.kills;
                 acc.d += s.deaths;
@@ -265,14 +265,14 @@ export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA
                                     <span className="text-red-400">{statsA.d}</span>/
                                     <span className="text-blue-400">{statsA.a}</span>
                                 </div>
-                                <span className={`text-2xl sm:text-4xl font-black ${currentWinnerId === teamA.id ? 'text-green-400' : ''}`}>{teamA.shortName}</span>
+                                <span className={`text-2xl sm:text-4xl font-black ${teamA?.id && currentWinnerId === teamA.id ? 'text-green-400' : ''}`}>{teamA?.shortName || 'TBD'}</span>
                             </div>
 
                             <span className="text-gray-600 text-lg font-black italic opacity-50 mx-1">VS</span>
 
                             {/* Team B (Name Left, Stats Right) */}
                             <div className="flex items-center gap-2 sm:gap-3">
-                                <span className={`text-2xl sm:text-4xl font-black ${currentWinnerId === teamB.id ? 'text-green-400' : ''}`}>{teamB.shortName}</span>
+                                <span className={`text-2xl sm:text-4xl font-black ${teamB?.id && currentWinnerId === teamB.id ? 'text-green-400' : ''}`}>{teamB?.shortName || 'TBD'}</span>
                                 <div className="text-sm sm:text-base font-mono font-bold tracking-wider bg-black/40 px-2 py-1 rounded border border-white/10">
                                     <span className="text-green-400">{statsB.k}</span>/
                                     <span className="text-red-400">{statsB.d}</span>/
@@ -317,11 +317,11 @@ export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA
                             <div>
                                 <div className="flex items-center justify-between mb-3 px-1">
                                     <div className="flex items-center gap-2">
-                                        {teamA.logo && <img src={teamA.logo} className="w-5 h-5 object-contain" />}
-                                        <h4 className="font-bold text-white text-lg">{teamA.name}</h4>
+                                        {teamA?.logo && <img src={teamA.logo} className="w-5 h-5 object-contain" />}
+                                        <h4 className="font-bold text-white text-lg">{teamA?.name || 'TBD'}</h4>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        {currentWinnerId === teamA.id && <span className="text-[10px] font-bold bg-green-900/50 text-green-400 px-2 py-0.5 rounded border border-green-500/30 uppercase">Victoria</span>}
+                                        {teamA?.id && currentWinnerId === teamA.id && <span className="text-[10px] font-bold bg-green-900/50 text-green-400 px-2 py-0.5 rounded border border-green-500/30 uppercase">Victoria</span>}
                                     </div>
                                 </div>
                                 <div className="space-y-1">
@@ -330,7 +330,7 @@ export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA
                                             key={p.id} 
                                             player={p} 
                                             stats={currentStats[p.id] || { kills:0, deaths:0, assists:0, cs:0, totalPoints:0 } as any}
-                                            isWinner={currentWinnerId === teamA.id}
+                                            isWinner={teamA?.id ? currentWinnerId === teamA.id : false}
                                         />
                                     ))}
                                 </div>
@@ -340,11 +340,11 @@ export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA
                             <div>
                                 <div className="flex items-center justify-between mb-3 px-1">
                                     <div className="flex items-center gap-2">
-                                        {teamB.logo && <img src={teamB.logo} className="w-5 h-5 object-contain" />}
-                                        <h4 className="font-bold text-white text-lg">{teamB.name}</h4>
+                                        {teamB?.logo && <img src={teamB.logo} className="w-5 h-5 object-contain" />}
+                                        <h4 className="font-bold text-white text-lg">{teamB?.name || 'TBD'}</h4>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        {currentWinnerId === teamB.id && <span className="text-[10px] font-bold bg-green-900/50 text-green-400 px-2 py-0.5 rounded border border-green-500/30 uppercase">Victoria</span>}
+                                        {teamB?.id && currentWinnerId === teamB.id && <span className="text-[10px] font-bold bg-green-900/50 text-green-400 px-2 py-0.5 rounded border border-green-500/30 uppercase">Victoria</span>}
                                     </div>
                                 </div>
                                 <div className="space-y-1">
@@ -353,7 +353,7 @@ export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA
                                             key={p.id} 
                                             player={p} 
                                             stats={currentStats[p.id] || { kills:0, deaths:0, assists:0, cs:0, totalPoints:0 } as any}
-                                            isWinner={currentWinnerId === teamB.id}
+                                            isWinner={teamB?.id ? currentWinnerId === teamB.id : false}
                                         />
                                     ))}
                                 </div>

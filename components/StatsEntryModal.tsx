@@ -318,8 +318,8 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     const [importText, setImportText] = useState("");
 
     // Players lists
-    const playersA = allPlayers.filter(p => p.teamId === teamA.id);
-    const playersB = allPlayers.filter(p => p.teamId === teamB.id);
+    const playersA = teamA?.id ? allPlayers.filter(p => p.teamId === teamA.id) : [];
+    const playersB = teamB?.id ? allPlayers.filter(p => p.teamId === teamB.id) : [];
     const matchPlayers = [...playersA, ...playersB];
 
     // Initialize logic (FIXED)
@@ -522,7 +522,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                                 Editor de Estadísticas
                             </span>
                             <span className="text-gray-500">|</span>
-                            <span className="text-white font-bold">{teamA.shortName} vs {teamB.shortName}</span>
+                            <span className="text-white font-bold">{teamA?.shortName || 'TBD'} vs {teamB?.shortName || 'TBD'}</span>
                             <div className="flex gap-2">
                                 <span className="text-xs bg-black/30 px-2 py-1 rounded border border-gray-700 text-gray-400">BO{numGames}</span>
                             </div>
@@ -572,20 +572,22 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                 <div className="p-2 bg-[#050a14] border-b border-gray-800 flex justify-center gap-6 items-center">
                     <span className="text-xs text-gray-500 uppercase font-bold">Ganador Partida {activeGame}:</span>
                     <button 
-                        onClick={() => handleWinnerChange(teamA.id)}
-                        className={`flex items-center gap-2 px-3 py-1 rounded border transition-all ${currentWinner === teamA.id ? 'bg-green-900/30 border-green-500 text-green-400' : 'bg-[#1e293b] border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                        onClick={() => teamA?.id && handleWinnerChange(teamA.id)}
+                        disabled={!teamA?.id}
+                        className={`flex items-center gap-2 px-3 py-1 rounded border transition-all ${currentWinner === teamA?.id ? 'bg-green-900/30 border-green-500 text-green-400' : 'bg-[#1e293b] border-gray-700 text-gray-400 hover:border-gray-500'}`}
                     >
-                        {teamA.logo ? <img src={teamA.logo} className="w-4 h-4 object-contain" /> : null}
-                        <span className="text-xs font-bold">{teamA.shortName}</span>
-                        {currentWinner === teamA.id && <CheckCircle2 className="w-3 h-3" />}
+                        {teamA?.logo ? <img src={teamA.logo} className="w-4 h-4 object-contain" /> : null}
+                        <span className="text-xs font-bold">{teamA?.shortName || 'TBD'}</span>
+                        {teamA?.id && currentWinner === teamA.id && <CheckCircle2 className="w-3 h-3" />}
                     </button>
                     <button 
-                        onClick={() => handleWinnerChange(teamB.id)}
-                        className={`flex items-center gap-2 px-3 py-1 rounded border transition-all ${currentWinner === teamB.id ? 'bg-green-900/30 border-green-500 text-green-400' : 'bg-[#1e293b] border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                        onClick={() => teamB?.id && handleWinnerChange(teamB.id)}
+                        disabled={!teamB?.id}
+                        className={`flex items-center gap-2 px-3 py-1 rounded border transition-all ${currentWinner === teamB?.id ? 'bg-green-900/30 border-green-500 text-green-400' : 'bg-[#1e293b] border-gray-700 text-gray-400 hover:border-gray-500'}`}
                     >
-                        {teamB.logo ? <img src={teamB.logo} className="w-4 h-4 object-contain" /> : null}
-                        <span className="text-xs font-bold">{teamB.shortName}</span>
-                        {currentWinner === teamB.id && <CheckCircle2 className="w-3 h-3" />}
+                        {teamB?.logo ? <img src={teamB.logo} className="w-4 h-4 object-contain" /> : null}
+                        <span className="text-xs font-bold">{teamB?.shortName || 'TBD'}</span>
+                        {teamB?.id && currentWinner === teamB.id && <CheckCircle2 className="w-3 h-3" />}
                     </button>
                 </div>
 
@@ -595,22 +597,30 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                     {/* Team A Column */}
                     <div>
                         <div className="flex items-center gap-2 mb-4 border-b border-gray-700 pb-2">
-                            <img src={teamA.logo} className="w-6 h-6 object-contain" />
-                            <h3 className={`font-bold text-lg ${currentWinner === teamA.id ? 'text-green-400' : 'text-white'}`}>{teamA.name}</h3>
+                            {teamA?.logo && <img src={teamA.logo} className="w-6 h-6 object-contain" />}
+                            <h3 className={`font-bold text-lg ${teamA?.id && currentWinner === teamA.id ? 'text-green-400' : 'text-white'}`}>{teamA?.name || 'TBD'}</h3>
                         </div>
                         <div className="space-y-2">
-                            {playersA.map(p => <PlayerRow key={p.id} player={p} stats={currentStats} onStatChange={handleStatChange} />)}
+                            {playersA.length > 0 ? (
+                                playersA.map(p => <PlayerRow key={p.id} player={p} stats={currentStats} onStatChange={handleStatChange} />)
+                            ) : (
+                                <p className="text-gray-500 text-xs italic p-4 text-center bg-black/20 rounded border border-dashed border-gray-800">No hay jugadores asignados a este equipo</p>
+                            )}
                         </div>
                     </div>
 
                     {/* Team B Column */}
                     <div>
                         <div className="flex items-center gap-2 mb-4 border-b border-gray-700 pb-2">
-                            <img src={teamB.logo} className="w-6 h-6 object-contain" />
-                            <h3 className={`font-bold text-lg ${currentWinner === teamB.id ? 'text-green-400' : 'text-white'}`}>{teamB.name}</h3>
+                            {teamB?.logo && <img src={teamB.logo} className="w-6 h-6 object-contain" />}
+                            <h3 className={`font-bold text-lg ${teamB?.id && currentWinner === teamB.id ? 'text-green-400' : 'text-white'}`}>{teamB?.name || 'TBD'}</h3>
                         </div>
                         <div className="space-y-2">
-                            {playersB.map(p => <PlayerRow key={p.id} player={p} stats={currentStats} onStatChange={handleStatChange} />)}
+                            {playersB.length > 0 ? (
+                                playersB.map(p => <PlayerRow key={p.id} player={p} stats={currentStats} onStatChange={handleStatChange} />)
+                            ) : (
+                                <p className="text-gray-500 text-xs italic p-4 text-center bg-black/20 rounded border border-dashed border-gray-800">No hay jugadores asignados a este equipo</p>
+                            )}
                         </div>
                     </div>
 

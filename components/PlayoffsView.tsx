@@ -324,7 +324,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
   const handleToggleVisibility = async () => {
       if (!isAdmin) return;
-      let newVisibleDays = visibleDays.includes(currentDay) 
+      const newVisibleDays = visibleDays.includes(currentDay) 
           ? visibleDays.filter(d => d !== currentDay) 
           : [...visibleDays, currentDay];
       
@@ -335,7 +335,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
   const handleToggleLock = async () => {
       if (!isAdmin) return;
-      let newClosedDays = closedDays.includes(currentDay)
+      const newClosedDays = closedDays.includes(currentDay)
           ? closedDays.filter(d => d !== currentDay)
           : [...closedDays, currentDay];
       

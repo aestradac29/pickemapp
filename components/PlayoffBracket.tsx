@@ -47,22 +47,28 @@ const BracketMatch = ({
     // CALCULATE SCORE FOR BRACKET
     let scoreA = 0;
     let scoreB = 0;
-    if (isFinished) {
-        if (match.games && match.games.length > 0) {
-            match.games.forEach(g => {
-                if (g.winnerId === match.teamA.id) scoreA++;
-                if (g.winnerId === match.teamB.id) scoreB++;
-            });
-        } else if (match.winnerId) {
-            if (match.winnerId === match.teamA.id) scoreA = 1;
-            else scoreB = 1;
-        }
+    if (match.games && match.games.length > 0) {
+        match.games.forEach(g => {
+            if (g.winnerId === match.teamA.id) scoreA++;
+            if (g.winnerId === match.teamB.id) scoreB++;
+        });
+    } else if (match.winnerId) {
+        if (match.winnerId === match.teamA.id) scoreA = 1;
+        else scoreB = 1;
     }
 
+    const hasScore = scoreA > 0 || scoreB > 0;
+
     const renderTeam = (team: Team, isTeamA: boolean) => {
-        const isSelected = prediction === team.id;
-        const isWinner = match.winnerId === team.id;
-        const isLoser = match.winnerId && match.winnerId !== team.id;
+        if (!team) return (
+            <div className="flex items-center justify-between px-2 py-1 w-full transition-all border-l-2 h-7 bg-gray-800/30 border-transparent opacity-50">
+                <span className="text-[10px] text-gray-600 italic">TBD</span>
+            </div>
+        );
+
+        const isSelected = team.id ? prediction === team.id : false;
+        const isWinner = team.id && match.winnerId === team.id;
+        const isLoser = team.id && match.winnerId && match.winnerId !== team.id;
         const teamScore = isTeamA ? scoreA : scoreB;
         
         const isPlaceholder = !team.id || team.id.toLowerCase().includes('winner') || team.id.toLowerCase().includes('loser') || team.name.includes('Winner') || team.name.includes('Loser') || team.name === 'TBD';
@@ -108,9 +114,9 @@ const BracketMatch = ({
                     <span className={`text-[10px] truncate ${textClass}`}>{team.name}</span>
                 </div>
                 
-                {/* SHOW SCORE IF FINISHED */}
-                {isFinished && (
-                    <span className={`text-[10px] font-bold ml-1 ${isWinner ? 'text-green-400' : 'text-gray-600'}`}>
+                {/* SHOW SCORE IF AVAILABLE */}
+                {(isFinished || hasScore) && (
+                    <span className={`text-[10px] font-bold ml-1 ${isWinner ? 'text-green-400' : isFinished ? 'text-gray-600' : 'text-gray-400'}`}>
                         {teamScore}
                     </span>
                 )}

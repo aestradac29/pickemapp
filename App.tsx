@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { MATCHES, USERS } from './constants';
-import { MatchCard } from './components/MatchCard';
+
 import { Leaderboard } from './components/Leaderboard';
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
@@ -18,7 +17,7 @@ import { TeamsView } from './components/TeamsView';
 import { OfficialStandings } from './components/OfficialStandings';
 import { HallOfFame } from './components/HallOfFame'; // Import nuevo
 import { ViewState, UserPrediction, User } from './types';
-import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft } from 'lucide-react';
+import { Menu, X, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, AlertTriangle } from 'lucide-react';
 import { authService } from './services/authService';
 import { dataService } from './services/dataService';
 
@@ -49,6 +48,9 @@ const App: React.FC = () => {
 
   // Admin Check - Dynamic based on Database Role
   const isAdmin = userRole === 'admin';
+
+  // --- CONFIG CHECK --- 
+  const isFirebaseConfigured = import.meta.env.VITE_FIREBASE_API_KEY && import.meta.env.VITE_FIREBASE_PROJECT_ID;
 
   // --- AUTH INITIALIZATION & LISTENER ---
   useEffect(() => {
@@ -109,10 +111,12 @@ const App: React.FC = () => {
         if (newName === 'Invocador' && prev && prev !== 'Invocador') return prev;
         return newName;
       });
-      setCurrentUserId(user.id);
-      setCurrentUserAvatar(user.profile?.avatar_url);
-      setUserRole(user.role || 'user'); // Set Role from DB
-      loadUserData(user.id);
+      if (user && user.id) {
+        setCurrentUserId(user.id);
+        setCurrentUserAvatar(user.profile?.avatar_url);
+        setUserRole(user.role || 'user'); // Set Role from DB
+        loadUserData(user.id);
+      }
 
       // Smart Redirect
       if (view === ViewState.LOGIN) {
@@ -174,17 +178,32 @@ const App: React.FC = () => {
       setView(ViewState.PROFILE);
   };
 
-  const handleSelectWinner = async (matchId: string, teamId: string) => {
-    setPredictions(prev => {
-      const existing = prev.find(p => p.matchId === matchId);
-      if (existing) {
-        return prev.map(p => p.matchId === matchId ? { ...p, predictedWinnerId: teamId } : p);
-      }
-      return [...prev, { matchId, predictedWinnerId: teamId }];
-    });
-  };
+
 
   const renderContent = () => {
+    if (!isFirebaseConfigured) {
+      return (
+        <div className="w-full h-screen bg-hextech-900 text-hextech-400 flex flex-col items-center justify-center p-4">
+          <div className="bg-red-900/50 border border-red-500/50 rounded-lg p-6 max-w-lg text-center shadow-lg">
+            <AlertTriangle className="mx-auto h-12 w-12 text-red-400 mb-4" />
+            <h1 className="text-2xl font-bold text-white mb-2">Configuración Incompleta</h1>
+            <p className="text-red-200/80 mb-4">
+              La aplicación no puede conectar con la base de datos. Por favor, configura las variables de entorno de Firebase en un fichero <code className="bg-red-400/20 px-1 rounded">.env.local</code> para continuar.
+            </p>
+            <div className="bg-hextech-900/70 rounded p-3 text-left text-xs font-mono">
+              <p>VITE_FIREBASE_API_KEY=...</p>
+              <p>VITE_FIREBASE_AUTH_DOMAIN=...</p>
+              <p>VITE_FIREBASE_PROJECT_ID=...</p>
+              <p>VITE_FIREBASE_STORAGE_BUCKET=...</p>
+              <p>VITE_FIREBASE_MESSAGING_SENDER_ID=...</p>
+              <p>VITE_FIREBASE_APP_ID=...</p>
+            </div>
+             <p className="text-xs text-red-200/60 mt-4">Consulta el fichero <code className="bg-red-400/20 px-1 rounded">.env.example</code> para más detalles. La aplicación se recargará automáticamente.</p>
+          </div>
+        </div>
+      );
+    }
+
     switch (view) {
       case ViewState.LOGIN:
         return <Login onLogin={handleLogin} />;

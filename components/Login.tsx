@@ -130,7 +130,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
              {isResetting ? <KeyRound className="w-8 h-8 text-[#f0e6d2]" /> : <Shield className="w-8 h-8 text-[#f0e6d2]" />}
           </div>
           <h1 className="text-3xl font-bold text-[#f0e6d2] tracking-wider uppercase text-center">
-            Pick'em <span className="text-[#c8aa6e]">Pro</span>
+            Pick&apos;em <span className="text-[#c8aa6e]">Pro</span>
           </h1>
           <p className="text-[#a09b8c] text-sm mt-2 text-center">
             {isResetting ? 'Recupera el acceso a tu cuenta' : 

@@ -14,13 +14,8 @@ declare global {
 
 let firebaseConfig;
 
-// 1. Detectar si estamos en Producción
-const isProd = typeof import.meta.env !== 'undefined' && import.meta.env.PROD;
-
-// 2. Verificar si las variables de entorno de Vercel existen
-// NOTA: Vite requiere que las variables empiecen por VITE_
 const env = import.meta.env || {};
-const hasProdKeys = isProd && !!env.VITE_FIREBASE_API_KEY;
+const hasProdKeys = !!env.VITE_FIREBASE_API_KEY && !!env.VITE_FIREBASE_PROJECT_ID;
 
 if (hasProdKeys) {
   // --- PRODUCCIÓN (VERCEL) ---

@@ -201,7 +201,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
             const bannerId = user.banner;
 
             // 1. Check for specific banner definition (e.g. 'banner_shf' or 'banner_bds' mapped in constants)
-            let specificBannerClass = bannerId && BANNER_STYLES[bannerId] ? BANNER_STYLES[bannerId] : null;
+            const specificBannerClass = bannerId && BANNER_STYLES[bannerId] ? BANNER_STYLES[bannerId] : null;
 
             // 2. Identify Team Data (even if specific class exists, we might need logo)
             if (bannerId && bannerId.startsWith('banner_')) {

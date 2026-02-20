@@ -134,6 +134,24 @@ export const AdminPanel: React.FC = () => {
                         matches.map(match => {
                             const isEditing = editingMatchId === match.id;
 
+                            // Calculate Score
+                            let scoreA = 0;
+                            let scoreB = 0;
+                            if (match.games && match.games.length > 0) {
+                                match.games.forEach(g => {
+                                    if (match.teamA?.id && g.winnerId === match.teamA.id) scoreA++;
+                                    if (match.teamB?.id && g.winnerId === match.teamB.id) scoreB++;
+                                });
+                            } else if (match.winnerId) {
+                                if (match.teamA?.id && match.winnerId === match.teamA.id) scoreA = 1;
+                                else scoreB = 1;
+                            }
+                            const hasScore = scoreA > 0 || scoreB > 0;
+
+                            const isTbd = (team: Team) => !team.id || team.id.toLowerCase().includes('winner') || team.id.toLowerCase().includes('loser') || team.name.includes('Winner') || team.name.includes('Loser') || team.name === 'TBD';
+                            const tbdA = isTbd(match.teamA);
+                            const tbdB = isTbd(match.teamB);
+
                             return (
                                 <div key={match.id} className={`grid grid-cols-12 p-4 items-center border-b border-gray-800 hover:bg-white/5 transition-colors ${isEditing ? 'bg-blue-900/20' : ''}`}>
                                     {isEditing && editForm ? (
@@ -201,9 +219,25 @@ export const AdminPanel: React.FC = () => {
                                                 {new Date(match.startTime).toLocaleString()}
                                             </div>
                                             <div className="col-span-3 flex items-center justify-center gap-3">
-                                                <span className={`font-bold ${match.winnerId === match.teamA.id ? 'text-green-400' : 'text-gray-400'}`}>{match.teamA.shortName}</span>
-                                                <span className="text-gray-600 text-xs">VS</span>
-                                                <span className={`font-bold ${match.winnerId === match.teamB.id ? 'text-green-400' : 'text-gray-400'}`}>{match.teamB.shortName}</span>
+                                                <div className="flex flex-col items-center">
+                                                    <span className={`font-bold ${match.winnerId === match.teamA.id ? 'text-green-400' : tbdA ? 'text-gray-600 italic' : 'text-gray-400'}`}>
+                                                        {match.teamA.shortName}
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-col items-center min-w-[40px]">
+                                                    {hasScore ? (
+                                                        <span className="text-[10px] font-black italic text-white bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700 shadow-sm">
+                                                            {scoreA}-{scoreB}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-600 text-[10px] font-bold">VS</span>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-col items-center">
+                                                    <span className={`font-bold ${match.winnerId === match.teamB.id ? 'text-green-400' : tbdB ? 'text-gray-600 italic' : 'text-gray-400'}`}>
+                                                        {match.teamB.shortName}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div className="col-span-2 text-center">
                                                 {match.winnerId ? (

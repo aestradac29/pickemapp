@@ -23,7 +23,7 @@ const TeamScheduleModal: React.FC<TeamScheduleModalProps> = ({ team, matches, on
     // Filter matches involving this team
     const teamMatches = useMemo(() => {
         return matches
-            .filter(m => m.teamA.id === team.id || m.teamB.id === team.id)
+            .filter(m => m.teamA?.id === team.id || m.teamB?.id === team.id)
             .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     }, [matches, team]);
 
@@ -32,7 +32,7 @@ const TeamScheduleModal: React.FC<TeamScheduleModalProps> = ({ team, matches, on
         let w = 0, l = 0;
         teamMatches.forEach(m => {
             if (m.isCompleted && m.winnerId) {
-                if (m.winnerId === team.id) w++;
+                if (m.winnerId === team?.id) w++;
                 else l++;
             }
         });
@@ -77,11 +77,13 @@ const TeamScheduleModal: React.FC<TeamScheduleModalProps> = ({ team, matches, on
                         </div>
                     ) : (
                         teamMatches.map(match => {
-                            const isHome = match.teamA.id === team.id;
+                            const isHome = match.teamA?.id === team.id;
                             const opponent = isHome ? match.teamB : match.teamA;
                             const isWin = match.winnerId === team.id;
                             const isLoss = match.winnerId && match.winnerId !== team.id;
                             const isFuture = !match.isCompleted;
+
+                            if (!opponent) return null;
 
                             return (
                                 <div key={match.id} className="flex items-center gap-3 p-3 rounded-lg bg-[#0f1d36] border border-gray-800 hover:border-gray-600 transition-colors">
@@ -182,14 +184,14 @@ export const OfficialStandings: React.FC = () => {
         // Calculate Stats
         regularSeasonMatches.forEach(m => {
             const winnerId = m.winnerId!;
-            const loserId = m.teamA.id === winnerId ? m.teamB.id : m.teamA.id;
+            const loserId = m.teamA?.id === winnerId ? m.teamB?.id : m.teamA?.id;
 
-            if (stats[winnerId]) {
+            if (winnerId && stats[winnerId]) {
                 stats[winnerId].played++;
                 stats[winnerId].wins++;
                 stats[winnerId].lastFive.push('W');
             }
-            if (stats[loserId]) {
+            if (loserId && stats[loserId]) {
                 stats[loserId].played++;
                 stats[loserId].losses++;
                 stats[loserId].lastFive.push('L');
@@ -207,7 +209,7 @@ export const OfficialStandings: React.FC = () => {
             // Simplified approach: Iterate reversed match history per team
             let currentStreak = 0;
             const teamMatches = regularSeasonMatches
-                .filter(m => m.teamA.id === row.team.id || m.teamB.id === row.team.id)
+                .filter(m => m.teamA?.id === row.team.id || m.teamB?.id === row.team.id)
                 .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()); // Reverse Chrono
 
             for (const m of teamMatches) {
