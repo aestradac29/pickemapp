@@ -132,18 +132,14 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       const completedMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.isCompleted && m.winnerId);
       completedMatches.forEach(m => {
           if (m.winnerId) {
-              const teamAId = m.teamA?.id;
-              const teamBId = m.teamB?.id;
-              
-              if (teamAId && !records[teamAId]) records[teamAId] = { w: 0, l: 0 };
-              if (teamBId && !records[teamBId]) records[teamBId] = { w: 0, l: 0 };
-              
-              if (m.winnerId === teamAId && teamAId && teamBId) {
-                  records[teamAId].w++;
-                  records[teamBId].l++;
-              } else if (m.winnerId === teamBId && teamAId && teamBId) {
-                  records[teamBId].w++;
-                  records[teamAId].l++;
+              if (!records[m.teamA.id]) records[m.teamA.id] = { w: 0, l: 0 };
+              if (!records[m.teamB.id]) records[m.teamB.id] = { w: 0, l: 0 };
+              if (m.winnerId === m.teamA.id) {
+                  records[m.teamA.id].w++;
+                  records[m.teamB.id].l++;
+              } else {
+                  records[m.teamB.id].w++;
+                  records[m.teamA.id].l++;
               }
           }
       });
@@ -555,8 +551,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     </div>
                 ) : (
                     matches.map(match => {
-                        const recA = match.teamA?.id ? teamRecords[match.teamA.id] : null;
-                        const recB = match.teamB?.id ? teamRecords[match.teamB.id] : null;
+                        const recA = teamRecords[match.teamA.id];
+                        const recB = teamRecords[match.teamB.id];
                         const strRecA = recA ? `${recA.w}-${recA.l}` : undefined;
                         const strRecB = recB ? `${recB.w}-${recB.l}` : undefined;
 

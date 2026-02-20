@@ -406,15 +406,11 @@ export const dataService = {
                         } catch(e) {}
                     }
 
-                    // Resolve team objects safely
-                    const teamAId = typeof m.teamA === 'string' ? m.teamA : (m.teamA as any)?.id;
-                    const teamBId = typeof m.teamB === 'string' ? m.teamB : (m.teamB as any)?.id;
-
                     return {
                         ...m,
                         day: finalDay,
-                        teamA: (teamAId && teamsMap[teamAId]) || m.teamA, 
-                        teamB: (teamBId && teamsMap[teamBId]) || m.teamB
+                        teamA: (m.teamA && teamsMap[m.teamA.id]) || m.teamA, 
+                        teamB: (m.teamB && teamsMap[m.teamB.id]) || m.teamB
                     };
                 });
 
@@ -653,22 +649,17 @@ export const dataService = {
         });
 
         // 3. Update Match Object
-        // We determine the Series Winner based on game wins and the BestOf threshold
-        const winsA = games.filter(g => g.winnerId === match.teamA?.id).length;
-        const winsB = games.filter(g => g.winnerId === match.teamB?.id).length;
-        
-        const threshold = Math.ceil((match.bestOf || 1) / 2);
-        let seriesWinnerId = null;
-        
-        if (winsA >= threshold) seriesWinnerId = match.teamA?.id;
-        else if (winsB >= threshold) seriesWinnerId = match.teamB?.id;
+        // We determine the Series Winner based on game wins
+        const winsA = games.filter(g => g.winnerId === match.teamA.id).length;
+        const winsB = games.filter(g => g.winnerId === match.teamB.id).length;
+        const seriesWinnerId = winsA > winsB ? match.teamA.id : (winsB > winsA ? match.teamB.id : null);
 
         const updatedMatch = { 
             ...match, 
             games: games, 
             stats: aggregatedStats, 
             winnerId: seriesWinnerId,
-            isCompleted: seriesWinnerId !== null 
+            isCompleted: true 
         };
         allMatches[index] = updatedMatch;
         

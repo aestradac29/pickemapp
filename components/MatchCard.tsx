@@ -31,7 +31,7 @@ const TeamButton = ({
     onSelect,
     record
 }: { 
-    team: Team | any; 
+    team: Team; 
     isSelected: boolean; 
     match: Match; 
     isEditing: boolean;
@@ -39,35 +39,21 @@ const TeamButton = ({
     onSelect: (id: string, teamId: string) => void; 
     record?: string;
 }) => {
-    // Normalize team if it's a string or missing
-    const effectiveTeam = typeof team === 'string' 
-        ? { id: team, name: team, shortName: team, color: '#333' } as Team
-        : team || { id: 'TBD', name: 'TBD', shortName: 'TBD', color: '#333' } as Team;
-
-    const isTbd = !effectiveTeam.id || 
-                  effectiveTeam.id.toLowerCase().includes('winner') || 
-                  effectiveTeam.id.toLowerCase().includes('loser') || 
-                  effectiveTeam.name.includes('Winner') || 
-                  effectiveTeam.name.includes('Loser') || 
-                  effectiveTeam.name === 'TBD';
-
     // Determinar si es el ganador oficial
-    const isWinner = effectiveTeam.id && match.winnerId === effectiveTeam.id;
+    const isWinner = match.winnerId === team.id;
     // Determinar si es una predicción fallida (Estaba seleccionado, el partido acabó, y NO es el ganador)
     const isWrongPick = match.isCompleted && isSelected && match.winnerId && !isWinner;
 
     return (
       <button
-        onClick={() => !isEditing && !isLocked && !isTbd && onSelect(match.id, effectiveTeam.id)}
-        disabled={isEditing || match.isCompleted || isLocked || isTbd}
+        onClick={() => !isEditing && !isLocked && onSelect(match.id, team.id)}
+        disabled={isEditing || match.isCompleted || isLocked}
         className={`
-          flex-1 flex flex-col items-center justify-center p-4 rounded-lg transition-all duration-200 border-2 relative min-h-[140px]
+          flex-1 flex flex-col items-center justify-center p-4 rounded-lg transition-all duration-200 border-2 relative
           ${isSelected && !isWrongPick
             ? 'bg-hextech-500/10 border-hextech-500 shadow-[0_0_15px_rgba(200,170,110,0.3)]' 
             : isWrongPick
                 ? 'bg-red-900/20 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
-            : isTbd
-                ? 'bg-gray-900/40 border-gray-800 opacity-60 border-dashed'
             : (match.isCompleted || isLocked)
                 ? 'bg-gray-800/30 border-gray-800 opacity-70 grayscale-[0.5] cursor-not-allowed' 
                 : 'bg-hextech-800 border-gray-700 hover:border-gray-500 hover:bg-gray-800'
@@ -76,10 +62,10 @@ const TeamButton = ({
         `}
       >
         <div className="mb-2 relative w-16 h-16 flex items-center justify-center">
-            {effectiveTeam.logo && !isTbd ? (
+            {team.logo ? (
                  <img 
-                    src={effectiveTeam.logo} 
-                    alt={effectiveTeam.name}
+                    src={team.logo} 
+                    alt={team.name}
                     className={`w-14 h-14 object-contain drop-shadow-md`}
                     onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
@@ -88,20 +74,20 @@ const TeamButton = ({
                  />
             ) : null}
             
-            {/* Fallback Initial or TBD Icon */}
+            {/* Fallback Initial */}
             <div 
-                className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg text-white shadow-lg ${effectiveTeam.logo && !isTbd ? 'hidden' : ''} ${isTbd ? 'bg-gray-800 border border-gray-700 text-gray-500' : ''}`}
-                style={!isTbd ? { backgroundColor: effectiveTeam.color } : {}}
+                className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg text-white shadow-lg ${team.logo ? 'hidden' : ''}`}
+                style={{ backgroundColor: team.color }}
             >
-                {isTbd ? '?' : effectiveTeam.shortName?.[0] || '?'}
+                {team.shortName[0]}
             </div>
         </div>
         
         <div className="flex flex-col items-center">
-            <span className={`font-bold text-lg leading-none ${isSelected ? (isWrongPick ? 'text-red-500' : 'text-hextech-500') : isTbd ? 'text-gray-500 italic' : 'text-gray-300'}`}>
-            {effectiveTeam.shortName || 'TBD'}
+            <span className={`font-bold text-lg leading-none ${isSelected ? (isWrongPick ? 'text-red-500' : 'text-hextech-500') : 'text-gray-300'}`}>
+            {team.shortName}
             </span>
-            {record && !isTbd && (
+            {record && (
                 <span className="text-[10px] font-bold text-gray-500 mt-1 bg-black/30 px-1.5 rounded">
                     {record}
                 </span>
@@ -149,8 +135,8 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   
   // Local Edit State
   const [editState, setEditState] = useState({
-      teamA: match.teamA?.id || '',
-      teamB: match.teamB?.id || '',
+      teamA: match.teamA.id,
+      teamB: match.teamB.id,
       startTime: match.startTime,
       winnerId: match.winnerId || '',
       status: match.isCompleted ? 'finished' : 'scheduled',
@@ -172,31 +158,27 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   // Has Stats Data?
   const hasStats = (match.games && match.games.length > 0) || (match.stats && Object.keys(match.stats).length > 0);
 
-  // Calculate Score
+  // Calculate Score for Completed Matches
   let scoreA = 0;
   let scoreB = 0;
-  if (match.games && match.games.length > 0) {
-      match.games.forEach(g => {
-          if (match.teamA?.id && g.winnerId === match.teamA.id) scoreA++;
-          if (match.teamB?.id && g.winnerId === match.teamB.id) scoreB++;
-      });
-  } else if (match.winnerId) {
-      // Fallback for simple BO1
-      if (match.teamA?.id && match.winnerId === match.teamA.id) scoreA = 1;
-      else scoreB = 1;
+  if (match.isCompleted) {
+      if (match.games && match.games.length > 0) {
+          match.games.forEach(g => {
+              if (g.winnerId === match.teamA.id) scoreA++;
+              if (g.winnerId === match.teamB.id) scoreB++;
+          });
+      } else if (match.winnerId) {
+          // Fallback for simple BO1
+          if (match.winnerId === match.teamA.id) scoreA = 1;
+          else scoreB = 1;
+      }
   }
-
-  const hasScore = scoreA > 0 || scoreB > 0;
-
-  const isTbdA = !match.teamA?.id || match.teamA.id === 'TBD' || match.teamA.name === 'TBD' || match.teamA.id.toLowerCase().includes('winner') || match.teamA.id.toLowerCase().includes('loser');
-  const isTbdB = !match.teamB?.id || match.teamB.id === 'TBD' || match.teamB.name === 'TBD' || match.teamB.id.toLowerCase().includes('winner') || match.teamB.id.toLowerCase().includes('loser');
-  const isMatchTbd = isTbdA || isTbdB;
 
   // Sync state with props when match changes
   useEffect(() => {
     setEditState({
-      teamA: match.teamA?.id || '',
-      teamB: match.teamB?.id || '',
+      teamA: match.teamA.id,
+      teamB: match.teamB.id,
       startTime: match.startTime,
       winnerId: match.winnerId || '',
       status: match.isCompleted ? 'finished' : 'scheduled',
@@ -305,17 +287,14 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                     {!match.id.startsWith('temp') && onEditStats && (
                         <button 
                             type="button"
-                            disabled={isMatchTbd}
-                            onClick={() => !isMatchTbd && onEditStats(match)}
+                            onClick={() => onEditStats(match)}
                             className={`flex items-center gap-1 text-xs font-bold uppercase px-3 py-1.5 rounded border transition-colors mr-2
-                                ${isMatchTbd 
-                                    ? 'bg-gray-800 border-gray-700 text-gray-600 cursor-not-allowed opacity-50'
-                                    : hasStats 
-                                        ? 'bg-green-900/30 border-green-500 text-green-300 hover:bg-green-900/50' 
-                                        : 'bg-purple-900/30 border-purple-500 text-purple-300 hover:bg-purple-900/50'
+                                ${hasStats 
+                                    ? 'bg-green-900/30 border-green-500 text-green-300 hover:bg-green-900/50' 
+                                    : 'bg-purple-900/30 border-purple-500 text-purple-300 hover:bg-purple-900/50'
                                 }
                             `}
-                            title={isMatchTbd ? "No se pueden meter stats a un partido TBD" : "Editar Estadísticas Fantasy"}
+                            title="Editar Estadísticas Fantasy"
                         >
                             <BarChart2 className="w-3 h-3" />
                             Stats
@@ -519,69 +498,60 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 
       {/* Teams Selection */}
       <div className="p-4 relative">
-        <div className="flex justify-between items-stretch gap-4">
-          {isTbdA && isTbdB && !isEditing ? (
-              <div className="flex-1 flex flex-col items-center justify-center py-10 bg-black/40 rounded-lg border border-gray-800/50 shadow-inner group transition-all">
-                  <div className="flex items-center gap-12 mb-3">
-                      <div className="w-14 h-14 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center text-gray-700 font-bold text-2xl shadow-lg">?</div>
-                      <div className="flex flex-col items-center">
-                          <span className="text-gray-700 font-black italic text-3xl tracking-tighter opacity-40">VS</span>
-                      </div>
-                      <div className="w-14 h-14 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center text-gray-700 font-bold text-2xl shadow-lg">?</div>
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                      <span className="text-gray-600 font-bold uppercase tracking-[0.3em] text-[10px]">Enfrentamiento TBD</span>
-                      <span className="text-gray-700 text-[9px] uppercase font-medium">Esperando resultados previos</span>
-                  </div>
-              </div>
-          ) : (
-            <>
-              <TeamButton 
-                team={match.teamA} 
-                isSelected={match.teamA?.id ? selectedWinnerId === match.teamA.id : false} 
-                match={match}
-                isEditing={isEditing}
-                isLocked={isLocked}
-                onSelect={onSelectWinner}
-                record={teamARecord}
-              />
-              
-              <div className="flex flex-col items-center justify-center gap-2 min-w-[60px]">
-                {hasScore ? (
-                    // SHOW NUMERIC SCORE
-                    <div className="flex items-center gap-2 text-2xl font-black italic tracking-widest drop-shadow-md">
-                        <span className={scoreA > scoreB ? 'text-green-400' : scoreA < scoreB ? 'text-red-400/70' : 'text-gray-500'}>{scoreA}</span>
-                        <span className="text-gray-700 text-base">-</span>
-                        <span className={scoreB > scoreA ? 'text-green-400' : scoreB < scoreA ? 'text-red-400/70' : 'text-gray-500'}>{scoreB}</span>
-                    </div>
-                ) : (
-                    <span className="text-gray-600 font-bold text-xl italic">VS</span>
-                )}
-                
-                {/* VIEW STATS BUTTON (User Mode) */}
-                {match.isCompleted && hasStats && onViewStats && !isEditing && (
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onViewStats(match); }}
-                        className="flex flex-col items-center justify-center bg-blue-900/20 hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 hover:border-blue-400 rounded px-2 py-1 transition-colors group z-20"
-                        title="Ver Estadísticas Detalladas"
-                    >
-                        <FileBarChart className="w-4 h-4 mb-0.5 group-hover:text-white" />
-                        <span className="text-[9px] font-bold uppercase">Stats</span>
-                    </button>
-                )}
-              </div>
+        {/* Overlay for Locked matches that aren't finished yet */}
+        {isLocked && !match.isCompleted && (
+            <div className="absolute inset-0 bg-black/10 z-10 flex items-center justify-center pointer-events-none">
+                <div className="bg-black/80 px-4 py-2 rounded-full border border-gray-700 backdrop-blur text-gray-300 text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-xl">
+                    <Lock className="w-3 h-3 text-red-400" /> Predicciones Cerradas
+                </div>
+            </div>
+        )}
 
-              <TeamButton 
-                team={match.teamB} 
-                isSelected={match.teamB?.id ? selectedWinnerId === match.teamB.id : false} 
-                match={match}
-                isEditing={isEditing}
-                isLocked={isLocked}
-                onSelect={onSelectWinner}
-                record={teamBRecord}
-              />
-            </>
-          )}
+        <div className="flex justify-between items-stretch gap-4">
+          <TeamButton 
+            team={match.teamA} 
+            isSelected={selectedWinnerId === match.teamA.id} 
+            match={match}
+            isEditing={isEditing}
+            isLocked={isLocked}
+            onSelect={onSelectWinner}
+            record={teamARecord}
+          />
+          
+          <div className="flex flex-col items-center justify-center gap-2 min-w-[60px]">
+            {match.isCompleted ? (
+                // SHOW NUMERIC SCORE FOR COMPLETED MATCHES
+                <div className="flex items-center gap-2 text-2xl font-black italic tracking-widest drop-shadow-md">
+                    <span className={scoreA > scoreB ? 'text-green-400' : 'text-gray-500'}>{scoreA}</span>
+                    <span className="text-gray-700 text-base">-</span>
+                    <span className={scoreB > scoreA ? 'text-green-400' : 'text-gray-500'}>{scoreB}</span>
+                </div>
+            ) : (
+                <span className="text-gray-600 font-bold text-xl italic">VS</span>
+            )}
+            
+            {/* VIEW STATS BUTTON (User Mode) */}
+            {match.isCompleted && hasStats && onViewStats && !isEditing && (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onViewStats(match); }}
+                    className="flex flex-col items-center justify-center bg-blue-900/20 hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 hover:border-blue-400 rounded px-2 py-1 transition-colors group z-20"
+                    title="Ver Estadísticas Detalladas"
+                >
+                    <FileBarChart className="w-4 h-4 mb-0.5 group-hover:text-white" />
+                    <span className="text-[9px] font-bold uppercase">Stats</span>
+                </button>
+            )}
+          </div>
+
+          <TeamButton 
+            team={match.teamB} 
+            isSelected={selectedWinnerId === match.teamB.id} 
+            match={match}
+            isEditing={isEditing}
+            isLocked={isLocked}
+            onSelect={onSelectWinner}
+            record={teamBRecord}
+          />
         </div>
       </div>
     </div>
