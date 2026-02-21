@@ -238,7 +238,12 @@ export const dataService = {
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
-                return docSnap.data().data as Record<string, Team>;
+                const dbTeams = docSnap.data().data as Record<string, Team>;
+                // Ensure TBD is present if not in DB (from constants)
+                if (!dbTeams['tbd'] && TEAMS.tbd) {
+                     return { ...dbTeams, tbd: TEAMS.tbd };
+                }
+                return dbTeams;
             } else {
                 console.log("Seeding Teams to Database...");
                 await setDoc(docRef, { data: cleanPayload(TEAMS) });
@@ -652,14 +657,27 @@ export const dataService = {
         // We determine the Series Winner based on game wins
         const winsA = games.filter(g => g.winnerId === match.teamA.id).length;
         const winsB = games.filter(g => g.winnerId === match.teamB.id).length;
-        const seriesWinnerId = winsA > winsB ? match.teamA.id : (winsB > winsA ? match.teamB.id : null);
+        
+        const bestOf = match.bestOf || 1;
+        const winsNeeded = Math.ceil(bestOf / 2);
+        
+        let seriesWinnerId: string | null = null;
+        let isSeriesCompleted = false;
+
+        if (winsA >= winsNeeded) {
+            seriesWinnerId = match.teamA.id;
+            isSeriesCompleted = true;
+        } else if (winsB >= winsNeeded) {
+            seriesWinnerId = match.teamB.id;
+            isSeriesCompleted = true;
+        }
 
         const updatedMatch = { 
             ...match, 
             games: games, 
             stats: aggregatedStats, 
             winnerId: seriesWinnerId,
-            isCompleted: true 
+            isCompleted: isSeriesCompleted 
         };
         allMatches[index] = updatedMatch;
         

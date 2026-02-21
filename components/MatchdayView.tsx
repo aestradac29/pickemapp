@@ -203,8 +203,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   const handleCreateNewMatch = () => {
       const tempMatch: Match = {
           id: `temp-${Date.now()}`,
-          teamA: TEAMS.fnc,
-          teamB: TEAMS.g2,
+          teamA: TEAMS.tbd,
+          teamB: TEAMS.tbd,
           startTime: new Date().toISOString(),
           stage: Stage.GROUPS, 
           isCompleted: false,

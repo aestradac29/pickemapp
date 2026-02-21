@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Match, Team, Stage } from '../types';
-import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2, AlertTriangle, Swords, ShieldAlert, Crown, GitMerge, BarChart2, FileBarChart } from 'lucide-react';
+import { CheckCircle2, Save, X, Calendar, Trophy, Loader2, AlertCircle, Lock, Trash2, AlertTriangle, Swords, ShieldAlert, Crown, GitMerge, BarChart2, FileBarChart, Clock } from 'lucide-react';
 
 interface MatchCardProps {
   match: Match;
@@ -152,26 +152,26 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Effective Lock: Global Day Lock OR Individual Time Lock
+  const isTbd = match.teamA.id === 'tbd' || match.teamB.id === 'tbd';
   const isTimeLocked = new Date() > new Date(match.startTime) && !match.isCompleted;
-  const isLocked = isDayLocked || isTimeLocked;
+  const isLocked = isDayLocked || isTimeLocked || isTbd;
 
   // Has Stats Data?
-  const hasStats = (match.games && match.games.length > 0) || (match.stats && Object.keys(match.stats).length > 0);
+  const hasStats = ((match.games && match.games.length > 0) || (match.stats && Object.keys(match.stats).length > 0)) && !isTbd;
 
-  // Calculate Score for Completed Matches
+  // Calculate Score for Completed Matches or In-Progress Matches
   let scoreA = 0;
   let scoreB = 0;
-  if (match.isCompleted) {
-      if (match.games && match.games.length > 0) {
-          match.games.forEach(g => {
-              if (g.winnerId === match.teamA.id) scoreA++;
-              if (g.winnerId === match.teamB.id) scoreB++;
-          });
-      } else if (match.winnerId) {
-          // Fallback for simple BO1
-          if (match.winnerId === match.teamA.id) scoreA = 1;
-          else scoreB = 1;
-      }
+  
+  if (match.games && match.games.length > 0) {
+      match.games.forEach(g => {
+          if (g.winnerId === match.teamA.id) scoreA++;
+          if (g.winnerId === match.teamB.id) scoreB++;
+      });
+  } else if (match.winnerId) {
+      // Fallback for simple BO1
+      if (match.winnerId === match.teamA.id) scoreA = 1;
+      else scoreB = 1;
   }
 
   // Sync state with props when match changes
@@ -288,13 +288,16 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                         <button 
                             type="button"
                             onClick={() => onEditStats(match)}
+                            disabled={isTbd}
                             className={`flex items-center gap-1 text-xs font-bold uppercase px-3 py-1.5 rounded border transition-colors mr-2
-                                ${hasStats 
-                                    ? 'bg-green-900/30 border-green-500 text-green-300 hover:bg-green-900/50' 
-                                    : 'bg-purple-900/30 border-purple-500 text-purple-300 hover:bg-purple-900/50'
+                                ${isTbd 
+                                    ? 'bg-gray-800/50 border-gray-700 text-gray-500 cursor-not-allowed opacity-50'
+                                    : hasStats 
+                                        ? 'bg-green-900/30 border-green-500 text-green-300 hover:bg-green-900/50' 
+                                        : 'bg-purple-900/30 border-purple-500 text-purple-300 hover:bg-purple-900/50'
                                 }
                             `}
-                            title="Editar Estadísticas Fantasy"
+                            title={isTbd ? "Estadísticas no disponibles (TBD)" : "Editar Estadísticas Fantasy"}
                         >
                             <BarChart2 className="w-3 h-3" />
                             Stats
@@ -357,22 +360,20 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                   <div>
                     <label className="text-[10px] text-gray-500 uppercase font-bold">Equipo Azul</label>
                     <select 
-                        value={editState.teamA}
+                        value={editState.teamA || 'tbd'}
                         onChange={(e) => setEditState({...editState, teamA: e.target.value})}
                         className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-white focus:border-red-500 outline-none"
                     >
-                        <option value="">Selecciona Equipo</option>
                         {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="text-[10px] text-gray-500 uppercase font-bold">Equipo Rojo</label>
                     <select 
-                        value={editState.teamB}
+                        value={editState.teamB || 'tbd'}
                         onChange={(e) => setEditState({...editState, teamB: e.target.value})}
                         className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-white focus:border-red-500 outline-none"
                     >
-                        <option value="">Selecciona Equipo</option>
                         {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                   </div>
@@ -498,15 +499,6 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 
       {/* Teams Selection */}
       <div className="p-4 relative">
-        {/* Overlay for Locked matches that aren't finished yet */}
-        {isLocked && !match.isCompleted && (
-            <div className="absolute inset-0 bg-black/10 z-10 flex items-center justify-center pointer-events-none">
-                <div className="bg-black/80 px-4 py-2 rounded-full border border-gray-700 backdrop-blur text-gray-300 text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-xl">
-                    <Lock className="w-3 h-3 text-red-400" /> Predicciones Cerradas
-                </div>
-            </div>
-        )}
-
         <div className="flex justify-between items-stretch gap-4">
           <TeamButton 
             team={match.teamA} 
@@ -519,8 +511,8 @@ export const MatchCard: React.FC<MatchCardProps> = ({
           />
           
           <div className="flex flex-col items-center justify-center gap-2 min-w-[60px]">
-            {match.isCompleted ? (
-                // SHOW NUMERIC SCORE FOR COMPLETED MATCHES
+            {(match.isCompleted || (match.games && match.games.length > 0)) ? (
+                // SHOW NUMERIC SCORE FOR COMPLETED MATCHES OR MATCHES IN PROGRESS
                 <div className="flex items-center gap-2 text-2xl font-black italic tracking-widest drop-shadow-md">
                     <span className={scoreA > scoreB ? 'text-green-400' : 'text-gray-500'}>{scoreA}</span>
                     <span className="text-gray-700 text-base">-</span>
@@ -531,11 +523,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             )}
             
             {/* VIEW STATS BUTTON (User Mode) */}
-            {match.isCompleted && hasStats && onViewStats && !isEditing && (
+            {hasStats && onViewStats && !isEditing && (
                 <button 
                     onClick={(e) => { e.stopPropagation(); onViewStats(match); }}
-                    className="flex flex-col items-center justify-center bg-blue-900/20 hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 hover:border-blue-400 rounded px-2 py-1 transition-colors group z-20"
-                    title="Ver Estadísticas Detalladas"
+                    disabled={isTbd}
+                    className={`flex flex-col items-center justify-center bg-blue-900/20 hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 hover:border-blue-400 rounded px-2 py-1 transition-colors group z-20 ${isTbd ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title={isTbd ? "Estadísticas no disponibles" : "Ver Estadísticas Detalladas"}
                 >
                     <FileBarChart className="w-4 h-4 mb-0.5 group-hover:text-white" />
                     <span className="text-[9px] font-bold uppercase">Stats</span>

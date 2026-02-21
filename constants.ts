@@ -242,6 +242,14 @@ export const TEAMS: Record<string, Team> = {
     color: '#f0e500',
     logo: getLogo('Team_Vitalitylogo_square.png')
   },
+  tbd: {
+    id: 'tbd',
+    name: 'TBD',
+    shortName: 'TBD',
+    region: Region.LEC,
+    color: '#6b7280', // Gray-500
+    logo: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/svg/position-unselected.svg'
+  }
 };
 
 // Mock Players... (Rest of file remains unchanged)

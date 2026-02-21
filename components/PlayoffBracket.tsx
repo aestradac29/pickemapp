@@ -47,16 +47,15 @@ const BracketMatch = ({
     // CALCULATE SCORE FOR BRACKET
     let scoreA = 0;
     let scoreB = 0;
-    if (isFinished) {
-        if (match.games && match.games.length > 0) {
-            match.games.forEach(g => {
-                if (g.winnerId === match.teamA.id) scoreA++;
-                if (g.winnerId === match.teamB.id) scoreB++;
-            });
-        } else if (match.winnerId) {
-            if (match.winnerId === match.teamA.id) scoreA = 1;
-            else scoreB = 1;
-        }
+    
+    if (match.games && match.games.length > 0) {
+        match.games.forEach(g => {
+            if (g.winnerId === match.teamA.id) scoreA++;
+            if (g.winnerId === match.teamB.id) scoreB++;
+        });
+    } else if (match.winnerId) {
+        if (match.winnerId === match.teamA.id) scoreA = 1;
+        else scoreB = 1;
     }
 
     const renderTeam = (team: Team, isTeamA: boolean) => {
@@ -108,8 +107,8 @@ const BracketMatch = ({
                     <span className={`text-[10px] truncate ${textClass}`}>{team.name}</span>
                 </div>
                 
-                {/* SHOW SCORE IF FINISHED */}
-                {isFinished && (
+                {/* SHOW SCORE IF FINISHED OR IN PROGRESS */}
+                {(isFinished || (match.games && match.games.length > 0)) && (
                     <span className={`text-[10px] font-bold ml-1 ${isWinner ? 'text-green-400' : 'text-gray-600'}`}>
                         {teamScore}
                     </span>

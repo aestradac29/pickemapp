@@ -315,8 +315,14 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
                <div className="w-full flex justify-center gap-1 mb-3 flex-wrap">
                    {opponents.length > 0 ? (
                        opponents.map((opp, idx) => (
-                           <div key={idx} className="bg-black/60 border border-gray-700 p-1 rounded backdrop-blur-sm" title={`vs ${opp.name}`}>
-                               {opp.logo ? <img src={opp.logo} className="w-4 h-4 object-contain" /> : <div className="w-4 h-4 rounded-full" style={{backgroundColor: opp.color}}></div>}
+                           <div key={idx} className="bg-black/60 border border-gray-700 p-1 rounded backdrop-blur-sm flex items-center justify-center w-6 h-6" title={opp.id === 'tbd' ? 'Por Definir' : `vs ${opp.name}`}>
+                               {opp.id === 'tbd' ? (
+                                   <span className="text-[8px] font-bold text-gray-500">TBD</span>
+                               ) : opp.logo ? (
+                                   <img src={opp.logo} className="w-4 h-4 object-contain" />
+                               ) : (
+                                   <div className="w-4 h-4 rounded-full" style={{backgroundColor: opp.color}}></div>
+                               )}
                            </div>
                        ))
                    ) : (
