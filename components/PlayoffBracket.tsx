@@ -9,7 +9,6 @@ interface PlayoffBracketProps {
   predictions: { matchId: string; predictedWinnerId: string }[];
   onSelectWinner: (matchId: string, teamId: string) => void;
   isLocked: boolean;
-  isSpectating?: boolean;
 }
 
 const BracketMatch = ({ 
@@ -17,8 +16,7 @@ const BracketMatch = ({
     prediction, 
     onSelect, 
     isLocked, 
-    label,
-    isSpectating
+    label 
 }: { 
     match?: Match; 
     teams: Team[]; 
@@ -26,7 +24,6 @@ const BracketMatch = ({
     onSelect: (mId: string, tId: string) => void; 
     isLocked: boolean;
     label?: string;
-    isSpectating?: boolean;
 }) => {
     if (!match) {
         return (
@@ -62,55 +59,18 @@ const BracketMatch = ({
     }
 
     const renderTeam = (team: Team, isTeamA: boolean) => {
-        // HIDE PREDICTION IF NOT STARTED AND NOT VIEWING SELF (AND NOT ADMIN)
-        // If match hasn't started, and we are not the owner of the prediction, hide it.
-        // We assume 'isLocked' passed to this component reflects if the user CAN edit.
-        // But for VIEWING, we need to know if we should show the prediction.
-        // The parent component should probably filter predictions or we check here.
-        // However, 'prediction' prop is just the ID.
-        
-        // Logic:
-        // If match is NOT started (isTimeLocked is false) AND NOT isFinished
-        // AND we are viewing someone else's picks (we can infer this if onSelect is a no-op or from a prop, but better to pass a flag)
-        
-        // Actually, the requirement is "no se tienen que poder ver las predicciones de los partidos que no han comenzado".
-        // This implies for OTHER users. For the current user, they must see what they picked.
-        
-        // Let's rely on a new prop `hidePredictions` or similar, but since I can't easily change the interface without checking usage...
-        // Wait, I can check if the match is locked. If it is NOT locked (meaning it's in the future), 
-        // and we are viewing another user, we shouldn't see it.
-        // But `isLocked` prop here usually means "Can the current viewer edit this?".
-        
-        // Let's look at how `PlayoffsView` uses this.
-        // It passes `isLocked={!isDayVisible || isManuallyClosed || isGlobalPlayoffLock || (viewingUserId !== currentUserId)}`
-        
-        // If `viewingUserId !== currentUserId`, `isLocked` is true.
-        // So if `isLocked` is true, it might be because it's another user.
-        // But we also want to show predictions if the match HAS started.
-        
-        // Revised Logic:
-        // We need to know if we are viewing another user.
-        // If (ViewingOtherUser AND MatchNotStarted) -> Hide Prediction.
-        
-        // Since I don't have `isViewingOtherUser` prop, I'll add it to the component props.
-        
         const isSelected = prediction === team.id;
         const isWinner = match.winnerId === team.id;
         const isLoser = match.winnerId && match.winnerId !== team.id;
+        const teamScore = isTeamA ? scoreA : scoreB;
         
-        // Determine if we should hide the selection
-        let showSelection = isSelected;
-        if (isSpectating && !isTimeLocked && !isFinished) {
-            showSelection = false;
-        }
-
         const isPlaceholder = !team.id || team.id.toLowerCase().includes('winner') || team.id.toLowerCase().includes('loser') || team.name.includes('Winner') || team.name.includes('Loser') || team.name === 'TBD';
 
         let bgClass = isPlaceholder ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-700/50 cursor-pointer';
         let textClass = 'text-gray-400';
         let borderClass = 'border-transparent';
 
-        if (showSelection) {
+        if (isSelected) {
             bgClass = 'bg-[#c8aa6e]/10 cursor-pointer';
             borderClass = 'border-[#c8aa6e]';
             textClass = 'text-[#c8aa6e] font-bold';
@@ -120,10 +80,10 @@ const BracketMatch = ({
             if (isWinner) {
                 bgClass = 'bg-green-900/30';
                 textClass = 'text-green-400 font-bold';
-                if (showSelection) borderClass = 'border-green-500';
+                if (isSelected) borderClass = 'border-green-500';
             } else if (isLoser) {
                 textClass = 'text-gray-600 line-through';
-                if (showSelection) {
+                if (isSelected) {
                     bgClass = 'bg-red-900/20';
                     borderClass = 'border-red-500';
                     textClass = 'text-red-500 line-through';
@@ -249,7 +209,6 @@ export const PlayoffBracket: React.FC<PlayoffBracketProps> = ({ matches, teams, 
                             onSelect={onSelectWinner}
                             isLocked={isLocked}
                             label={`${labelPrefix} ${idx + 1}`}
-                            isSpectating={isSpectating}
                          />
                          
                          {/* Conector Horizontal Básico */}
@@ -339,7 +298,6 @@ export const PlayoffBracket: React.FC<PlayoffBracketProps> = ({ matches, teams, 
                                 onSelect={onSelectWinner}
                                 isLocked={isLocked}
                                 label="GRAN FINAL"
-                                isSpectating={isSpectating}
                              />
                         </div>
                         <div className="text-center">
