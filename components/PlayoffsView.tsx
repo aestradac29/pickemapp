@@ -194,11 +194,11 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           const match = allMatches.find(m => m.id === p.matchId);
           if (!match) return false;
           
-          // Show prediction ONLY if match started. Admins also cannot see future picks of others.
+          // Show prediction if match started OR global lock is active OR Admin
           const hasStarted = new Date() >= new Date(match.startTime);
-          return hasStarted;
+          return hasStarted || isLockedForUser || isAdmin;
       });
-  }, [predictions, allMatches, isSpectating]);
+  }, [predictions, allMatches, isSpectating, isLockedForUser, isAdmin]);
 
   // Filter matches for Bracket View (All Playoff matches)
   const bracketMatches = useMemo(() => {

@@ -587,10 +587,9 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                         const strRecB = recB ? `${recB.w}-${recB.l}` : undefined;
 
                         // Visibility Logic for Spectating
-                        // If spectating, you can ONLY see the pick if the match has started OR Admin
-                        // Removed isLockedForUser to ensure picks are hidden until match start
+                        // If spectating, you can ONLY see the pick if the match has started OR the day is closed
                         const matchStarted = new Date() >= new Date(match.startTime);
-                        const canSeePick = !isSpectating || matchStarted || isAdmin;
+                        const canSeePick = !isSpectating || isLockedForUser || matchStarted || isAdmin;
                         const userPick = predictions.find(p => p.matchId === match.id)?.predictedWinnerId;
 
                         return (
