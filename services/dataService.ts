@@ -11,6 +11,19 @@ const cleanPayload = (data: any): any => {
 };
 
 export const dataService = {
+    // --- UTILS ---
+    getDeterministicWinner(userId: string, match: Match): string {
+        if (match.teamA.id === 'tbd' || match.teamB.id === 'tbd') return 'tbd';
+        
+        const str = userId + match.id;
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const index = Math.abs(hash) % 2; 
+        return index === 0 ? match.teamA.id : match.teamB.id;
+    },
+
     // --- CONFIGURATION (Active Days & Locks) ---
     async getDaysConfig(): Promise<{ 
         visibleDays: number[], 

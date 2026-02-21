@@ -98,25 +98,55 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       const fetchPicks = async () => {
           if (!viewingUserId) return;
           
+          let userPicks = [];
+          
           if (viewingUserId === currentUserId) {
-              setPredictions(initialPredictions);
-              return;
+              userPicks = initialPredictions;
+          } else {
+              setIsLoadingPicks(true);
+              try {
+                  userPicks = await dataService.getUserPredictions(viewingUserId);
+              } catch (e) {
+                  console.error("Error fetching user picks", e);
+                  userPicks = [];
+              } finally {
+                  setIsLoadingPicks(false);
+              }
+          }
+          
+          // AUTO-FILL LOGIC: Check for locked matches without predictions
+          if (allMatches.length > 0) {
+              const now = new Date();
+              const filledPicks = [...userPicks];
+              let hasAutoPicks = false;
+
+              allMatches.forEach(match => {
+                  const isStarted = new Date(match.startTime) <= now;
+                  const isTbd = match.teamA.id === 'tbd' || match.teamB.id === 'tbd';
+                  
+                  if (isStarted && !isTbd) {
+                      const hasPrediction = filledPicks.some(p => p.matchId === match.id);
+                      if (!hasPrediction) {
+                          const autoPick = dataService.getDeterministicWinner(viewingUserId, match);
+                          if (autoPick !== 'tbd') {
+                              filledPicks.push({ matchId: match.id, predictedWinnerId: autoPick });
+                              hasAutoPicks = true;
+                          }
+                      }
+                  }
+              });
+              
+              if (hasAutoPicks) {
+                  setPredictions(filledPicks);
+                  return;
+              }
           }
 
-          setIsLoadingPicks(true);
-          try {
-              const userPicks = await dataService.getUserPredictions(viewingUserId);
-              setPredictions(userPicks);
-          } catch (e) {
-              console.error("Error fetching user picks", e);
-              setPredictions([]);
-          } finally {
-              setIsLoadingPicks(false);
-          }
+          setPredictions(userPicks);
       };
       
       fetchPicks();
-  }, [viewingUserId, currentUserId]);
+  }, [viewingUserId, currentUserId, allMatches.length]); // Depend on matches length to re-run if matches load late
 
   // Derive matches for current day from allMatches state
   const matches = useMemo(() => {
