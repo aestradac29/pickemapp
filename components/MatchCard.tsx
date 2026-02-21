@@ -62,7 +62,11 @@ const TeamButton = ({
         `}
       >
         <div className="mb-2 relative w-16 h-16 flex items-center justify-center">
-            {team.logo ? (
+            {team.id === 'tbd' ? (
+                <div className="w-14 h-14 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center shadow-inner">
+                    <span className="text-gray-500 font-bold text-xs tracking-tighter">TBD</span>
+                </div>
+            ) : team.logo ? (
                  <img 
                     src={team.logo} 
                     alt={team.name}
@@ -76,7 +80,7 @@ const TeamButton = ({
             
             {/* Fallback Initial */}
             <div 
-                className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg text-white shadow-lg ${team.logo ? 'hidden' : ''}`}
+                className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg text-white shadow-lg ${team.logo || team.id === 'tbd' ? 'hidden' : ''}`}
                 style={{ backgroundColor: team.color }}
             >
                 {team.shortName[0]}

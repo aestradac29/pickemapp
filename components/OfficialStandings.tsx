@@ -164,6 +164,7 @@ export const OfficialStandings: React.FC = () => {
 
         // Initialize teams
         teams.forEach(t => {
+            if (t.id === 'tbd') return;
             stats[t.id] = {
                 team: t,
                 played: 0,

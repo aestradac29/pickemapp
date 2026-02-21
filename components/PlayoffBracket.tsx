@@ -99,7 +99,11 @@ const BracketMatch = ({
                 title={isPlaceholder ? 'Equipo por determinar' : effectiveLock ? 'Predicción Cerrada' : ''}
             >
                 <div className="flex items-center gap-2 overflow-hidden w-full">
-                    {team.logo ? (
+                    {team.id === 'tbd' ? (
+                        <div className="w-4 h-4 rounded-full bg-gray-800 border border-dashed border-gray-600 flex-shrink-0 flex items-center justify-center">
+                            <span className="text-[6px] text-gray-500 font-bold">?</span>
+                        </div>
+                    ) : team.logo ? (
                         <img src={team.logo} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
                     ) : (
                         <div className="w-4 h-4 rounded-full bg-gray-700 flex-shrink-0 flex items-center justify-center text-[7px]" style={{backgroundColor: team.color}}>{team.shortName[0]}</div>
