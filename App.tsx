@@ -18,7 +18,7 @@ import { TeamsView } from './components/TeamsView';
 import { OfficialStandings } from './components/OfficialStandings';
 import { HallOfFame } from './components/HallOfFame'; // Import nuevo
 import { ViewState, UserPrediction, User } from './types';
-import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft } from 'lucide-react';
+import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, Download } from 'lucide-react';
 import { authService } from './services/authService';
 import { dataService } from './services/dataService';
 
@@ -45,6 +45,7 @@ const App: React.FC = () => {
 
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   // Leaderboard Data
   const [leaderboardUsers, setLeaderboardUsers] = useState<User[]>([]);
@@ -70,17 +71,20 @@ const App: React.FC = () => {
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    
-    // Show the install prompt
-    deferredPrompt.prompt();
-    
-    // Wait for the user to respond to the prompt
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User response to the install prompt: ${outcome}`);
-    
-    // We've used the prompt, and can't use it again, throw it away
-    setDeferredPrompt(null);
+    if (deferredPrompt) {
+      // Show the install prompt
+      deferredPrompt.prompt();
+      
+      // Wait for the user to respond to the prompt
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to the install prompt: ${outcome}`);
+      
+      // We've used the prompt, and can't use it again, throw it away
+      setDeferredPrompt(null);
+    } else {
+      // Show manual install guide if native prompt is not available
+      setShowInstallGuide(true);
+    }
   };
 
   // --- AUTH INITIALIZATION & LISTENER ---
@@ -337,14 +341,14 @@ const App: React.FC = () => {
                    </button>
                 )}
 
-                {deferredPrompt && (
-                   <button 
-                        onClick={handleInstallClick}
-                        className="text-xs border border-[#c8aa6e] bg-[#c8aa6e]/10 rounded-full px-3 py-1.5 text-[#c8aa6e] hover:bg-[#c8aa6e]/20 transition-all font-bold"
-                   >
-                        Instalar App
-                   </button>
-                )}
+                <button 
+                    onClick={handleInstallClick}
+                    className="text-xs border border-[#c8aa6e] bg-[#c8aa6e]/10 rounded-full px-3 py-1.5 text-[#c8aa6e] hover:bg-[#c8aa6e]/20 transition-all font-bold flex items-center gap-1.5"
+                    title="Instalar App"
+                >
+                    <Download className="w-3 h-3" />
+                    Instalar App
+                </button>
 
                 <div className="h-6 w-px bg-gray-700 mx-2"></div>
                 
@@ -379,7 +383,16 @@ const App: React.FC = () => {
               </div>
 
               {/* Mobile Menu Button */}
-              <div className="md:hidden flex items-center gap-4">
+              <div className="md:hidden flex items-center gap-3">
+                 <button 
+                      onClick={handleInstallClick}
+                      className="p-1.5 text-[#c8aa6e] bg-[#c8aa6e]/10 border border-[#c8aa6e]/30 rounded-lg hover:bg-[#c8aa6e]/20 transition-colors flex items-center gap-1"
+                      title="Instalar App"
+                 >
+                      <Download className="w-4 h-4" />
+                      <span className="text-[10px] font-bold uppercase">App</span>
+                 </button>
+
                  {/* Quick Change Split for Mobile (Icon Only) */}
                  {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
                     <button 
@@ -422,11 +435,6 @@ const App: React.FC = () => {
                             </button>
                         </>
                     )}
-                    {deferredPrompt && (
-                        <button onClick={() => { handleInstallClick(); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-[#c8aa6e] hover:bg-gray-800 rounded font-bold flex items-center gap-2">
-                            Instalar App
-                        </button>
-                    )}
                     <button onClick={handleLogout} className="block w-full text-left py-3 px-3 text-red-400 hover:bg-red-900/20 rounded font-medium flex items-center gap-2 mt-2 border-t border-gray-800">
                         <LogOut className="w-4 h-4" /> Cerrar Sesión
                     </button>
@@ -459,6 +467,52 @@ const App: React.FC = () => {
             onClose={() => setShowPasswordResetModal(false)}
             onSuccess={handlePasswordSuccess}
           />
+      )}
+
+      {/* Install Guide Modal */}
+      {showInstallGuide && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#0a1428] border border-hextech-500/30 rounded-xl p-6 max-w-sm w-full shadow-2xl relative">
+            <button 
+              onClick={() => setShowInstallGuide(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-bold text-[#c8aa6e] mb-4 flex items-center gap-2">
+              <Download className="w-5 h-5" /> Instalar App
+            </h3>
+            <div className="space-y-4 text-sm text-gray-300">
+              <p>Para instalar la aplicación manualmente en tu dispositivo:</p>
+              <div className="bg-[#091428] p-3 rounded-lg border border-gray-800">
+                <p className="font-bold text-white mb-1">📱 En iOS (Safari):</p>
+                <ol className="list-decimal list-inside space-y-1 ml-1">
+                  <li>Toca el botón <strong>Compartir</strong> <Share2 className="w-3 h-3 inline" /> en la barra inferior.</li>
+                  <li>Selecciona <strong>Añadir a la pantalla de inicio</strong>.</li>
+                </ol>
+              </div>
+              <div className="bg-[#091428] p-3 rounded-lg border border-gray-800">
+                <p className="font-bold text-white mb-1">🤖 En Android (Chrome):</p>
+                <ol className="list-decimal list-inside space-y-1 ml-1">
+                  <li>Toca el menú de <strong>3 puntos</strong> arriba a la derecha.</li>
+                  <li>Selecciona <strong>Instalar aplicación</strong> o <strong>Añadir a la pantalla de inicio</strong>.</li>
+                </ol>
+              </div>
+              <div className="bg-[#091428] p-3 rounded-lg border border-gray-800">
+                <p className="font-bold text-white mb-1">💻 En PC (Chrome/Edge):</p>
+                <ol className="list-decimal list-inside space-y-1 ml-1">
+                  <li>Haz clic en el icono de <strong>Instalar</strong> en la barra de direcciones (arriba a la derecha).</li>
+                </ol>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowInstallGuide(false)}
+              className="w-full mt-6 bg-[#c8aa6e] text-[#0a1428] font-bold py-2 rounded hover:bg-[#d4b87e] transition-colors"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
