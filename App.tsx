@@ -17,7 +17,6 @@ import { ProfileView } from './components/ProfileView';
 import { TeamsView } from './components/TeamsView';
 import { OfficialStandings } from './components/OfficialStandings';
 import { HallOfFame } from './components/HallOfFame'; // Import nuevo
-import { NotificationSystem } from './components/NotificationSystem'; // Import NotificationSystem
 import { ViewState, UserPrediction, User } from './types';
 import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft } from 'lucide-react';
 import { authService } from './services/authService';
@@ -44,12 +43,45 @@ const App: React.FC = () => {
   // Recovery State
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
 
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
   // Leaderboard Data
   const [leaderboardUsers, setLeaderboardUsers] = useState<User[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
 
   // Admin Check - Dynamic based on Database Role
   const isAdmin = userRole === 'admin';
+
+  // --- PWA INSTALL LISTENER ---
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    
+    // Show the install prompt
+    deferredPrompt.prompt();
+    
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    
+    // We've used the prompt, and can't use it again, throw it away
+    setDeferredPrompt(null);
+  };
 
   // --- AUTH INITIALIZATION & LISTENER ---
   useEffect(() => {
@@ -305,6 +337,15 @@ const App: React.FC = () => {
                    </button>
                 )}
 
+                {deferredPrompt && (
+                   <button 
+                        onClick={handleInstallClick}
+                        className="text-xs border border-[#c8aa6e] bg-[#c8aa6e]/10 rounded-full px-3 py-1.5 text-[#c8aa6e] hover:bg-[#c8aa6e]/20 transition-all font-bold"
+                   >
+                        Instalar App
+                   </button>
+                )}
+
                 <div className="h-6 w-px bg-gray-700 mx-2"></div>
                 
                 {/* Profile Clickable Area */}
@@ -381,6 +422,11 @@ const App: React.FC = () => {
                             </button>
                         </>
                     )}
+                    {deferredPrompt && (
+                        <button onClick={() => { handleInstallClick(); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-[#c8aa6e] hover:bg-gray-800 rounded font-bold flex items-center gap-2">
+                            Instalar App
+                        </button>
+                    )}
                     <button onClick={handleLogout} className="block w-full text-left py-3 px-3 text-red-400 hover:bg-red-900/20 rounded font-medium flex items-center gap-2 mt-2 border-t border-gray-800">
                         <LogOut className="w-4 h-4" /> Cerrar Sesión
                     </button>
@@ -394,9 +440,6 @@ const App: React.FC = () => {
       <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
         {renderContent()}
       </main>
-
-      {/* Notification System */}
-      {currentUser && <NotificationSystem />}
 
       {/* Footer */}
       <footer className="w-full bg-[#050a14] border-t border-white/5 py-8 mt-auto backdrop-blur-sm">
