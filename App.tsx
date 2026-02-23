@@ -17,6 +17,7 @@ import { ProfileView } from './components/ProfileView';
 import { TeamsView } from './components/TeamsView';
 import { OfficialStandings } from './components/OfficialStandings';
 import { HallOfFame } from './components/HallOfFame'; // Import nuevo
+import { NotificationSystem } from './components/NotificationSystem'; // Import NotificationSystem
 import { ViewState, UserPrediction, User } from './types';
 import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft } from 'lucide-react';
 import { authService } from './services/authService';
@@ -393,6 +394,9 @@ const App: React.FC = () => {
       <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
         {renderContent()}
       </main>
+
+      {/* Notification System */}
+      {currentUser && <NotificationSystem />}
 
       {/* Footer */}
       <footer className="w-full bg-[#050a14] border-t border-white/5 py-8 mt-auto backdrop-blur-sm">

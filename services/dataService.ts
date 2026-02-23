@@ -1,9 +1,9 @@
 
-import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame } from '../types';
+import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame, Notification } from '../types';
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, FANTASY_SCHEDULE } from '../constants';
 import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc } from "firebase/firestore";
 
 // Helper CRÍTICO: Elimina recursivamente cualquier campo 'undefined' del objeto.
 const cleanPayload = (data: any): any => {
@@ -102,6 +102,39 @@ export const dataService = {
     async updateGlobalConfig(config: any) {
         const docRef = doc(db, "admin_data", "config");
         await setDoc(docRef, cleanPayload(config), { merge: true });
+    },
+
+    // --- NOTIFICATIONS ---
+    async getNotifications(): Promise<Notification[]> {
+        try {
+            const q = query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(10));
+            const querySnapshot = await getDocs(q);
+            return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+        } catch (e) {
+            console.error("Error fetching notifications:", e);
+            return [];
+        }
+    },
+
+    async createNotification(notification: Omit<Notification, 'id' | 'createdAt'>) {
+        try {
+            await addDoc(collection(db, "notifications"), {
+                ...notification,
+                createdAt: new Date().toISOString()
+            });
+        } catch (e) {
+            console.error("Error creating notification:", e);
+            throw e;
+        }
+    },
+
+    async deleteNotification(id: string) {
+        try {
+            await deleteDoc(doc(db, "notifications", id));
+        } catch (e) {
+            console.error("Error deleting notification:", e);
+            throw e;
+        }
     },
 
     // NEW: Handle Round Transitions (Price Updates)

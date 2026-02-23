@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Match, Team } from '../types';
+import { Match, Team, Notification } from '../types';
 import { dataService } from '../services/dataService';
-import { Loader2, Save, AlertCircle, CheckCircle2, Calendar } from 'lucide-react';
+import { Loader2, Save, AlertCircle, CheckCircle2, Calendar, Bell, Trash2, Plus } from 'lucide-react';
 
 export const AdminPanel: React.FC = () => {
     const [matches, setMatches] = useState<Match[]>([]);
@@ -9,6 +9,16 @@ export const AdminPanel: React.FC = () => {
     const [selectedDay, setSelectedDay] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+
+    // Notification State
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [newNotification, setNewNotification] = useState({
+        title: '',
+        message: '',
+        type: 'info' as 'info' | 'success' | 'warning' | 'error',
+        active: true
+    });
+    const [isSendingNotification, setIsSendingNotification] = useState(false);
 
     // Editing State
     const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
@@ -23,11 +33,14 @@ export const AdminPanel: React.FC = () => {
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const t = await dataService.getTeams();
+            const [t, m, n] = await Promise.all([
+                dataService.getTeams(),
+                dataService.getMatches(selectedDay),
+                dataService.getNotifications()
+            ]);
             setTeams(Object.values(t));
-            
-            const m = await dataService.getMatches(selectedDay);
             setMatches(m);
+            setNotifications(n);
         } catch (e) {
             console.error(e);
             setMessage({ type: 'error', text: 'Error cargando datos' });
@@ -39,6 +52,35 @@ export const AdminPanel: React.FC = () => {
     useEffect(() => {
         loadData();
     }, [selectedDay]);
+
+    const handleSendNotification = async () => {
+        if (!newNotification.title || !newNotification.message) return;
+        setIsSendingNotification(true);
+        try {
+            await dataService.createNotification(newNotification);
+            setMessage({ type: 'success', text: 'Notificación enviada' });
+            setNewNotification({ title: '', message: '', type: 'info', active: true });
+            const n = await dataService.getNotifications();
+            setNotifications(n);
+        } catch (e) {
+            console.error(e);
+            setMessage({ type: 'error', text: 'Error enviando notificación' });
+        } finally {
+            setIsSendingNotification(false);
+        }
+    };
+
+    const handleDeleteNotification = async (id: string) => {
+        if (!confirm('¿Borrar notificación?')) return;
+        try {
+            await dataService.deleteNotification(id);
+            const n = await dataService.getNotifications();
+            setNotifications(n);
+        } catch (e) {
+            console.error(e);
+            setMessage({ type: 'error', text: 'Error borrando notificación' });
+        }
+    };
 
     const startEdit = (match: Match) => {
         setEditingMatchId(match.id);
@@ -87,7 +129,6 @@ export const AdminPanel: React.FC = () => {
                     <h1 className="text-3xl font-bold text-red-400 uppercase tracking-widest border-b-4 border-red-900 pb-2">
                         Panel de Administración
                     </h1>
-                    {/* Botón de Importación eliminado. Usar Importador de Supabase */}
                 </div>
 
                 {message && (
@@ -96,6 +137,81 @@ export const AdminPanel: React.FC = () => {
                         {message.text}
                     </div>
                 )}
+
+                {/* NOTIFICATIONS SECTION */}
+                <div className="bg-[#0f1923] p-6 rounded-xl border border-gray-700 mb-8">
+                    <div className="flex items-center gap-2 mb-4 text-blue-400">
+                        <Bell className="w-6 h-6" />
+                        <h2 className="text-xl font-bold uppercase">Gestor de Notificaciones</h2>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Create Form */}
+                        <div className="space-y-4">
+                            <input 
+                                type="text" 
+                                placeholder="Título"
+                                value={newNotification.title}
+                                onChange={e => setNewNotification({...newNotification, title: e.target.value})}
+                                className="w-full bg-[#050a14] border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none"
+                            />
+                            <textarea 
+                                placeholder="Mensaje"
+                                value={newNotification.message}
+                                onChange={e => setNewNotification({...newNotification, message: e.target.value})}
+                                className="w-full bg-[#050a14] border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none h-24 resize-none"
+                            />
+                            <div className="flex gap-4">
+                                <select 
+                                    value={newNotification.type}
+                                    onChange={e => setNewNotification({...newNotification, type: e.target.value as any})}
+                                    className="bg-[#050a14] border border-gray-600 rounded p-3 text-white outline-none"
+                                >
+                                    <option value="info">Info (Azul)</option>
+                                    <option value="success">Éxito (Verde)</option>
+                                    <option value="warning">Alerta (Amarillo)</option>
+                                    <option value="error">Error (Rojo)</option>
+                                </select>
+                                <button 
+                                    onClick={handleSendNotification}
+                                    disabled={isSendingNotification || !newNotification.title}
+                                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded p-3 flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isSendingNotification ? <Loader2 className="animate-spin w-5 h-5"/> : <Plus className="w-5 h-5"/>}
+                                    Enviar Notificación
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Recent List */}
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                            <h3 className="text-gray-400 text-xs font-bold uppercase mb-2">Recientes</h3>
+                            {notifications.length === 0 && <p className="text-gray-600 text-sm italic">Sin notificaciones recientes</p>}
+                            {notifications.map(n => (
+                                <div key={n.id} className="bg-[#050a14] p-3 rounded border border-gray-800 flex justify-between items-start group">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`w-2 h-2 rounded-full ${
+                                                n.type === 'success' ? 'bg-green-500' : 
+                                                n.type === 'warning' ? 'bg-yellow-500' : 
+                                                n.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                                            }`}></span>
+                                            <span className="font-bold text-gray-200 text-sm">{n.title}</span>
+                                            <span className="text-[10px] text-gray-600">{new Date(n.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                        <p className="text-gray-400 text-xs mt-1 line-clamp-2">{n.message}</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => handleDeleteNotification(n.id)}
+                                        className="text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
 
                 {/* Day Selector */}
                 <div className="flex items-center gap-4 mb-6 bg-[#0f1923] p-4 rounded-xl border border-gray-700 overflow-x-auto">
