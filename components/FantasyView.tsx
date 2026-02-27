@@ -584,7 +584,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
       if (!roundConfig || allMatches.length === 0) return map;
 
       // Filter matches that belong to this round (matchdays) AND match the stage
-      // Also ensure match is completed to show actual points
+      // Also ensure match has stats (effectively completed)
       const relevantMatches = allMatches.filter(m => {
           const isCorrectStage = roundConfig.stage === Stage.GROUPS 
               ? m.stage === Stage.GROUPS 
@@ -592,7 +592,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
           
           return isCorrectStage && 
                  roundConfig.matchdays.includes(m.day || 0) &&
-                 m.isCompleted;
+                 (m.isCompleted || !!m.stats);
       });
 
       // Sum points for each player

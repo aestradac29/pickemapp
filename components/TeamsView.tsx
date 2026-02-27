@@ -22,8 +22,8 @@ const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ player, team, m
         const sortedMatches = [...matches].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
         sortedMatches.forEach(match => {
-            // Skip matches where player has no stats
-            if (!match.isCompleted) return;
+            // Skip matches where player has no stats (unless marked completed, but even then we need stats)
+            if (!match.isCompleted && !match.stats && (!match.games || match.games.length === 0)) return;
 
             const opponentId = match.teamA.id === team.id ? match.teamB.id : match.teamA.id;
             const opponent = teams[opponentId];
@@ -287,7 +287,7 @@ export const TeamsView: React.FC = () => {
                 const roundMatches = matches.filter(m =>
                     (round.stage === Stage.GROUPS ? m.stage === Stage.GROUPS : m.stage !== Stage.GROUPS) &&
                     round.matchdays.includes(m.day || 0) &&
-                    m.isCompleted &&
+                    (m.isCompleted || !!m.stats) &&
                     (m.teamA.id === p.teamId || m.teamB.id === p.teamId) // Optimization
                 );
 

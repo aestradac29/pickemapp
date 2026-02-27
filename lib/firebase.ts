@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import * as Auth from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getMessaging, isSupported } from "firebase/messaging";
 
 // Add global type augmentation for ImportMeta to fix TypeScript errors
 declare global {
@@ -56,3 +57,11 @@ if (hasProdKeys) {
 const app = initializeApp(firebaseConfig);
 export const auth = Auth.getAuth(app);
 export const db = getFirestore(app);
+
+// Initialize Messaging only if supported by the browser
+export let messaging: any = null;
+isSupported().then((supported) => {
+  if (supported) {
+    messaging = getMessaging(app);
+  }
+});
