@@ -85,7 +85,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
             dataService.getAdminRanking()
         ]);
         
-        const teamsList = Object.values(teamsMap);
+        const teamsList = Object.values(teamsMap).filter(t => t.id !== 'tbd');
         setOfficialRanking(adminRankingIds || []);
         
         let orderedIds: string[] = [];
@@ -102,7 +102,8 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
         if (orderedIds && orderedIds.length > 0) {
             const orderedTeams = orderedIds
                 .map(id => teamsMap[id])
-                .filter(Boolean); // remove undefined if any ID mismatch
+                .filter(Boolean) // remove undefined if any ID mismatch
+                .filter(t => t.id !== 'tbd');
             
             // Add any missing teams (newly added to DB but not in saved order) at the end
             const missingTeams = teamsList.filter(t => !orderedIds.includes(t.id));
