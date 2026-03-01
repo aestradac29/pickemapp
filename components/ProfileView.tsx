@@ -276,15 +276,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
             // 2. Max Ranking: Teams Count * 6 (Perfect Hit)
             const rankingMax = Object.keys(teamsMap).length * 6;
 
-            // 3. Max Playoffs: Sum of weighted rounds
-            const playoffMatches = allMatches.filter(m => m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS);
-            const pointsPerRound: Record<number, number> = { 1: 3, 2: 4, 3: 6, 4: 8, 5: 10 };
-            const playoffsMax = playoffMatches.reduce((acc, m) => acc + (pointsPerRound[m.day || 1] || 3), 0);
+            // 3. Max Playoffs: Fixed theoretical max for LEC format (66 pts)
+            // R1 (4x3) + R2 (4x4) + R3 (2x6) + R4 (2x8) + R5 (1x10) = 12 + 16 + 12 + 16 + 10 = 66
+            const playoffsMax = 66;
 
             setMaxScores({ 
                 matchday: matchdayMax || 55, // Fallback if no matches
                 ranking: rankingMax || 60,   // Fallback if no teams
-                playoffs: playoffsMax || 66  // Fallback if no playoffs
+                playoffs: playoffsMax        // Fixed max
             });
 
             if (viewingUserId) {
