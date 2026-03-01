@@ -13,7 +13,10 @@ const cleanPayload = (data: any): any => {
 export const dataService = {
     // --- UTILS ---
     getDeterministicWinner(userId: string, match: Match): string {
-        if (match.teamA.id === 'tbd' || match.teamB.id === 'tbd') return 'tbd';
+        const teamAId = (match.teamA && typeof match.teamA === 'object' && 'id' in match.teamA) ? match.teamA.id : (match.teamA as any);
+        const teamBId = (match.teamB && typeof match.teamB === 'object' && 'id' in match.teamB) ? match.teamB.id : (match.teamB as any);
+
+        if (!teamAId || !teamBId || teamAId === 'tbd' || teamBId === 'tbd') return 'tbd';
         
         const str = userId + match.id;
         let hash = 0;
@@ -21,7 +24,7 @@ export const dataService = {
             hash = str.charCodeAt(i) + ((hash << 5) - hash);
         }
         const index = Math.abs(hash) % 2; 
-        return index === 0 ? match.teamA.id : match.teamB.id;
+        return index === 0 ? teamAId : teamBId;
     },
 
     // --- CONFIGURATION (Active Days & Locks) ---
