@@ -112,7 +112,7 @@ export interface Match {
   winnerId?: string | null; // If completed
   day?: number | null; // Optional day number for filtering
   bestOf?: number; // BO1, BO3, BO5
-  bracketStage?: 'winners' | 'losers'; // Nuevo campo para Playoffs
+  bracketStage?: 'winners' | 'losers' | 'finals'; // Nuevo campo para Playoffs
   stats?: Record<string, PlayerGameStats>; // Mapa playerId -> stats (AGGREGATED/AVERAGE for backward compatibility)
   games?: MatchGame[]; // DETAILED stats per game
 }

@@ -1,5 +1,5 @@
 {
   "name": "Pick'em Pro",
   "description": "Una aplicación web interactiva para organizar torneos de predicciones (Pick'ems) de League of Legends con amigos, potenciada por IA para análisis de partidas.",
-  "requestFramePermissions": [] 
+  "requestFramePermissions": []
 }

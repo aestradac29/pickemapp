@@ -169,10 +169,10 @@ export const PlayoffBracket: React.FC<PlayoffBracketProps> = ({ matches, teams, 
     const sortedMatches = [...matches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     
     // 1. Identify Grand Final (Strict check)
-    let grandFinal = sortedMatches.find(m => m.stage === Stage.FINALS);
+    let grandFinal = sortedMatches.find(m => m.stage === Stage.FINALS || m.bracketStage === 'finals');
     
     // 2. Identify Winners Matches (exclude finals)
-    let winnersMatches = sortedMatches.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
+    let winnersMatches = sortedMatches.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS && m.bracketStage !== 'finals');
     
     // CORRECCIÓN INTELIGENTE:
     // Si no hay Gran Final explícita (Stage.FINALS) pero el Winners Bracket tiene más de 7 partidos,

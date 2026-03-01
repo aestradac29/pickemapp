@@ -114,7 +114,7 @@ export const fantasyService = {
         // --- BRACKET STAKES (Reward Upper Bracket / Finals) ---
         let bracketMultiplier = 1.0;
         
-        if (stage === Stage.FINALS) {
+        if (stage === Stage.FINALS || bracketStage === 'finals') {
             bracketMultiplier = 1.25; // Grand Final Bonus
         } else if (stage === Stage.PLAYOFFS) {
             if (bracketStage === 'winners') bracketMultiplier = 1.15; // Winners Bracket Bonus

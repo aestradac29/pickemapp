@@ -218,8 +218,8 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
         // Sort identically to PlayoffBracket.tsx
         const sortedMatches = [...bracketMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         
-        let grandFinal = sortedMatches.find(m => m.stage === Stage.FINALS);
-        let winnersMatches = sortedMatches.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
+        let grandFinal = sortedMatches.find(m => m.stage === Stage.FINALS || m.bracketStage === 'finals');
+        let winnersMatches = sortedMatches.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS && m.bracketStage !== 'finals');
         
         if (!grandFinal && winnersMatches.length > 7) {
             grandFinal = winnersMatches[winnersMatches.length - 1];

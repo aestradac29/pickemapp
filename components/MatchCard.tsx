@@ -429,11 +429,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                             <label className="text-[10px] text-gray-500 uppercase font-bold">Bracket (Playoffs)</label>
                             <select 
                                 value={editState.bracketStage}
-                                onChange={(e) => setEditState({...editState, bracketStage: e.target.value as 'winners'|'losers' })}
+                                onChange={(e) => setEditState({...editState, bracketStage: e.target.value as 'winners'|'losers'|'finals' })}
                                 className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-white focus:border-red-500 outline-none uppercase"
                             >
                                 <option value="winners">Winners Bracket</option>
                                 <option value="losers">Losers Bracket</option>
+                                <option value="finals">Gran Final</option>
                             </select>
                        </div>
                   )}
@@ -472,6 +473,10 @@ export const MatchCard: React.FC<MatchCardProps> = ({
                       <span className="text-gray-500 font-bold uppercase flex items-center gap-1 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">
                          <ShieldAlert className="w-3 h-3" /> Losers
                       </span>
+                   ) : match.bracketStage === 'finals' ? (
+                       <span className="text-[#c8aa6e] font-bold uppercase flex items-center gap-1 bg-[#c8aa6e]/20 px-1.5 py-0.5 rounded border border-[#c8aa6e]/50">
+                          <Trophy className="w-3 h-3" /> Gran Final
+                       </span>
                    ) : (
                        <span className="text-yellow-500 font-bold uppercase flex items-center gap-1 bg-yellow-900/20 px-1.5 py-0.5 rounded border border-yellow-700/50">
                           <Crown className="w-3 h-3" /> Winners
