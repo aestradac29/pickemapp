@@ -895,8 +895,16 @@ export const dataService = {
                 const regularMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.winnerId);
                 
                 regularMatches.forEach(m => {
+                    let predictedWinnerId = null;
                     const pick = userPredictions.find((p: any) => p.matchId === m.id);
-                    if (pick && pick.predictedWinnerId === m.winnerId) {
+                    
+                    if (pick && pick.predictedWinnerId) {
+                        predictedWinnerId = pick.predictedWinnerId;
+                    } else {
+                        predictedWinnerId = this.getDeterministicWinner(userId, m);
+                    }
+
+                    if (predictedWinnerId === m.winnerId) {
                         matchdayScore += 1;
                     }
                 });
@@ -906,8 +914,16 @@ export const dataService = {
                 const pointsPerRound: Record<number, number> = { 1: 3, 2: 4, 3: 6, 4: 8, 5: 10 };
                 
                 playoffMatches.forEach(m => {
+                    let predictedWinnerId = null;
                     const pick = userPredictions.find((p: any) => p.matchId === m.id);
-                    if (pick && pick.predictedWinnerId === m.winnerId) {
+
+                    if (pick && pick.predictedWinnerId) {
+                        predictedWinnerId = pick.predictedWinnerId;
+                    } else {
+                        predictedWinnerId = this.getDeterministicWinner(userId, m);
+                    }
+
+                    if (predictedWinnerId === m.winnerId) {
                         playoffsScore += (pointsPerRound[m.day || 1] || 3);
                     }
                 });
@@ -962,8 +978,16 @@ export const dataService = {
                     const dayMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.day === d && m.winnerId);
                     let dayPoints = 0;
                     dayMatches.forEach(m => {
+                        let predictedWinnerId = null;
                         const pick = userPredictions.find((p: any) => p.matchId === m.id);
-                        if (pick && pick.predictedWinnerId === m.winnerId) {
+                        
+                        if (pick && pick.predictedWinnerId) {
+                            predictedWinnerId = pick.predictedWinnerId;
+                        } else {
+                            predictedWinnerId = this.getDeterministicWinner(userId, m);
+                        }
+
+                        if (predictedWinnerId === m.winnerId) {
                             dayPoints += 1;
                         }
                     });
@@ -980,8 +1004,16 @@ export const dataService = {
                      const matchesInStep = playoffMatches.filter(m => targetRounds.includes(m.day || 0) && m.winnerId);
                      
                      matchesInStep.forEach(m => {
+                        let predictedWinnerId = null;
                         const pick = userPredictions.find((p: any) => p.matchId === m.id);
-                        if (pick && pick.predictedWinnerId === m.winnerId) {
+                        
+                        if (pick && pick.predictedWinnerId) {
+                            predictedWinnerId = pick.predictedWinnerId;
+                        } else {
+                            predictedWinnerId = this.getDeterministicWinner(userId, m);
+                        }
+
+                        if (predictedWinnerId === m.winnerId) {
                             dayPoints += (pointsPerRound[m.day || 1] || 3);
                         }
                      });
@@ -1024,8 +1056,16 @@ export const dataService = {
 
                     if (isDayComplete && pendingMatches.length === 0 && dayMatches.length >= 2) {
                         const correctCount = dayMatches.filter(m => {
+                            let predictedWinnerId = null;
                             const pick = userPredictions.find((p: any) => p.matchId === m.id);
-                            return pick && pick.predictedWinnerId === m.winnerId;
+                            
+                            if (pick && pick.predictedWinnerId) {
+                                predictedWinnerId = pick.predictedWinnerId;
+                            } else {
+                                predictedWinnerId = this.getDeterministicWinner(userId, m);
+                            }
+                            
+                            return predictedWinnerId === m.winnerId;
                         }).length;
 
                         // Si acertó todos los partidos de esa jornada completa
