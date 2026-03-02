@@ -128,7 +128,11 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                       const hasPrediction = filledPicks.some(p => p.matchId === match.id);
                       if (!hasPrediction) {
                           const autoPick = dataService.getDeterministicWinner(viewingUserId, match);
-                          if (autoPick !== 'tbd') {
+                          // Only show auto-pick if match is on/after Feb 21, 2026
+                          const matchTime = new Date(match.startTime).getTime();
+                          const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                          
+                          if (autoPick !== 'tbd' && matchTime >= cutoff) {
                               filledPicks.push({ matchId: match.id, predictedWinnerId: autoPick });
                               hasAutoPicks = true;
                           }

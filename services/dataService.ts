@@ -460,6 +460,14 @@ export const dataService = {
                         } catch(e) {}
                     }
 
+                    // FIX: Override incorrect day assignments for specific playoff matches
+                    // This ensures correct points calculation (R1=3, R2=4, R3=6, R4=8, R5=10)
+                    if (m.id === 'custom-1771355205951') finalDay = 1; // TH vs GX (L-R1)
+                    if (m.id === 'custom-1771616605726') finalDay = 1; // FNC vs VIT (L-R1)
+                    if (m.id === 'custom-1771616694618') finalDay = 4; // MKOI vs G2 (W-Final)
+                    if (m.id === 'custom-1771675245729') finalDay = 4; // MKOI vs KC (L-Final)
+                    if (m.id === 'custom-1771676684096') finalDay = 5; // G2 vs KC (Gran Final)
+
                     return {
                         ...m,
                         day: finalDay,
@@ -900,11 +908,22 @@ export const dataService = {
                 regularMatches.forEach(m => {
                     let predictedWinnerId = null;
                     const pick = userPredictions.find((p: any) => p.matchId === m.id);
+                    let isRandom = false;
                     
                     if (pick && pick.predictedWinnerId) {
                         predictedWinnerId = pick.predictedWinnerId;
                     } else {
                         predictedWinnerId = this.getDeterministicWinner(userId, m);
+                        isRandom = true;
+                    }
+
+                    // Random picks only count if match is on/after Feb 21, 2026
+                    if (isRandom) {
+                        const matchTime = new Date(m.startTime).getTime();
+                        const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                        if (matchTime < cutoff) {
+                            predictedWinnerId = null;
+                        }
                     }
 
                     if (predictedWinnerId === m.winnerId) {
@@ -919,11 +938,22 @@ export const dataService = {
                 playoffMatches.forEach(m => {
                     let predictedWinnerId = null;
                     const pick = userPredictions.find((p: any) => p.matchId === m.id);
+                    let isRandom = false;
 
                     if (pick && pick.predictedWinnerId) {
                         predictedWinnerId = pick.predictedWinnerId;
                     } else {
                         predictedWinnerId = this.getDeterministicWinner(userId, m);
+                        isRandom = true;
+                    }
+
+                    // Random picks only count if match is on/after Feb 21, 2026
+                    if (isRandom) {
+                        const matchTime = new Date(m.startTime).getTime();
+                        const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                        if (matchTime < cutoff) {
+                            predictedWinnerId = null;
+                        }
                     }
 
                     if (predictedWinnerId === m.winnerId) {
@@ -983,11 +1013,21 @@ export const dataService = {
                     dayMatches.forEach(m => {
                         let predictedWinnerId = null;
                         const pick = userPredictions.find((p: any) => p.matchId === m.id);
+                        let isRandom = false;
                         
                         if (pick && pick.predictedWinnerId) {
                             predictedWinnerId = pick.predictedWinnerId;
                         } else {
                             predictedWinnerId = this.getDeterministicWinner(userId, m);
+                            isRandom = true;
+                        }
+
+                        if (isRandom) {
+                            const matchTime = new Date(m.startTime).getTime();
+                            const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                            if (matchTime < cutoff) {
+                                predictedWinnerId = null;
+                            }
                         }
 
                         if (predictedWinnerId === m.winnerId) {
@@ -1009,11 +1049,21 @@ export const dataService = {
                      matchesInStep.forEach(m => {
                         let predictedWinnerId = null;
                         const pick = userPredictions.find((p: any) => p.matchId === m.id);
+                        let isRandom = false;
                         
                         if (pick && pick.predictedWinnerId) {
                             predictedWinnerId = pick.predictedWinnerId;
                         } else {
                             predictedWinnerId = this.getDeterministicWinner(userId, m);
+                            isRandom = true;
+                        }
+
+                        if (isRandom) {
+                            const matchTime = new Date(m.startTime).getTime();
+                            const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                            if (matchTime < cutoff) {
+                                predictedWinnerId = null;
+                            }
                         }
 
                         if (predictedWinnerId === m.winnerId) {
@@ -1061,11 +1111,21 @@ export const dataService = {
                         const correctCount = dayMatches.filter(m => {
                             let predictedWinnerId = null;
                             const pick = userPredictions.find((p: any) => p.matchId === m.id);
+                            let isRandom = false;
                             
                             if (pick && pick.predictedWinnerId) {
                                 predictedWinnerId = pick.predictedWinnerId;
                             } else {
                                 predictedWinnerId = this.getDeterministicWinner(userId, m);
+                                isRandom = true;
+                            }
+
+                            if (isRandom) {
+                                const matchTime = new Date(m.startTime).getTime();
+                                const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                                if (matchTime < cutoff) {
+                                    predictedWinnerId = null;
+                                }
                             }
                             
                             return predictedWinnerId === m.winnerId;
