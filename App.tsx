@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { MATCHES, USERS } from './constants';
+
 import { MatchCard } from './components/MatchCard';
 import { Leaderboard } from './components/Leaderboard';
 import { Login } from './components/Login';
@@ -17,6 +17,7 @@ import { ProfileView } from './components/ProfileView';
 import { TeamsView } from './components/TeamsView';
 import { OfficialStandings } from './components/OfficialStandings';
 import { HallOfFame } from './components/HallOfFame'; // Import nuevo
+import { Album } from './components/Album'; // New Album Import
 import { ViewState, UserPrediction, User } from './types';
 import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, Download } from 'lucide-react';
 import { authService } from './services/authService';
@@ -249,6 +250,8 @@ const App: React.FC = () => {
         return <TeamsView />;
       case ViewState.HALL_OF_FAME: // Nuevo caso
         return <HallOfFame />;
+      case ViewState.ALBUM: // New case
+        return <Album currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.DB_MANAGER:
          // Protect route
          if (!isAdmin) return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;

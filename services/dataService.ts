@@ -1,9 +1,9 @@
 
-import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame, Notification } from '../types';
+import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame, Notification, Card, UserCard, TradeOffer, UserPackState, CardType } from '../types';
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, FANTASY_SCHEDULE } from '../constants';
 import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where } from "firebase/firestore";
 
 // Helper CRÍTICO: Elimina recursivamente cualquier campo 'undefined' del objeto.
 const cleanPayload = (data: any): any => {
@@ -36,7 +36,8 @@ export const dataService = {
         playoffRounds?: number, 
         playoffsAccessible?: boolean,
         fantasyRound?: number, // Current active fantasy round
-        fantasyLocked?: boolean // Is current fantasy round locked?
+        fantasyLocked?: boolean, // Is current fantasy round locked?
+        albumEnabled?: boolean // Is the album feature enabled?
     }> {
         try {
             const docRef = doc(db, "admin_data", "config");
@@ -46,8 +47,9 @@ export const dataService = {
             let config = {
                 visibleDays: [1], closedDays: [], 
                 playoffVisibleDays: [1], playoffClosedDays: [],
-                playoffRounds: 5, playoffsAccessible: false,
-                fantasyRound: 1, fantasyLocked: false
+                playoffRounds: 3, playoffsAccessible: false,
+                fantasyRound: 1, fantasyLocked: false,
+                albumEnabled: true
             };
 
             if (docSnap.exists()) {
@@ -57,10 +59,11 @@ export const dataService = {
                     closedDays: data.closedDays || [],
                     playoffVisibleDays: data.playoffVisibleDays || [1],
                     playoffClosedDays: data.playoffClosedDays || [],
-                    playoffRounds: data.playoffRounds || 5, 
+                    playoffRounds: data.playoffRounds || 3, 
                     playoffsAccessible: data.playoffsAccessible || false,
                     fantasyRound: data.fantasyRound || 1,
-                    fantasyLocked: data.fantasyLocked || false // Manual Override
+                    fantasyLocked: data.fantasyLocked || false, // Manual Override
+                    albumEnabled: data.albumEnabled !== undefined ? data.albumEnabled : true
                 };
             }
 
@@ -96,8 +99,9 @@ export const dataService = {
             return { 
                 visibleDays: [1], closedDays: [], 
                 playoffVisibleDays: [1], playoffClosedDays: [],
-                playoffRounds: 5, playoffsAccessible: false,
-                fantasyRound: 1, fantasyLocked: false
+                playoffRounds: 3, playoffsAccessible: false,
+                fantasyRound: 1, fantasyLocked: false,
+                albumEnabled: true
             };
         }
     },
@@ -107,7 +111,33 @@ export const dataService = {
         await setDoc(docRef, cleanPayload(config), { merge: true });
     },
 
-    // --- NOTIFICATIONS ---
+    // Helper to get points for a playoff match based on its position
+    getPlayoffMatchPoints(match: Match, allPlayoffMatches: Match[]): number {
+        const sorted = [...allPlayoffMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        const winners = sorted.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
+        const losers = sorted.filter(m => m.bracketStage === 'losers');
+        const final = sorted.find(m => m.stage === Stage.FINALS || m.bracketStage === 'finals');
+
+        // R1 / L-R1: 3 pts
+        if (winners.slice(0, 4).some(w => w.id === match.id)) return 3;
+        if (losers.slice(0, 2).some(l => l.id === match.id)) return 3;
+
+        // R2 / L-R2: 4 pts
+        if (winners.slice(4, 6).some(w => w.id === match.id)) return 4;
+        if (losers.slice(2, 4).some(l => l.id === match.id)) return 4;
+
+        // L-Semi: 6 pts
+        if (losers.slice(4, 5).some(l => l.id === match.id)) return 6;
+
+        // Final W / L-Final: 8 pts
+        if (winners.slice(6, 7).some(w => w.id === match.id)) return 8;
+        if (losers.slice(5, 6).some(l => l.id === match.id)) return 8;
+
+        // Gran Final: 10 pts
+        if (final && final.id === match.id) return 10;
+
+        return 3; // Default
+    },
     async getNotifications(): Promise<Notification[]> {
         try {
             const q = query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(10));
@@ -460,13 +490,17 @@ export const dataService = {
                         } catch(e) {}
                     }
 
-                    // FIX: Override incorrect day assignments for specific playoff matches
-                    // This ensures correct points calculation (R1=3, R2=4, R3=6, R4=8, R5=10)
-                    if (m.id === 'custom-1771355205951') finalDay = 1; // TH vs GX (L-R1)
-                    if (m.id === 'custom-1771616605726') finalDay = 1; // FNC vs VIT (L-R1)
-                    if (m.id === 'custom-1771616694618') finalDay = 4; // MKOI vs G2 (W-Final)
-                    if (m.id === 'custom-1771675245729') finalDay = 4; // MKOI vs KC (L-Final)
-                    if (m.id === 'custom-1771676684096') finalDay = 5; // G2 vs KC (Gran Final)
+                    // --- PLAYOFF DAY ASSIGNMENT LOGIC (User Requested) ---
+                    if (m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS) {
+                        // We need to identify the match type to assign the correct day (1, 2, 3)
+                        // Jornada 1: R1 1-4
+                        // Jornada 2: R2 1-2, L-R1 1-2, L-R2 1-2, Final Winners
+                        // Jornada 3: L-Semi, L-Final, Gran Final
+                        
+                        // To do this accurately without sorting the whole array every time, 
+                        // we use the bracketStage and some known IDs or properties if available.
+                        // However, for consistency, we'll apply a post-processing step below.
+                    }
 
                     return {
                         ...m,
@@ -475,6 +509,37 @@ export const dataService = {
                         teamB: (m.teamB && teamsMap[m.teamB.id]) || m.teamB
                     };
                 });
+
+                // --- POST-PROCESS PLAYOFF DAYS ---
+                const playoffMatches = allMatches.filter(m => m.stage === Stage.PLAYOFFS || m.stage === Stage.FINALS);
+                const sortedPlayoffs = [...playoffMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+                
+                const winners = sortedPlayoffs.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
+                const losers = sortedPlayoffs.filter(m => m.bracketStage === 'losers');
+                const final = sortedPlayoffs.find(m => m.stage === Stage.FINALS || m.bracketStage === 'finals');
+
+                allMatches = allMatches.map(m => {
+                    if (m.stage !== Stage.PLAYOFFS && m.stage !== Stage.FINALS) return m;
+
+                    let assignedDay = m.day;
+                    
+                    // Jornada 1: R1 1-4 (First 4 winners)
+                    if (winners.slice(0, 4).some(w => w.id === m.id)) assignedDay = 1;
+                    
+                    // Jornada 2: R2 1-2, L-R1 1-2, L-R2 1-2, Final Winners
+                    else if (winners.slice(4, 6).some(w => w.id === m.id)) assignedDay = 2; // R2
+                    else if (winners.slice(6, 7).some(w => w.id === m.id)) assignedDay = 2; // Final Winners
+                    else if (losers.slice(0, 2).some(l => l.id === m.id)) assignedDay = 2;  // L-R1
+                    else if (losers.slice(2, 4).some(l => l.id === m.id)) assignedDay = 2;  // L-R2
+                    
+                    // Jornada 3: L-Semi, L-Final, Gran Final
+                    else if (losers.slice(4, 5).some(l => l.id === m.id)) assignedDay = 3;  // L-Semi
+                    else if (losers.slice(5, 6).some(l => l.id === m.id)) assignedDay = 3;  // L-Final
+                    else if (final && final.id === m.id) assignedDay = 3;                  // Gran Final
+
+                    return { ...m, day: assignedDay };
+                });
+
 
             } else {
                 console.log("Seeding Matches...");
@@ -957,7 +1022,7 @@ export const dataService = {
                     }
 
                     if (predictedWinnerId === m.winnerId) {
-                        playoffsScore += (pointsPerRound[m.day || 1] || 3);
+                        playoffsScore += this.getPlayoffMatchPoints(m, playoffMatches);
                     }
                 });
 
@@ -1043,8 +1108,7 @@ export const dataService = {
 
                 for (let d = 1; d <= 3; d++) {
                      let dayPoints = 0;
-                     const targetRounds = (d === 3) ? [3, 4, 5] : [d];
-                     const matchesInStep = playoffMatches.filter(m => targetRounds.includes(m.day || 0) && m.winnerId);
+                     const matchesInStep = playoffMatches.filter(m => m.day === d && m.winnerId);
                      
                      matchesInStep.forEach(m => {
                         let predictedWinnerId = null;
@@ -1067,7 +1131,7 @@ export const dataService = {
                         }
 
                         if (predictedWinnerId === m.winnerId) {
-                            dayPoints += (pointsPerRound[m.day || 1] || 3);
+                            dayPoints += this.getPlayoffMatchPoints(m, playoffMatches);
                         }
                      });
 
@@ -1262,5 +1326,372 @@ export const dataService = {
     },
     async saveAdminCrystalBallResults(selections: any) {
         await setDoc(doc(db, "admin_data", "results"), { winter_2026_crystal: cleanPayload(selections) }, { merge: true });
+    },
+
+    // --- CARD COLLECTION SYSTEM ---
+    async getCardsForSplit(splitId: string): Promise<Card[]> {
+        try {
+            const docRef = doc(db, "admin_data", `cards_${splitId}`);
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+                return docSnap.data().cards || [];
+            } else {
+                // Seed initial cards (60 players + 12 teams)
+                const players = await this.getPlayers();
+                const teams = await this.getTeams();
+                
+                const cards: Card[] = [];
+                
+                // Add Team Cards (exclude TBD)
+                Object.values(teams).forEach((team: any) => {
+                    if (team.id !== 'tbd') {
+                        cards.push({
+                            id: `card_team_${team.id}`,
+                            splitId,
+                            type: CardType.TEAM,
+                            referenceId: team.id
+                        });
+                    }
+                });
+
+                // Add Player Cards
+                players.forEach(player => {
+                    cards.push({
+                        id: `card_player_${player.id}`,
+                        splitId,
+                        type: CardType.PLAYER,
+                        referenceId: player.id
+                    });
+                });
+
+                await setDoc(docRef, { cards: cleanPayload(cards) });
+                return cards;
+            }
+        } catch (e) {
+            console.error("Error getting cards:", e);
+            return [];
+        }
+    },
+
+    async saveCardsForSplit(splitId: string, cards: Card[]): Promise<void> {
+        try {
+            const docRef = doc(db, "admin_data", `cards_${splitId}`);
+            await setDoc(docRef, { cards: cleanPayload(cards) });
+        } catch (e) {
+            console.error("Error saving cards:", e);
+            throw e;
+        }
+    },
+
+    async getUserCollection(userId: string, splitId: string): Promise<UserCard[]> {
+        try {
+            const collectionRef = collection(db, "users", userId, `collection_${splitId}`);
+            const snapshot = await getDocs(collectionRef);
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserCard));
+        } catch (e) {
+            console.error("Error getting user collection:", e);
+            return [];
+        }
+    },
+
+    async getUserPackState(userId: string, splitId: string): Promise<UserPackState | null> {
+        try {
+            const docRef = doc(db, "users", userId, "pack_states", splitId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return docSnap.data() as UserPackState;
+            }
+            return null;
+        } catch (e) {
+            console.error("Error getting pack state:", e);
+            return null;
+        }
+    },
+
+    async getUserInventory(userId: string, splitId: string): Promise<UserCard[]> {
+        try {
+            const inventoryRef = collection(db, "users", userId, `inventory_${splitId}`);
+            const snapshot = await getDocs(inventoryRef);
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserCard));
+        } catch (e) {
+            console.error("Error getting user inventory:", e);
+            return [];
+        }
+    },
+
+    async moveCardToCollection(userId: string, splitId: string, inventoryItemId: string, cardId: string) {
+        try {
+            // 1. Add to Collection
+            const collectionRef = collection(db, "users", userId, `collection_${splitId}`);
+            const currentCollection = await this.getUserCollection(userId, splitId);
+            const existingInCollection = currentCollection.find(uc => uc.cardId === cardId);
+
+            if (existingInCollection) {
+                // Duplicate prevention: if already in collection, don't add more.
+                // Duplicate cards stay in inventory.
+                return;
+            } else {
+                await addDoc(collectionRef, {
+                    userId,
+                    cardId,
+                    quantity: 1
+                });
+            }
+
+            // 2. Update Inventory
+            const inventoryDocRef = doc(db, "users", userId, `inventory_${splitId}`, inventoryItemId);
+            const inventoryDoc = await getDoc(inventoryDocRef);
+            
+            if (inventoryDoc.exists()) {
+                const currentQty = inventoryDoc.data().quantity || 1;
+                if (currentQty > 1) {
+                    await updateDoc(inventoryDocRef, { quantity: currentQty - 1 });
+                } else {
+                    await deleteDoc(inventoryDocRef);
+                }
+            }
+
+        } catch (e) {
+            console.error("Error moving card to collection:", e);
+            throw e;
+        }
+    },
+
+    async deleteUserCollection(userId: string, splitId: string) {
+        try {
+            // Delete Collection
+            const collectionRef = collection(db, "users", userId, `collection_${splitId}`);
+            const snapshot = await getDocs(collectionRef);
+            const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+            await Promise.all(deletePromises);
+
+            // Delete Inventory
+            const inventoryRef = collection(db, "users", userId, `inventory_${splitId}`);
+            const invSnapshot = await getDocs(inventoryRef);
+            const invDeletePromises = invSnapshot.docs.map(doc => deleteDoc(doc.ref));
+            await Promise.all(invDeletePromises);
+
+            // Reset Pack State (optional, but good for full reset)
+            const packStateRef = doc(db, "users", userId, "pack_states", splitId);
+            await deleteDoc(packStateRef);
+
+        } catch (e) {
+            console.error("Error deleting user collection:", e);
+            throw e;
+        }
+    },
+
+    async openDailyPack(userId: string, splitId: string): Promise<Card[]> {
+        try {
+            // INFINITE PACKS ENABLED: Cooldown check removed for testing
+            /*
+            const packState = await this.getUserPackState(userId, splitId);
+            const now = new Date();
+            
+            // Check if 24 hours have passed
+            if (packState && packState.lastOpenedAt) {
+                const lastOpened = new Date(packState.lastOpenedAt);
+                const diffHours = Math.abs(now.getTime() - lastOpened.getTime()) / 36e5;
+                if (diffHours < 24) {
+                    throw new Error(`Debes esperar ${Math.ceil(24 - diffHours)} horas para abrir otro sobre.`);
+                }
+            }
+            */
+            const now = new Date();
+
+            // Get all possible cards
+            const allCards = await this.getCardsForSplit(splitId);
+            if (allCards.length === 0) throw new Error("No hay cartas disponibles en este split.");
+
+            // Generate 5 random cards
+            const drawnCards: Card[] = [];
+            for (let i = 0; i < 5; i++) {
+                const randomIndex = Math.floor(Math.random() * allCards.length);
+                drawnCards.push(allCards[randomIndex]);
+            }
+
+            // Save to user INVENTORY (not collection directly)
+            const inventoryRef = collection(db, "users", userId, `inventory_${splitId}`);
+            const currentInventory = await this.getUserInventory(userId, splitId);
+            
+            const batchUpdates = drawnCards.map(async (card) => {
+                const existing = currentInventory.find(inv => inv.cardId === card.id);
+                if (existing) {
+                    const docRef = doc(db, "users", userId, `inventory_${splitId}`, existing.id);
+                    await updateDoc(docRef, { quantity: existing.quantity + 1 });
+                } else {
+                    await addDoc(inventoryRef, {
+                        userId,
+                        cardId: card.id,
+                        quantity: 1,
+                        obtainedAt: now.toISOString()
+                    });
+                }
+            });
+
+            await Promise.all(batchUpdates);
+
+            // Update Pack State
+            const stateRef = doc(db, "users", userId, "pack_states", splitId);
+            await setDoc(stateRef, {
+                userId,
+                splitId,
+                lastOpenedAt: now.toISOString()
+            }, { merge: true });
+
+            return drawnCards;
+
+        } catch (e) {
+            console.error("Error opening pack:", e);
+            throw e;
+        }
+    },
+
+    // --- TRADING SYSTEM ---
+    async getAllDuplicateCards(splitId: string): Promise<{userId: string, username: string, cardId: string, quantity: number}[]> {
+        try {
+            const usersRef = collection(db, "users");
+            const usersSnap = await getDocs(usersRef);
+            
+            const duplicates: {userId: string, username: string, cardId: string, quantity: number}[] = [];
+            
+            for (const userDoc of usersSnap.docs) {
+                const userData = userDoc.data();
+                const userId = userDoc.id;
+                const username = userData.username || 'Invocador';
+                
+                const inventoryRef = collection(db, "users", userId, `inventory_${splitId}`);
+                const invSnap = await getDocs(inventoryRef);
+                
+                invSnap.docs.forEach(doc => {
+                    const cardData = doc.data() as UserCard;
+                    // In the new system, everything in inventory is a "duplicate" (or unpasted card)
+                    // But we only want to show it if they already have it in collection
+                    duplicates.push({
+                        userId,
+                        username,
+                        cardId: cardData.cardId,
+                        quantity: cardData.quantity
+                    });
+                });
+            }
+            return duplicates;
+        } catch (e) {
+            console.error("Error getting duplicate cards:", e);
+            return [];
+        }
+    },
+
+    async createTradeOffer(offer: Omit<TradeOffer, 'id' | 'createdAt'>): Promise<void> {
+        try {
+            await addDoc(collection(db, "trade_offers"), {
+                ...offer,
+                createdAt: new Date().toISOString()
+            });
+        } catch (e) {
+            console.error("Error creating trade offer:", e);
+            throw e;
+        }
+    },
+
+    async getUserTradeOffers(userId: string): Promise<TradeOffer[]> {
+        const offersRef = collection(db, "trade_offers");
+        const offersMap = new Map<string, TradeOffer>();
+        
+        try {
+            // Try to get offers sent by user
+            try {
+                const qFrom = query(offersRef, where("senderId", "==", userId));
+                const snapFrom = await getDocs(qFrom);
+                snapFrom.docs.forEach(doc => {
+                    offersMap.set(doc.id, { id: doc.id, ...doc.data() } as TradeOffer);
+                });
+            } catch (e) {
+                console.warn("Error getting sent offers (likely permission issue):", e);
+            }
+
+            // Try to get offers received by user
+            try {
+                const qTo = query(offersRef, where("receiverId", "==", userId));
+                const snapTo = await getDocs(qTo);
+                snapTo.docs.forEach(doc => {
+                    offersMap.set(doc.id, { id: doc.id, ...doc.data() } as TradeOffer);
+                });
+            } catch (e) {
+                console.warn("Error getting received offers (likely permission issue):", e);
+            }
+            
+            return Array.from(offersMap.values())
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        } catch (e) {
+            console.error("Error in getUserTradeOffers:", e);
+            return [];
+        }
+    },
+
+    async respondToTradeOffer(offerId: string, status: 'ACCEPTED' | 'REJECTED', splitId: string): Promise<void> {
+        try {
+            const offerRef = doc(db, "trade_offers", offerId);
+            const offerSnap = await getDoc(offerRef);
+            
+            if (!offerSnap.exists()) throw new Error("Offer not found");
+            
+            const offer = offerSnap.data() as TradeOffer;
+            if (offer.status !== 'PENDING') throw new Error("Offer is no longer pending");
+
+            if (status === 'ACCEPTED') {
+                // Execute trade
+                // 1. Verify both users still have the cards in inventory
+                const fromInventory = await this.getUserInventory(offer.senderId, splitId);
+                const toInventory = await this.getUserInventory(offer.receiverId!, splitId);
+
+                const offeredCard = fromInventory.find(uc => uc.cardId === offer.offeredCardId);
+                const hasOffered = offeredCard && offeredCard.quantity > 0;
+                
+                const requestedCard = toInventory.find(uc => uc.cardId === offer.requestedCardId);
+                const hasRequested = requestedCard && requestedCard.quantity > 0;
+
+                if (!hasOffered || !hasRequested) {
+                    await updateDoc(offerRef, { status: 'CANCELLED' });
+                    throw new Error("One of the users no longer has the required cards.");
+                }
+
+                // 2. Transfer cards (using inventory)
+                await this.transferCard(offer.senderId, offer.receiverId!, offer.offeredCardId, splitId);
+                await this.transferCard(offer.receiverId!, offer.senderId, offer.requestedCardId, splitId);
+            }
+
+            await updateDoc(offerRef, { status });
+
+        } catch (e) {
+            console.error("Error responding to trade:", e);
+            throw e;
+        }
+    },
+
+    async transferCard(fromUserId: string, toUserId: string, cardId: string, splitId: string) {
+        // Decrease from sender's inventory
+        const fromInvRef = collection(db, "users", fromUserId, `inventory_${splitId}`);
+        const fromSnap = await getDocs(fromInvRef);
+        const fromDoc = fromSnap.docs.find(d => d.data().cardId === cardId);
+        if (fromDoc) {
+            const currentQty = fromDoc.data().quantity || 1;
+            if (currentQty <= 1) {
+                await deleteDoc(doc(db, "users", fromUserId, `inventory_${splitId}`, fromDoc.id));
+            } else {
+                await updateDoc(doc(db, "users", fromUserId, `inventory_${splitId}`, fromDoc.id), { quantity: currentQty - 1 });
+            }
+        }
+
+        // Increase for receiver's inventory
+        const toInvRef = collection(db, "users", toUserId, `inventory_${splitId}`);
+        const toSnap = await getDocs(toInvRef);
+        const toDoc = toSnap.docs.find(d => d.data().cardId === cardId);
+        if (toDoc) {
+            await updateDoc(doc(db, "users", toUserId, `inventory_${splitId}`, toDoc.id), { quantity: (toDoc.data().quantity || 1) + 1 });
+        } else {
+            await addDoc(toInvRef, { userId: toUserId, cardId: cardId, quantity: 1, obtainedAt: new Date().toISOString() });
+        }
     }
 };

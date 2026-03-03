@@ -5,7 +5,7 @@ import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 async function run() {
     const usersRef = collection(db, "users");
     const snapshot = await getDocs(usersRef);
-    const users = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    const users = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
     const raul = users.find(u => (u.username || '').toLowerCase().includes('raulbarreda7'));
     
     if (!raul) {

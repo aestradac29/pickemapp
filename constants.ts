@@ -55,7 +55,7 @@ export const FANTASY_SCHEDULE = [
     { id: 2, label: 'Jornada 2', matchdays: [4, 5, 6], stage: Stage.GROUPS },
     { id: 3, label: 'Jornada 3', matchdays: [7, 8, 9], stage: Stage.GROUPS },
     { id: 4, label: 'Jornada 4', matchdays: [10, 11], stage: Stage.GROUPS },
-    { id: 5, label: 'Playoffs R1', matchdays: [1], stage: Stage.PLAYOFFS }, // Generic Playoff Round mapping
+    { id: 5, label: 'Playoffs R1', matchdays: [1], stage: Stage.PLAYOFFS }, 
     { id: 6, label: 'Playoffs R2', matchdays: [2], stage: Stage.PLAYOFFS },
     { id: 7, label: 'Playoffs R3', matchdays: [3], stage: Stage.PLAYOFFS },
 ];
@@ -141,7 +141,7 @@ export const TEAMS: Record<string, Team> = {
     shortName: 'FNC', 
     region: Region.LEC, 
     color: '#ff5900',
-    logo: getLogo('Fnaticlogo_square.png')
+    logo: getLogo('Fnatic_logo_square.png')
   },
   g2: { 
     id: 'g2', 

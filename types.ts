@@ -16,7 +16,6 @@ export enum ViewState {
   LOGIN = 'LOGIN',
   SPLIT_SELECTION = 'SPLIT_SELECTION', // New View
   DASHBOARD = 'DASHBOARD',
-  ADMIN = 'ADMIN', // New Admin View
   DB_MANAGER = 'DB_MANAGER', // New Database Editor View
   RANKING = 'RANKING', // Clasificación Winter 2026
   OFFICIAL_STANDINGS = 'OFFICIAL_STANDINGS', // NEW: Real LEC Standings
@@ -27,7 +26,52 @@ export enum ViewState {
   RESULTS = 'RESULTS', // Resultados jornada
   PROFILE = 'PROFILE', // New Profile View
   TEAMS = 'TEAMS', // New Teams View
-  HALL_OF_FAME = 'HALL_OF_FAME' // New Hall of Fame View
+  HALL_OF_FAME = 'HALL_OF_FAME', // New Hall of Fame View
+  ALBUM = 'ALBUM' // New Album View
+}
+
+export enum CardType {
+  PLAYER = 'PLAYER',
+  TEAM = 'TEAM'
+}
+
+export enum CardRarity {
+  COMMON = 'COMMON',
+  RARE = 'RARE',
+  EPIC = 'EPIC',
+  LEGENDARY = 'LEGENDARY',
+  MYTHIC = 'MYTHIC'
+}
+
+export interface Card {
+  id: string;
+  splitId: string;
+  type: CardType;
+  referenceId: string; // playerId or teamId
+  rarity: CardRarity;
+}
+
+export interface UserCard {
+  id: string;
+  userId: string;
+  cardId: string;
+  quantity: number;
+}
+
+export interface TradeOffer {
+  id: string;
+  senderId: string;
+  receiverId: string | null; // null if public listing
+  offeredCardId: string;
+  requestedCardId: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+  createdAt: string;
+}
+
+export interface UserPackState {
+  userId: string;
+  splitId: string;
+  lastOpenedAt: string | null;
 }
 
 export enum Role {

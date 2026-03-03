@@ -236,9 +236,9 @@ export const TeamsView: React.FC = () => {
     }, [players]);
 
     // Sort Teams by Total Points (Descending)
-    const teamsList = useMemo(() => Object.values(teams).filter(t => t.id !== 'tbd'), [teams]);
+    const teamsList = useMemo(() => Object.values(teams).filter((t: any) => t.id !== 'tbd'), [teams]);
     const teamsInOrder = useMemo(() => {
-        return [...teamsList].sort((a, b) => {
+        return [...teamsList].sort((a: any, b: any) => {
             const pointsA = players.filter(p => p.teamId === a.id).reduce((sum, p) => sum + (p.totalPoints || 0), 0);
             const pointsB = players.filter(p => p.teamId === b.id).reduce((sum, p) => sum + (p.totalPoints || 0), 0);
             return pointsB - pointsA;

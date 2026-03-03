@@ -38,7 +38,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
     onPredictionsSaved 
 }) => {
   // Config
-  const [totalRounds, setTotalRounds] = useState(5);
+  const [totalRounds, setTotalRounds] = useState(3);
   const [currentDay, setCurrentDay] = useState(1);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
   const [closedDays, setClosedDays] = useState<number[]>([]); 
