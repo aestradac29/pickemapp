@@ -35,20 +35,11 @@ export enum CardType {
   TEAM = 'TEAM'
 }
 
-export enum CardRarity {
-  COMMON = 'COMMON',
-  RARE = 'RARE',
-  EPIC = 'EPIC',
-  LEGENDARY = 'LEGENDARY',
-  MYTHIC = 'MYTHIC'
-}
-
 export interface Card {
   id: string;
   splitId: string;
   type: CardType;
   referenceId: string; // playerId or teamId
-  rarity: CardRarity;
 }
 
 export interface UserCard {

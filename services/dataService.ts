@@ -318,6 +318,14 @@ export const dataService = {
 
             if (docSnap.exists()) {
                 const dbTeams = docSnap.data().data as Record<string, Team>;
+                
+                // Force update Fnatic logo from constants (Hotfix for stale DB data)
+                if (dbTeams['fnc'] && TEAMS['fnc']) {
+                    // Ensure we use the updated URL and COLOR (for contrast)
+                    dbTeams['fnc'].logo = TEAMS['fnc'].logo;
+                    dbTeams['fnc'].color = TEAMS['fnc'].color;
+                }
+
                 // Ensure TBD is present if not in DB (from constants)
                 if (!dbTeams['tbd'] && TEAMS.tbd) {
                      return { ...dbTeams, tbd: TEAMS.tbd };

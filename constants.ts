@@ -140,8 +140,8 @@ export const TEAMS: Record<string, Team> = {
     name: 'Fnatic', 
     shortName: 'FNC', 
     region: Region.LEC, 
-    color: '#ff5900',
-    logo: getLogo('Fnatic_logo_square.png')
+    color: '#6e3200',
+    logo: 'https://static.wikia.nocookie.net/lolesports_gamepedia_en/images/f/fc/Fnaticlogo_square.png'
   },
   g2: { 
     id: 'g2', 

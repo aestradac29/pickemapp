@@ -93,7 +93,6 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
               id: `team_${t.id}`,
               splitId: selectedSplit,
               type: CardType.TEAM,
-              rarity: 'COMMON',
               referenceId: t.id
             });
           });
@@ -102,7 +101,6 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
               id: `player_${p.id}`,
               splitId: selectedSplit,
               type: CardType.PLAYER,
-              rarity: 'COMMON',
               referenceId: p.id
             });
           });
@@ -704,8 +702,12 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                             <img 
                               src={details.image} 
                               alt={details.name}
-                              className={`absolute inset-0 w-full h-full opacity-90 ${card.type === CardType.TEAM ? 'object-contain p-6' : 'object-cover object-top mix-blend-luminosity'}`}
+                              className={`absolute inset-0 w-full h-full opacity-90 ${card.type === CardType.TEAM ? 'object-contain p-4' : 'object-cover object-top mix-blend-luminosity'}`}
                               referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null; // Prevenir bucle infinito
+                                e.currentTarget.src = `https://ui-avatars.com/api/?name=${details.name}&background=random&color=fff`;
+                              }}
                             />
                           ) : (
                             <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center z-20">
@@ -722,7 +724,13 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                           <div className="absolute inset-0 z-20 flex flex-col justify-end p-3">
                             {card.type === CardType.PLAYER && details.teamLogo && (isOwned || canPaste) && (
                               <div className="absolute top-3 right-3 w-8 h-8 bg-black/40 backdrop-blur-sm rounded-full p-1.5 flex items-center justify-center border border-white/10">
-                                <img src={details.teamLogo} alt="Team" className="w-full h-full object-contain drop-shadow-md" referrerPolicy="no-referrer" />
+                                <img 
+                                  src={details.teamLogo} 
+                                  alt="Team" 
+                                  className="w-full h-full object-contain drop-shadow-md" 
+                                  referrerPolicy="no-referrer" 
+                                  onError={(e) => e.currentTarget.style.display = 'none'}
+                                />
                               </div>
                             )}
                             
