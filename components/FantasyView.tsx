@@ -503,7 +503,7 @@ const RankingRow: React.FC<RankingRowProps> = ({ user, rank, score, isMe, isView
     </div>
 );
 
-export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: boolean }> = ({ currentUserId, isAdmin }) => {
+export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: boolean; selectedSplit: string }> = ({ currentUserId, isAdmin, selectedSplit }) => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Record<string, Team>>({});
   const [allMatches, setAllMatches] = useState<Match[]>([]);
@@ -539,7 +539,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
 
   useEffect(() => {
     loadData();
-  }, [currentUserId]);
+  }, [currentUserId, selectedSplit]);
 
   useEffect(() => {
       if (currentUserId && !viewingUserId) {
@@ -609,7 +609,9 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
   }, [allMatches, viewRoundId]);
 
   const loadFantasyTeam = async (round: number, userId: string) => {
-      const savedData = await dataService.getFantasyTeam(userId, round);
+      console.log("Loading fantasy team for:", userId, round, selectedSplit);
+      const savedData = await dataService.getFantasyTeam(userId, round, selectedSplit);
+      console.log("Saved data:", savedData);
       if (savedData) {
           setMyTeam(savedData.team);
           setOriginalTeam(savedData.team); // Save snapshot for price restoration logic
@@ -627,8 +629,8 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
         const [fetchedPlayers, fetchedTeams, fetchedMatches, config, fetchedUsers] = await Promise.all([
             dataService.getPlayers(),
             dataService.getTeams(),
-            dataService.getMatches(),
-            dataService.getDaysConfig(),
+            dataService.getMatches(undefined, selectedSplit),
+            dataService.getDaysConfig(selectedSplit),
             dataService.getAllUsers()
         ]);
         
@@ -656,7 +658,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
   const loadHistory = async (userId: string) => {
       const history = [];
       for (let i = 1; i <= 7; i++) {
-          const rData = await dataService.getFantasyTeam(userId, i);
+          const rData = await dataService.getFantasyTeam(userId, i, selectedSplit);
           if (rData) history.push({ round: i, score: rData.score || 0, team: rData.team });
           else history.push({ round: i, score: 0, team: null });
       }
@@ -768,7 +770,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
     });
 
     try {
-        await dataService.saveFantasyTeam(currentUserId, teamToSave, myCaptain, activeConfigRound);
+        await dataService.saveFantasyTeam(currentUserId, teamToSave, myCaptain, activeConfigRound, selectedSplit);
         
         setMyTeam(teamToSave);
         setOriginalTeam(teamToSave);
@@ -776,7 +778,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
         setSaveStatus('success');
         setTimeout(() => setSaveStatus('idle'), 3000);
         
-        const rData = await dataService.getFantasyTeam(currentUserId, activeConfigRound);
+        const rData = await dataService.getFantasyTeam(currentUserId, activeConfigRound, selectedSplit);
         setHistoryScores(prev => prev.map(h => h.round === activeConfigRound ? { ...h, score: rData?.score || 0, team: rData?.team } : h));
 
     } catch (e) {
@@ -790,7 +792,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
       if (!isAdmin) return;
       const newStatus = !roundLocked;
       setRoundLocked(newStatus);
-      await dataService.updateGlobalConfig({ fantasyLocked: newStatus });
+      await dataService.updateGlobalConfig({ fantasyLocked: newStatus }, selectedSplit);
   };
 
   const handleForceRecalculate = async () => {
@@ -799,7 +801,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
       
       setIsAdminSaving(true);
       try {
-          await dataService.forceRecalculateAll();
+          await dataService.forceRecalculateAll(selectedSplit);
           alert("Puntos recalculados correctamente.");
           await loadData();
       } catch(e) {
@@ -821,7 +823,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
 
       setIsAdminSaving(true);
       try {
-        await dataService.processRoundTransition(newRound);
+        await dataService.processRoundTransition(newRound, selectedSplit);
         setActiveConfigRound(newRound);
         setViewRoundId(newRound);
         setRoundLocked(false);

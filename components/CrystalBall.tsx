@@ -201,6 +201,7 @@ const ScoredSelect = ({ label, options, categoryKey, selections, onChange, place
 };
 
 export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin }) => {
+  const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [officialResults, setOfficialResults] = useState<Record<string, string> | null>(null);
   const [championOptions, setChampionOptions] = useState<Option[]>([]);
@@ -282,13 +283,13 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
   useEffect(() => {
     const loadSelections = async () => {
         try {
-            const adminRes = await dataService.getAdminCrystalBallResults();
+            const adminRes = await dataService.getAdminCrystalBallResults(selectedSplit);
             setOfficialResults(adminRes);
 
             if (isAdmin && mode === 'official_result') {
                  setSelections(adminRes || {});
             } else if (viewingUserId) {
-                 const userRes = await dataService.getCrystalBall(viewingUserId);
+                 const userRes = await dataService.getCrystalBall(viewingUserId, selectedSplit);
                  setSelections(userRes || {});
             }
         } catch (e) {
@@ -331,10 +332,10 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
       setSaveStatus('idle');
       try {
           if (isAdmin && mode === 'official_result') {
-              await dataService.saveAdminCrystalBallResults(selections);
+              await dataService.saveAdminCrystalBallResults(selections, selectedSplit);
               setOfficialResults(selections); // Update local feedback immediately
           } else if (currentUserId) {
-              await dataService.saveCrystalBall(currentUserId, selections);
+              await dataService.saveCrystalBall(currentUserId, selections, selectedSplit);
           }
           setSaveStatus('success');
           setTimeout(() => setSaveStatus('idle'), 3000);
@@ -366,7 +367,9 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
     };
   };
 
-  const teamOptions: Option[] = teams.map(t => ({
+  const teamOptions: Option[] = teams
+    .filter(t => t.id !== 'tbd' && t.name !== 'TBD')
+    .map(t => ({
     id: t.id,
     label: t.name,
     subLabel: t.region,
@@ -442,7 +445,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
                 <h2 className={`text-3xl font-bold uppercase tracking-wider mb-1 text-transparent bg-clip-text ${mode === 'official_result' ? 'bg-gradient-to-r from-red-400 to-red-600' : 'bg-gradient-to-r from-purple-300 to-purple-600'}`}>
-                    {mode === 'official_result' ? 'ADMIN: RESULTADOS' : 'Bola de Cristal'}
+                    {mode === 'official_result' ? 'ADMIN: RESULTADOS' : `Bola de Cristal ${selectedSplit === 'spring_2026' ? 'Spring 2026' : 'Winter 2026'}`}
                 </h2>
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-purple-400" />

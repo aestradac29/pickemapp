@@ -76,7 +76,8 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect }) => {
           
           const visual = VISUAL_METADATA[styleKey];
           const Icon = visual.icon;
-          const isLocked = split.status !== 'active';
+          // Allow access to active AND completed splits
+          const isLocked = split.status === 'upcoming' || split.status === 'locked';
           
           return (
             <button
@@ -123,7 +124,12 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect }) => {
 
                 <span className={`
                   text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border mb-8
-                  ${split.status === 'active' ? 'bg-green-500/20 border-green-500 text-green-300' : 'bg-gray-800/50 border-gray-600 text-gray-400'}
+                  ${split.status === 'active' 
+                    ? 'bg-green-500/20 border-green-500 text-green-300' 
+                    : (split.status === 'completed' 
+                        ? 'bg-blue-500/20 border-blue-500 text-blue-300' 
+                        : 'bg-gray-800/50 border-gray-600 text-gray-400')
+                  }
                 `}>
                   {split.status === 'active' ? 'En Curso' : (split.status === 'completed' ? 'Finalizado' : 'Próximamente')}
                 </span>

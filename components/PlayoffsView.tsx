@@ -52,6 +52,14 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
   // Viewing State
   const [viewingUserId, setViewingUserId] = useState<string | null>(currentUserId);
+  
+  // Sync viewingUserId when currentUserId loads
+  useEffect(() => {
+      if (currentUserId) {
+          setViewingUserId(currentUserId);
+      }
+  }, [currentUserId]);
+
   const [predictions, setPredictions] = useState<UserPrediction[]>(initialPredictions);
   const [isLoadingPicks, setIsLoadingPicks] = useState(false);
 
@@ -309,7 +317,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       try {
           if (matchId.startsWith('temp-')) {
              await dataService.createMatch({
-                split_id: 'winter_2026',
+                split_id: dataService._getCurrentSplitId(),
                 team_a_id: updates.teamA,
                 team_b_id: updates.teamB,
                 start_time: updates.startTime,

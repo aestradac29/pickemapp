@@ -47,6 +47,7 @@ export interface UserCard {
   userId: string;
   cardId: string;
   quantity: number;
+  splitId?: string;
 }
 
 export interface TradeOffer {
@@ -139,6 +140,7 @@ export interface MatchGame {
 
 export interface Match {
   id: string;
+  splitId?: string; // New: To separate Winter/Spring/Summer
   teamA: Team;
   teamB: Team;
   startTime: string; // ISO String

@@ -28,7 +28,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
   const [teamsMap, setTeamsMap] = useState<Record<string, any>>({});
   const [playersMap, setPlayersMap] = useState<Record<string, any>>({});
   const [splits, setSplits] = useState<{id: string, name: string, status: string}[]>([]);
-  const [selectedSplit, setSelectedSplit] = useState<string>('winter_2026');
+  const [selectedSplit, setSelectedSplit] = useState<string>(dataService._getCurrentSplitId());
   const [allPossibleCards, setAllPossibleCards] = useState<Card[]>([]);
   const [tempAdminCards, setTempAdminCards] = useState<Card[]>([]);
   const [nextPackTime, setNextPackTime] = useState<Date | null>(null);
@@ -46,17 +46,22 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
         const availableSplits = await dataService.getSplits();
         setSplits(availableSplits);
         
-        // Fetch all base cards for the current split
-        const allCards = await dataService.getCardsForSplit(selectedSplit);
-        setCards(allCards);
+        // Fetch all base cards for all splits
+        const allCardsPromises = availableSplits.map(s => dataService.getCardsForSplit(s.id));
+        const allCards = await Promise.all(allCardsPromises);
+        setCards(allCards.flat());
 
         // Fetch user's collection
         const collection = await dataService.getUserCollection(currentUserId, selectedSplit);
-        setUserCards(collection);
+        setUserCards(collection.map(item => ({ ...item, splitId: selectedSplit })));
 
-        // Fetch user's inventory
-        const inv = await dataService.getUserInventory(currentUserId, selectedSplit);
-        setInventory(inv);
+        // Fetch user's inventory for all splits
+        const invPromises = availableSplits.map(async s => {
+            const inv = await dataService.getUserInventory(currentUserId, s.id);
+            return inv.map(item => ({ ...item, splitId: s.id }));
+        });
+        const allInventories = await Promise.all(invPromises);
+        setInventory(allInventories.flat());
 
         // Fetch pack state
         const packState = await dataService.getUserPackState(currentUserId, selectedSplit);
@@ -77,10 +82,10 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
         }
 
         // Fetch reference data
-        const teams = await dataService.getTeams();
+        const teams = await dataService.getTeams(true);
         setTeamsMap(teams);
         
-        const players = await dataService.getPlayers();
+        const players = await dataService.getPlayers(true);
         const pMap: Record<string, any> = {};
         players.forEach(p => pMap[p.id] = p);
         setPlayersMap(pMap);
@@ -146,23 +151,25 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
   const [openedCards, setOpenedCards] = useState<Card[] | null>(null);
   const [packError, setPackError] = useState<string | null>(null);
   const [isOpening, setIsOpening] = useState(false);
+  const [isSelectingSplit, setIsSelectingSplit] = useState(false);
 
-  const handleOpenPack = async () => {
+  const handleOpenPack = () => {
+    setIsSelectingSplit(true);
+  };
+
+  const confirmOpenPack = async (splitId: string) => {
     if (!currentUserId) return;
     setIsOpening(true);
+    setIsSelectingSplit(false);
     setPackError(null);
     try {
-      const newCards = await dataService.openDailyPack(currentUserId, selectedSplit);
+      const newCards = await dataService.openDailyPack(currentUserId, splitId);
       setOpenedCards(newCards);
       setRevealedCards(new Array(newCards.length).fill(false));
       setShowPackAnimation(true);
       
-      // Update next pack time (visual only, since we allowed infinite)
-      const now = new Date();
-      // setNextPackTime(new Date(now.getTime() + 24 * 60 * 60 * 1000));
-      
       // Refresh inventory
-      const inv = await dataService.getUserInventory(currentUserId, selectedSplit);
+      const inv = await dataService.getUserInventory(currentUserId, splitId);
       setInventory(inv);
     } catch (error: any) {
       setPackError(error.message || "Error al abrir el sobre");
@@ -179,9 +186,20 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
     });
   };
 
+  const handleRevealAll = () => {
+    setRevealedCards(new Array(openedCards?.length || 0).fill(true));
+  };
+
   const handleMoveToCollection = async (inventoryItem: UserCard) => {
     if (!currentUserId) return;
     
+    // Check if split matches
+    const card = getCardFromInventoryItem(inventoryItem);
+    if (card && card.splitId !== selectedSplit) {
+      alert("No puedes pegar un cromo de un split diferente en este álbum.");
+      return;
+    }
+
     // Check if already owned to prevent duplicates as requested
     const isAlreadyOwned = userCards.some(uc => uc.cardId === inventoryItem.cardId);
     if (isAlreadyOwned) {
@@ -258,6 +276,10 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
     }
   };
 
+  const getCardFromInventoryItem = (item: UserCard) => {
+    return cards.find(c => c.id === item.cardId && (!item.splitId || c.splitId === item.splitId));
+  };
+
   const loadMarketData = async () => {
     setIsLoading(true);
     try {
@@ -282,6 +304,10 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    localStorage.setItem('selectedSplit', selectedSplit);
+  }, [selectedSplit]);
 
   useEffect(() => {
     if (activeTab === 'MARKET') {
@@ -355,14 +381,23 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
 
   const [inventorySort, setInventorySort] = useState<'NAME' | 'TEAM' | 'TYPE'>('NAME');
   const [inventoryFilterTeam, setInventoryFilterTeam] = useState<string>('ALL');
+  const [inventoryFilterSplit, setInventoryFilterSplit] = useState<string>('ALL');
 
   const filteredInventory = useMemo(() => {
     let result = [...inventory];
 
+    // Filter by split
+    if (inventoryFilterSplit !== 'ALL') {
+      result = result.filter(item => {
+        const card = getCardFromInventoryItem(item);
+        return card && card.splitId === inventoryFilterSplit;
+      });
+    }
+
     // Filter by team
     if (inventoryFilterTeam !== 'ALL') {
       result = result.filter(item => {
-        const card = cards.find(c => c.id === item.cardId);
+        const card = getCardFromInventoryItem(item);
         if (!card) return false;
         if (card.type === CardType.TEAM) return card.referenceId === inventoryFilterTeam;
         if (card.type === CardType.PLAYER) return playersMap[card.referenceId]?.teamId === inventoryFilterTeam;
@@ -372,8 +407,8 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
 
     // Sort
     result.sort((a, b) => {
-      const cardA = cards.find(c => c.id === a.cardId);
-      const cardB = cards.find(c => c.id === b.cardId);
+      const cardA = getCardFromInventoryItem(a);
+      const cardB = getCardFromInventoryItem(b);
       if (!cardA || !cardB) return 0;
 
       const detailsA = getCardDetails(cardA);
@@ -395,17 +430,22 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
   const uniqueCards = useMemo(() => {
     const map = new Map<string, Card>();
     cards.forEach(c => {
+      if (c.splitId !== selectedSplit) return;
+      // Filter out cards if their reference entity is missing (e.g. filtered out by split logic)
+      if (c.type === CardType.TEAM && !teamsMap[c.referenceId]) return;
+      if (c.type === CardType.PLAYER && !playersMap[c.referenceId]) return;
+
       if (!map.has(c.referenceId)) {
         map.set(c.referenceId, c);
       }
     });
     return Array.from(map.values());
-  }, [cards]);
+  }, [cards, selectedSplit, teamsMap, playersMap]);
 
   const uniqueCollectedCount = useMemo(() => {
     const collectedRefIds = new Set<string>();
     userCards.forEach(uc => {
-      const card = cards.find(c => c.id === uc.cardId);
+      const card = getCardFromInventoryItem(uc);
       if (card && uc.quantity > 0) {
         collectedRefIds.add(card.referenceId);
       }
@@ -526,7 +566,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
           <button 
             onClick={handleOpenPack}
             disabled={!!nextPackTime || isOpening}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold uppercase tracking-wider shadow-lg transition-all ${
+            className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold uppercase tracking-wider shadow-lg transition-all ${
               nextPackTime 
                 ? 'bg-gray-800 text-gray-400 cursor-not-allowed border border-gray-700' 
                 : 'bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white shadow-pink-500/20 hover:scale-105'
@@ -540,10 +580,37 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
             ) : (
               <>
                 <PackageOpen className="w-5 h-5" />
-                <span>Abrir Sobre</span>
+                <span>{isOpening ? 'Abriendo...' : 'Abrir Sobre'}</span>
               </>
             )}
           </button>
+
+          {isSelectingSplit && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-gray-900 border border-gray-800 rounded-3xl p-8 w-full max-w-sm shadow-2xl">
+                <h3 className="text-2xl font-bold text-white mb-6 text-center">Seleccionar Split</h3>
+                <div className="flex flex-col gap-3 mb-8">
+                  {splits
+                    .filter(s => s.name !== 'Summer 2026')
+                    .map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => confirmOpenPack(s.id)}
+                        className="text-center bg-gray-800 hover:bg-gray-700 text-white px-6 py-4 rounded-2xl border border-gray-700 transition-all hover:scale-[1.02] font-semibold"
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                </div>
+                <button 
+                  onClick={() => setIsSelectingSplit(false)}
+                  className="w-full text-gray-500 hover:text-white py-2 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -664,16 +731,16 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8 relative z-10">
                   {typedTeamCards.map((card, index) => {
                     const ownedCardsForRef = userCards.filter(uc => {
-                      const c = cards.find(c => c.id === uc.cardId);
+                      const c = getCardFromInventoryItem(uc);
                       return c && c.referenceId === card.referenceId && uc.quantity > 0;
                     });
                     const isOwned = ownedCardsForRef.length > 0;
                     
-                    const displayCard = isOwned ? (cards.find(c => c.id === ownedCardsForRef[0].cardId) || card) : card;
+                    const displayCard = isOwned ? (getCardFromInventoryItem(ownedCardsForRef[0]) || card) : card;
                     
                     const inventoryItemsForRef = inventory.filter(inv => {
-                      const c = cards.find(c => c.id === inv.cardId);
-                      return c && c.referenceId === card.referenceId;
+                      const c = getCardFromInventoryItem(inv);
+                      return c && c.referenceId === card.referenceId && inv.splitId === selectedSplit;
                     });
                     const canPaste = !isOwned && inventoryItemsForRef.length > 0;
                     const inventoryItemToPaste = canPaste ? inventoryItemsForRef[0] : null;
@@ -789,6 +856,20 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-gray-500" />
                   <select 
+                    value={inventoryFilterSplit} 
+                    onChange={(e) => setInventoryFilterSplit(e.target.value)}
+                    className="bg-[#0a1428] border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-200 outline-none focus:border-[#c8aa6e]"
+                  >
+                    <option value="ALL">Todos los Splits</option>
+                    {splits.map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-gray-500" />
+                  <select 
                     value={inventoryFilterTeam} 
                     onChange={(e) => setInventoryFilterTeam(e.target.value)}
                     className="bg-[#0a1428] border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-200 outline-none focus:border-[#c8aa6e]"
@@ -826,7 +907,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
                 {filteredInventory.map((item) => {
-                  const card = cards.find(c => c.id === item.cardId);
+                  const card = getCardFromInventoryItem(item);
                   if (!card) return null;
                   const details = getCardDetails(card);
 
@@ -837,17 +918,33 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                         style={{ backgroundColor: details.color }}
                       >
                         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />
+                        
+                        {/* Split Badge */}
+                        <div className="absolute top-2 left-2 z-30 bg-black/50 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full border border-white/10 uppercase tracking-wider">
+                          {splits.find(s => s.id === card.splitId)?.name.split(' ')[0]}
+                        </div>
+
                         <img 
                           src={details.image} 
                           alt={details.name}
                           className={`absolute inset-0 w-full h-full opacity-90 ${card.type === CardType.TEAM ? 'object-contain p-6' : 'object-cover object-top mix-blend-luminosity'}`}
                           referrerPolicy="no-referrer"
                         />
+                        
+                        {/* Team Logo */}
+                        {card.type === CardType.PLAYER && details.teamLogo && (
+                          <div className="absolute top-2 right-2 w-8 h-8 bg-black/40 backdrop-blur-sm rounded-full p-1.5 flex items-center justify-center border border-white/10 z-20">
+                            <img src={details.teamLogo} alt="Team" className="w-full h-full object-contain drop-shadow-md" referrerPolicy="no-referrer" />
+                          </div>
+                        )}
+
                         <div className="absolute inset-0 z-20 flex flex-col justify-end p-3 text-center">
                           <h3 className="font-bold text-white text-xs leading-tight drop-shadow-md uppercase tracking-wider">{details.name}</h3>
+                          <p className="text-[10px] text-gray-300 font-medium uppercase tracking-widest mt-1">{details.subtitle}</p>
                         </div>
+                        
                         {item.quantity > 1 && (
-                          <div className="absolute top-2 right-2 z-30 bg-[#c8aa6e] text-[#091428] text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg border border-black/20">
+                          <div className="absolute bottom-12 right-2 z-30 bg-[#c8aa6e] text-[#091428] text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg border border-black/20">
                             x{item.quantity}
                           </div>
                         )}
@@ -879,10 +976,10 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {marketListings.map((listing, idx) => {
-                  const card = cards.find(c => c.id === listing.cardId);
+                  const card = cards.find(c => c.id === listing.cardId && c.splitId === selectedSplit);
                   if (!card) return null;
                   const details = getCardDetails(card);
-                  const globalIndex = cards.findIndex(c => c.id === card.id);
+                  const globalIndex = uniqueCards.findIndex(c => c.id === card.id);
 
                   return (
                     <div key={`${listing.userId}-${listing.cardId}-${idx}`} className="bg-[#0a1428] border border-gray-800 rounded-xl p-4 flex items-center gap-4">
@@ -927,8 +1024,8 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
               <div className="space-y-4">
                 {tradeOffers.map(offer => {
                   const isIncoming = offer.receiverId === currentUserId;
-                  const offeredCard = cards.find(c => c.id === offer.offeredCardId);
-                  const requestedCard = cards.find(c => c.id === offer.requestedCardId);
+                  const offeredCard = cards.find(c => c.id === offer.offeredCardId && c.splitId === selectedSplit);
+                  const requestedCard = cards.find(c => c.id === offer.requestedCardId && c.splitId === selectedSplit);
                   
                   if (!offeredCard || !requestedCard) return null;
 
@@ -1081,6 +1178,15 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
           <div className="w-full max-w-6xl p-8 flex flex-col items-center">
             <h2 className="text-3xl font-bold text-[#c8aa6e] mb-12 uppercase tracking-[0.2em] animate-pulse">¡Sobre Abierto!</h2>
             
+            {!revealedCards.every(r => r) && (
+              <button
+                onClick={handleRevealAll}
+                className="mb-8 bg-gray-800 hover:bg-gray-700 text-white font-bold px-6 py-2 rounded-lg uppercase tracking-wider transition-all"
+              >
+                Revelar Todos
+              </button>
+            )}
+
             <div className="flex flex-wrap justify-center gap-8 mb-12 perspective-1000">
               {openedCards.map((card, index) => {
                 const isRevealed = revealedCards[index];
@@ -1169,11 +1275,11 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
               <p className="text-sm text-gray-400 mb-2">Selecciona una de tus cartas del inventario para ofrecer:</p>
               <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
                 {inventory.map(invItem => {
-                  const card = cards.find(c => c.id === invItem.cardId);
+                  const card = getCardFromInventoryItem(invItem);
                   if (!card) return null;
                   const details = getCardDetails(card);
                   const isSelected = selectedOfferCard === card.id;
-                  const globalIndex = cards.findIndex(c => c.id === card.id);
+                  const globalIndex = uniqueCards.findIndex(c => c.id === card.id);
 
                   return (
                     <div 
@@ -1268,7 +1374,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                 <div className="flex flex-wrap justify-center gap-6">
                   {openedCards.map((card, idx) => {
                     const details = getCardDetails(card);
-                    const globalIndex = cards.findIndex(c => c.id === card.id);
+                    const globalIndex = uniqueCards.findIndex(c => c.id === card.id);
                     return (
                       <div 
                         key={`${card.id}-${idx}`}

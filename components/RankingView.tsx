@@ -10,6 +10,7 @@ interface RankingViewProps {
 }
 
 export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin }) => {
+  const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
   const [rankedTeams, setRankedTeams] = useState<Team[]>([]);
   const [officialRanking, setOfficialRanking] = useState<string[]>([]); // Estado para guardar el ranking oficial
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -82,7 +83,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
         // 1. Cargar equipos y Ranking Oficial SIEMPRE para comparar
         const [teamsMap, adminRankingIds] = await Promise.all([
             dataService.getTeams(),
-            dataService.getAdminRanking()
+            dataService.getAdminRanking(selectedSplit)
         ]);
         
         const teamsList = Object.values(teamsMap).filter(t => t.id !== 'tbd');
@@ -95,7 +96,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
             orderedIds = adminRankingIds;
         } else if (viewingUserId) {
             // Cargar ranking del usuario que estamos VIENDO (viewingUserId)
-            orderedIds = await dataService.getUserRanking(viewingUserId);
+            orderedIds = await dataService.getUserRanking(viewingUserId, selectedSplit);
         }
 
         // Apply order if exists
@@ -168,11 +169,11 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
 
       try {
           if (isAdmin && mode === 'official_result') {
-              await dataService.saveAdminRanking(teamIds);
+              await dataService.saveAdminRanking(teamIds, selectedSplit);
               // Actualizamos el estado local también para reflejar cambios inmediatos en la UI si cambiamos de modo
               setOfficialRanking(teamIds); 
           } else if (currentUserId) {
-              await dataService.saveUserRanking(currentUserId, teamIds);
+              await dataService.saveUserRanking(currentUserId, teamIds, selectedSplit);
           }
           setSaveStatus('success');
           setTimeout(() => setSaveStatus('idle'), 3000);
@@ -221,7 +222,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <h2 className={`text-2xl font-bold uppercase ${mode === 'official_result' ? 'text-red-500' : 'text-[#c8aa6e]'}`}>
-                {mode === 'official_result' ? 'ADMIN: RESULTADO REAL' : 'Clasificación Winter 2026'}
+                {mode === 'official_result' ? 'ADMIN: RESULTADO REAL' : `Clasificación ${selectedSplit === 'spring_2026' ? 'Spring 2026' : 'Winter 2026'}`}
             </h2>
             <p className="text-gray-400 text-sm">
                 {mode === 'official_result' 

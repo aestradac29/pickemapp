@@ -236,7 +236,7 @@ const App: React.FC = () => {
       case ViewState.CRYSTAL_BALL:
         return <CrystalBall currentUserId={currentUserId} isAdmin={isAdmin} />;
       case ViewState.FANTASY:
-        return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} />;
+        return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit || 'winter_2026'} />;
       case ViewState.OFFICIAL_STANDINGS:
         return <OfficialStandings />;
       case ViewState.PROFILE:

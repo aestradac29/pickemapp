@@ -13,6 +13,7 @@ interface ScoredPlayer extends Player {
 export const HallOfFame: React.FC = () => {
     const [viewMode, setViewMode] = useState<'GROUPS' | 'PLAYOFFS'>('GROUPS');
     const [currentDay, setCurrentDay] = useState(1);
+    const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
     
     const [matches, setMatches] = useState<Match[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -25,10 +26,10 @@ export const HallOfFame: React.FC = () => {
             setLoading(true);
             try {
                 const [m, p, t, conf] = await Promise.all([
-                    dataService.getMatches(),
+                    dataService.getMatches(undefined, selectedSplit),
                     dataService.getPlayers(),
                     dataService.getTeams(),
-                    dataService.getDaysConfig()
+                    dataService.getDaysConfig(selectedSplit)
                 ]);
                 
                 setMatches(m);

@@ -217,15 +217,6 @@ export const TEAMS: Record<string, Team> = {
     color: '#a855f7', // Purple
     logo: getLogo('Shifterslogo_square.png') // Wiki file guess
   },
-  // Ensure BDS is handled for legacy support if needed in lookups
-  bds: {
-    id: 'shf', 
-    name: 'Shifters', 
-    shortName: 'SHF', 
-    region: Region.LEC, 
-    color: '#a855f7', // Purple
-    logo: getLogo('Shifterslogo_square.png')
-  },
   th: { 
     id: 'th', 
     name: 'Team Heretics', 
