@@ -45,6 +45,17 @@ const App: React.FC = () => {
   // Recovery State
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
 
+  // Sync selectedSplit with localStorage changes
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'selectedSplit') {
+        setSelectedSplit(e.newValue);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallGuide, setShowInstallGuide] = useState(false);
@@ -155,11 +166,7 @@ const App: React.FC = () => {
 
       // Smart Redirect
       if (view === ViewState.LOGIN) {
-          if (selectedSplit) {
-              setView(ViewState.DASHBOARD);
-          } else {
-              setView(ViewState.SPLIT_SELECTION);
-          }
+          setView(ViewState.SPLIT_SELECTION);
       }
   };
 
@@ -185,11 +192,7 @@ const App: React.FC = () => {
     
     // Forzar navegación si seguimos en Login
     if (view === ViewState.LOGIN) {
-        if (selectedSplit) {
-            setView(ViewState.DASHBOARD);
-        } else {
-            setView(ViewState.SPLIT_SELECTION);
-        }
+        setView(ViewState.SPLIT_SELECTION);
     }
   };
 
@@ -228,7 +231,7 @@ const App: React.FC = () => {
       case ViewState.LOGIN:
         return <Login onLogin={handleLogin} />;
       case ViewState.SPLIT_SELECTION:
-        return <SplitSelection onSelect={handleSplitSelect} />;
+        return <SplitSelection onSelect={handleSplitSelect} onSelectAlbum={() => setView(ViewState.ALBUM)} isAdmin={isAdmin} />;
       case ViewState.DASHBOARD:
         return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
       case ViewState.RANKING:
@@ -316,7 +319,7 @@ const App: React.FC = () => {
                     <h1 className="font-bold text-lg tracking-wide text-hextech-400 leading-none">
                         PICK'EM <span className="text-hextech-500">PRO</span>
                     </h1>
-                    {selectedSplit && (
+                    {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
                         <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest group-hover:text-hextech-400 transition-colors">
                             {selectedSplit}
                         </span>
@@ -328,7 +331,13 @@ const App: React.FC = () => {
               <div className="hidden md:flex items-center gap-4">
                 {view !== ViewState.DASHBOARD && view !== ViewState.SPLIT_SELECTION && (
                     <button 
-                        onClick={() => setView(ViewState.DASHBOARD)}
+                        onClick={() => {
+                            if (view === ViewState.ALBUM) {
+                                setView(ViewState.SPLIT_SELECTION);
+                            } else {
+                                setView(selectedSplit ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION);
+                            }
+                        }}
                         className="text-gray-400 hover:text-[#c8aa6e] flex items-center gap-1 text-sm font-medium transition-colors"
                     >
                         <ChevronLeft className="w-4 h-4" /> Volver al Inicio
@@ -431,13 +440,15 @@ const App: React.FC = () => {
                             {isAdmin && <span className="text-[10px] bg-red-900/50 text-red-300 px-1.5 rounded border border-red-500/50 uppercase">Admin</span>}
                         </div>
                     </button>
-                    {selectedSplit && (
+                    {selectedSplit ? (
                         <>
-                            <button onClick={() => { setView(ViewState.DASHBOARD); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium">Inicio</button>
+                            <button onClick={() => { setView(view === ViewState.ALBUM ? ViewState.SPLIT_SELECTION : ViewState.DASHBOARD); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium">Inicio</button>
                             <button onClick={() => { setView(ViewState.SPLIT_SELECTION); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium flex items-center gap-2">
                                 <ArrowRightLeft className="w-4 h-4" /> Cambiar Split
                             </button>
                         </>
+                    ) : (
+                        <button onClick={() => { setView(ViewState.SPLIT_SELECTION); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium">Inicio</button>
                     )}
                     <button onClick={handleLogout} className="block w-full text-left py-3 px-3 text-red-400 hover:bg-red-900/20 rounded font-medium flex items-center gap-2 mt-2 border-t border-gray-800">
                         <LogOut className="w-4 h-4" /> Cerrar Sesión

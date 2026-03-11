@@ -28,7 +28,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
   const [teamsMap, setTeamsMap] = useState<Record<string, any>>({});
   const [playersMap, setPlayersMap] = useState<Record<string, any>>({});
   const [splits, setSplits] = useState<{id: string, name: string, status: string}[]>([]);
-  const [selectedSplit, setSelectedSplit] = useState<string>(dataService._getCurrentSplitId());
+  const [selectedSplit, setSelectedSplit] = useState<string>('winter_2026');
   const [allPossibleCards, setAllPossibleCards] = useState<Card[]>([]);
   const [tempAdminCards, setTempAdminCards] = useState<Card[]>([]);
   const [nextPackTime, setNextPackTime] = useState<Date | null>(null);
@@ -49,7 +49,10 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
         // Fetch all base cards for all splits
         const allCardsPromises = availableSplits.map(s => dataService.getCardsForSplit(s.id));
         const allCards = await Promise.all(allCardsPromises);
-        setCards(allCards.flat());
+        const flatCards = allCards.flat();
+        console.log("Loaded cards:", flatCards.length);
+        console.log("Card IDs:", flatCards.map(c => c.id).slice(0, 10));
+        setCards(flatCards);
 
         // Fetch user's collection
         const collection = await dataService.getUserCollection(currentUserId, selectedSplit);
@@ -61,6 +64,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
             return inv.map(item => ({ ...item, splitId: s.id }));
         });
         const allInventories = await Promise.all(invPromises);
+        console.log("Loaded inventory:", allInventories.flat().length);
         setInventory(allInventories.flat());
 
         // Fetch pack state
@@ -95,7 +99,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
           Object.values(teams).forEach((t: any) => {
             if (t.id === 'tbd') return; // Skip TBD team
             possible.push({
-              id: `team_${t.id}`,
+              id: `card_team_${t.id}`,
               splitId: selectedSplit,
               type: CardType.TEAM,
               referenceId: t.id
@@ -103,14 +107,14 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
           });
           players.forEach((p: any) => {
             possible.push({
-              id: `player_${p.id}`,
+              id: `card_player_${p.id}`,
               splitId: selectedSplit,
               type: CardType.PLAYER,
               referenceId: p.id
             });
           });
           setAllPossibleCards(possible);
-          setTempAdminCards(allCards);
+          setTempAdminCards(allCards.flat().filter(c => c.splitId === selectedSplit));
         }
 
       } catch (error) {
@@ -169,8 +173,12 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
       setShowPackAnimation(true);
       
       // Refresh inventory
-      const inv = await dataService.getUserInventory(currentUserId, splitId);
-      setInventory(inv);
+      const invPromises = splits.map(async s => {
+          const inv = await dataService.getUserInventory(currentUserId, s.id);
+          return inv.map(item => ({ ...item, splitId: s.id }));
+      });
+      const allInventories = await Promise.all(invPromises);
+      setInventory(allInventories.flat());
     } catch (error: any) {
       setPackError(error.message || "Error al abrir el sobre");
     } finally {
@@ -195,13 +203,15 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
     
     // Check if split matches
     const card = getCardFromInventoryItem(inventoryItem);
-    if (card && card.splitId !== selectedSplit) {
+    const itemSplitId = inventoryItem.splitId || card?.splitId;
+    
+    if (itemSplitId && itemSplitId !== selectedSplit) {
       alert("No puedes pegar un cromo de un split diferente en este álbum.");
       return;
     }
 
     // Check if already owned to prevent duplicates as requested
-    const isAlreadyOwned = userCards.some(uc => uc.cardId === inventoryItem.cardId);
+    const isAlreadyOwned = userCards.some(uc => uc.cardId === inventoryItem.cardId && uc.splitId === selectedSplit);
     if (isAlreadyOwned) {
       alert("Ya tienes este cromo en tu álbum.");
       return;
@@ -277,7 +287,8 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
   };
 
   const getCardFromInventoryItem = (item: UserCard) => {
-    return cards.find(c => c.id === item.cardId && (!item.splitId || c.splitId === item.splitId));
+    const card = cards.find(c => c.id === item.cardId);
+    return card;
   };
 
   const loadMarketData = async () => {
@@ -369,7 +380,10 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
     setIsSavingAdmin(true);
     try {
       await dataService.saveCardsForSplit(selectedSplit, tempAdminCards);
-      setCards(tempAdminCards);
+      setCards(prev => {
+        const otherCards = prev.filter(c => c.splitId !== selectedSplit);
+        return [...otherCards, ...tempAdminCards];
+      });
       alert("Cartas guardadas correctamente para el split.");
     } catch (e) {
       console.error(e);
@@ -390,7 +404,15 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
     if (inventoryFilterSplit !== 'ALL') {
       result = result.filter(item => {
         const card = getCardFromInventoryItem(item);
-        return card && card.splitId === inventoryFilterSplit;
+        if (!card) {
+          console.log("Card not found for item:", item.cardId);
+          return false;
+        }
+        const match = item.splitId === inventoryFilterSplit;
+        if (!match) {
+          console.log("Card split mismatch:", card.splitId, inventoryFilterSplit);
+        }
+        return match;
       });
     }
 
@@ -424,8 +446,9 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
       return 0;
     });
 
+    console.log("Filtered inventory:", result.length, "items for split:", inventoryFilterSplit);
     return result;
-  }, [inventory, inventorySort, inventoryFilterTeam, cards, playersMap]);
+  }, [inventory, inventorySort, inventoryFilterTeam, inventoryFilterSplit, cards, playersMap]);
 
   const uniqueCards = useMemo(() => {
     const map = new Map<string, Card>();
@@ -921,7 +944,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                         
                         {/* Split Badge */}
                         <div className="absolute top-2 left-2 z-30 bg-black/50 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full border border-white/10 uppercase tracking-wider">
-                          {splits.find(s => s.id === card.splitId)?.name.split(' ')[0]}
+                          {splits.find(s => s.id === item.splitId)?.name.split(' ')[0]}
                         </div>
 
                         <img 
@@ -1101,9 +1124,21 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div>
                 <h3 className="text-xl font-bold text-white mb-2">Administración de Cartas</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-gray-400 text-sm">Split:</span>
+                  <select
+                    value={selectedSplit}
+                    onChange={(e) => setSelectedSplit(e.target.value)}
+                    className="bg-[#0a1428] border border-gray-700 rounded-lg px-3 py-1 text-sm text-gray-200 outline-none focus:border-[#c8aa6e]"
+                  >
+                    {splits.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <p className="text-gray-400 text-sm">
-                  Gestiona las cartas disponibles para el split seleccionado ({splits.find(s => s.id === selectedSplit)?.name}).
-                  Seleccionadas: {cards.length} / {allPossibleCards.length}
+                  Gestiona las cartas disponibles para el split seleccionado.
+                  Seleccionadas: {cards.filter(c => c.splitId === selectedSplit).length} / {allPossibleCards.length}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -1274,7 +1309,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
             <div className="mb-6">
               <p className="text-sm text-gray-400 mb-2">Selecciona una de tus cartas del inventario para ofrecer:</p>
               <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
-                {inventory.map(invItem => {
+                {filteredInventory.map(invItem => {
                   const card = getCardFromInventoryItem(invItem);
                   if (!card) return null;
                   const details = getCardDetails(card);
@@ -1299,6 +1334,11 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                       <div className="absolute top-1 left-1 z-30 bg-gray-900/80 text-white text-[10px] px-1.5 rounded">
                         Disp: {invItem.quantity}
                       </div>
+                      {item.splitId === 'spring_2026' && (
+                        <div className="absolute top-6 left-1 z-30 bg-blue-900/80 text-white text-[10px] px-1.5 rounded">
+                          SPRING
+                        </div>
+                      )}
                     </div>
                   );
                 })}

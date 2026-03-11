@@ -330,9 +330,11 @@ export const dataService = {
     },
 
     // --- TEAMS ---
-    async getTeams(ignoreSplit: boolean = false): Promise<Record<string, Team>> {
+    async getTeams(ignoreSplit: boolean = false, splitId?: string): Promise<Record<string, Team>> {
         try {
-            const docRef = doc(db, "admin_data", this._getDocName("teams"));
+            const targetSplitId = splitId || this._getCurrentSplitId();
+            const docName = splitId === 'winter_2026' ? 'teams' : (splitId ? `teams_${splitId}` : this._getDocName("teams"));
+            const docRef = doc(db, "admin_data", docName);
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
@@ -355,8 +357,14 @@ export const dataService = {
                     delete dbTeams['bds'];
                 }
 
+                // If ignoreSplit is true, ensure we have teams from other splits
+                if (ignoreSplit && targetSplitId === 'spring_2026') {
+                    if (!dbTeams['rat'] && TEAMS['rat']) dbTeams['rat'] = TEAMS['rat'];
+                    if (!dbTeams['kcb'] && TEAMS['kcb']) dbTeams['kcb'] = TEAMS['kcb'];
+                }
+
                 // Filter out teams for Spring Split
-                if (!ignoreSplit && this._getCurrentSplitId() === 'spring_2026') {
+                if (!ignoreSplit && targetSplitId === 'spring_2026') {
                     if (dbTeams['rat']) delete dbTeams['rat'];
                     if (dbTeams['kcb']) delete dbTeams['kcb'];
                 }
@@ -371,7 +379,7 @@ export const dataService = {
                 }
                 
                 const result = { ...TEAMS };
-                if (this._getCurrentSplitId() === 'spring_2026') {
+                if (!ignoreSplit && targetSplitId === 'spring_2026') {
                     if (result['rat']) delete result['rat'];
                     if (result['kcb']) delete result['kcb'];
                 }
@@ -380,7 +388,7 @@ export const dataService = {
         } catch (e) {
             console.error("Error getting teams:", e);
             const result = { ...TEAMS };
-            if (this._getCurrentSplitId() === 'spring_2026') {
+            if (!ignoreSplit && (splitId || this._getCurrentSplitId()) === 'spring_2026') {
                 if (result['rat']) delete result['rat'];
                 if (result['kcb']) delete result['kcb'];
             }
@@ -402,19 +410,48 @@ export const dataService = {
     },
 
     // --- PLAYERS & PRICES ---
-    async getPlayers(ignoreSplit: boolean = false): Promise<Player[]> {
+    async getPlayers(ignoreSplit: boolean = false, splitId?: string): Promise<Player[]> {
         try {
-            const playersDocRef = doc(db, "admin_data", this._getDocName("players"));
+            const targetSplitId = splitId || this._getCurrentSplitId();
+            const docName = splitId === 'winter_2026' ? 'players' : (splitId ? `players_${splitId}` : this._getDocName("players"));
+            const playersDocRef = doc(db, "admin_data", docName);
             const playersSnap = await getDoc(playersDocRef);
             let playersList: Player[] = [];
 
             if (playersSnap.exists()) {
                 playersList = playersSnap.data().list as Player[];
+                
+                // If ignoreSplit is true, ensure we have players from other splits (like rat and kcb)
+                if (ignoreSplit && targetSplitId === 'spring_2026') {
+                    try {
+                        const basePlayersDocRef = doc(db, "admin_data", "players");
+                        const basePlayersSnap = await getDoc(basePlayersDocRef);
+                        let basePlayersList = PLAYERS; // Fallback to constants
+                        if (basePlayersSnap.exists()) {
+                            basePlayersList = basePlayersSnap.data().list as Player[];
+                        }
+                        const existingIds = new Set(playersList.map(p => p.id));
+                        for (const bp of basePlayersList) {
+                            if (!existingIds.has(bp.id)) {
+                                playersList.push(bp);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Could not fetch base players for ignoreSplit merge", e);
+                        // Fallback to constants on error
+                        const existingIds = new Set(playersList.map(p => p.id));
+                        for (const bp of PLAYERS) {
+                            if (!existingIds.has(bp.id)) {
+                                playersList.push(bp);
+                            }
+                        }
+                    }
+                }
             }
 
             // If list is empty or seems invalid (e.g. < 10 players), try to re-seed from Winter data
             if (playersList.length < 10) {
-                if (this._getCurrentSplitId() !== 'winter_2026') {
+                if (targetSplitId !== 'winter_2026') {
                     const basePlayersDocRef = doc(db, "admin_data", "players");
                     const basePlayersSnap = await getDoc(basePlayersDocRef);
                     
@@ -422,7 +459,7 @@ export const dataService = {
                         playersList = basePlayersSnap.data().list as Player[];
                         
                         // Filter for Spring
-                        if (!ignoreSplit && this._getCurrentSplitId() === 'spring_2026') {
+                        if (!ignoreSplit && targetSplitId === 'spring_2026') {
                             playersList = playersList.filter(p => p.teamId !== 'rat' && p.teamId !== 'kcb');
                         }
                         
@@ -449,7 +486,7 @@ export const dataService = {
             }
 
             // Ensure filter is applied (redundant if seeded correctly, but safe)
-            if (this._getCurrentSplitId() === 'spring_2026') {
+            if (!ignoreSplit && targetSplitId === 'spring_2026') {
                 playersList = playersList.filter(p => p.teamId !== 'rat' && p.teamId !== 'kcb');
             }
 
@@ -1441,11 +1478,24 @@ export const dataService = {
             const docSnap = await getDoc(docRef);
             
             if (docSnap.exists()) {
-                return docSnap.data().cards || [];
-            } else {
-                // Seed initial cards (60 players + 12 teams)
-                const players = await this.getPlayers();
-                const teams = await this.getTeams();
+                const existingCards = docSnap.data().cards || [];
+                // Re-seed if winter and missing rat/kcb cards (should be 72 cards total)
+                if (splitId === 'winter_2026' && existingCards.length < 70) {
+                    console.log("Re-seeding winter cards to include missing teams...");
+                } 
+                // Re-seed if spring and has rat/kcb cards (should be 60 cards total)
+                else if (splitId === 'spring_2026' && existingCards.length > 65) {
+                    console.log("Re-seeding spring cards to remove extra teams...");
+                }
+                else {
+                    return existingCards;
+                }
+            }
+            
+            // Seed initial cards
+            const isWinter = splitId === 'winter_2026';
+                const players = await this.getPlayers(isWinter, splitId);
+                const teams = await this.getTeams(isWinter, splitId);
                 
                 const cards: Card[] = [];
                 
@@ -1473,7 +1523,6 @@ export const dataService = {
 
                 await setDoc(docRef, { cards: cleanPayload(cards) });
                 return cards;
-            }
         } catch (e) {
             console.error("Error getting cards:", e);
             return [];

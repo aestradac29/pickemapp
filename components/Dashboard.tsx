@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ViewState } from '../types';
-import { Trophy, ListOrdered, Sparkles, CalendarCheck, Swords, UserPlus, Lock, Unlock, Database, Users, Table2, Crown, BookImage } from 'lucide-react';
+import { Trophy, ListOrdered, Sparkles, CalendarCheck, Swords, UserPlus, Lock, Unlock, Database, Users, Table2, Crown } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
 interface DashboardProps {
@@ -138,17 +138,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       border: 'hover:border-yellow-400',
       bg: 'hover:bg-yellow-400/10',
       locked: !isWinterSplit
-    },
-    ...(albumEnabled || isAdmin ? [{
-      id: ViewState.ALBUM,
-      title: 'Álbum',
-      subtitle: 'Colecciona cartas',
-      icon: BookImage,
-      color: 'text-pink-400',
-      border: 'hover:border-pink-400',
-      bg: 'hover:bg-pink-400/10',
-      locked: !albumEnabled && isAdmin
-    }] : [])
+    }
   ];
 
   return (
