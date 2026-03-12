@@ -7,9 +7,11 @@ import { TradeOffer } from '../types';
 interface AlbumProps {
   currentUserId: string | null;
   isAdmin?: boolean;
+  selectedSplit: string;
+  setSelectedSplit: (split: string) => void;
 }
 
-export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
+export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin, selectedSplit, setSelectedSplit }) => {
   const [cards, setCards] = useState<Card[]>([]);
   const [userCards, setUserCards] = useState<UserCard[]>([]);
   const [inventory, setInventory] = useState<UserCard[]>([]);
@@ -28,7 +30,6 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
   const [teamsMap, setTeamsMap] = useState<Record<string, any>>({});
   const [playersMap, setPlayersMap] = useState<Record<string, any>>({});
   const [splits, setSplits] = useState<{id: string, name: string, status: string}[]>([]);
-  const [selectedSplit, setSelectedSplit] = useState<string>('winter_2026');
   const [allPossibleCards, setAllPossibleCards] = useState<Card[]>([]);
   const [tempAdminCards, setTempAdminCards] = useState<Card[]>([]);
   const [nextPackTime, setNextPackTime] = useState<Date | null>(null);
@@ -1010,7 +1011,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                         className="w-16 aspect-[2.5/3.5] rounded-md border border-gray-700 overflow-hidden relative"
                         style={{ backgroundColor: details.color }}
                       >
-                        <img src={details.image} alt={details.name} className={`absolute inset-0 w-full h-full opacity-80 ${card.type === CardType.TEAM ? 'object-contain p-6' : 'object-cover mix-blend-luminosity'}`} referrerPolicy="no-referrer" />
+                        <img src={details.image} alt={details.name} className={`absolute inset-0 w-full h-full opacity-80 ${card.type === CardType.TEAM ? 'object-contain p-2' : 'object-cover mix-blend-luminosity'}`} referrerPolicy="no-referrer" />
                       </div>
                       <div className="flex-1">
                         <h4 className="font-bold text-white text-sm">
@@ -1296,7 +1297,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
       {/* Create Trade Modal */}
       {isCreatingTrade && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#0a1428] border border-gray-800 rounded-2xl p-6 max-w-2xl w-full shadow-2xl relative">
+          <div className="bg-[#0a1428] border border-gray-800 rounded-2xl p-6 max-w-2xl w-full shadow-2xl relative z-[60]">
             <button 
               onClick={() => { setIsCreatingTrade(null); setSelectedOfferCard(null); }}
               className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
@@ -1304,7 +1305,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
               <X className="w-6 h-6" />
             </button>
 
-            <h3 className="text-xl font-bold text-white mb-6">Proponer Intercambio a {isCreatingTrade.targetUsername}</h3>
+            <h3 className="text-xl font-bold text-white mb-6">Proponer Intercambio a {isCreatingTrade?.targetUsername || 'Usuario'}</h3>
             
             <div className="mb-6">
               <p className="text-sm text-gray-400 mb-2">Selecciona una de tus cartas del inventario para ofrecer:</p>
@@ -1320,7 +1321,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                     <div 
                       key={invItem.id}
                       onClick={() => setSelectedOfferCard(card.id)}
-                      className={`flex-shrink-0 w-24 aspect-[2.5/3.5] rounded-lg border-2 cursor-pointer transition-all ${isSelected ? 'border-[#c8aa6e] scale-105 shadow-[0_0_15px_rgba(200,170,110,0.3)]' : 'border-gray-700 hover:border-gray-500'}`}
+                      className={`relative flex-shrink-0 w-24 aspect-[2.5/3.5] rounded-lg border-2 cursor-pointer transition-all ${isSelected ? 'border-[#c8aa6e] scale-105 shadow-[0_0_15px_rgba(200,170,110,0.3)]' : 'border-gray-700 hover:border-gray-500'}`}
                       style={{ backgroundColor: details.color }}
                     >
                       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10" />
@@ -1334,7 +1335,7 @@ export const Album: React.FC<AlbumProps> = ({ currentUserId, isAdmin }) => {
                       <div className="absolute top-1 left-1 z-30 bg-gray-900/80 text-white text-[10px] px-1.5 rounded">
                         Disp: {invItem.quantity}
                       </div>
-                      {item.splitId === 'spring_2026' && (
+                      {invItem.splitId === 'spring_2026' && (
                         <div className="absolute top-6 left-1 z-30 bg-blue-900/80 text-white text-[10px] px-1.5 rounded">
                           SPRING
                         </div>

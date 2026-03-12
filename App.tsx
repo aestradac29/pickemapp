@@ -235,13 +235,13 @@ const App: React.FC = () => {
       case ViewState.DASHBOARD:
         return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
       case ViewState.RANKING:
-        return <RankingView currentUserId={currentUserId} isAdmin={isAdmin} />;
+        return <RankingView currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit} />;
       case ViewState.CRYSTAL_BALL:
-        return <CrystalBall currentUserId={currentUserId} isAdmin={isAdmin} />;
+        return <CrystalBall currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit} />;
       case ViewState.FANTASY:
         return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit || 'winter_2026'} />;
       case ViewState.OFFICIAL_STANDINGS:
-        return <OfficialStandings />;
+        return <OfficialStandings selectedSplit={selectedSplit} />;
       case ViewState.PROFILE:
         return (
             <ProfileView 
@@ -254,7 +254,7 @@ const App: React.FC = () => {
       case ViewState.HALL_OF_FAME: // Nuevo caso
         return <HallOfFame />;
       case ViewState.ALBUM: // New case
-        return <Album currentUserId={currentUserId} isAdmin={isAdmin} />;
+        return <Album currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit || 'winter_2026'} setSelectedSplit={setSelectedSplit} />;
       case ViewState.DB_MANAGER:
          // Protect route
          if (!isAdmin) return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
@@ -275,6 +275,7 @@ const App: React.FC = () => {
                 initialPredictions={predictions} 
                 isAdmin={isAdmin}
                 onPredictionsSaved={refreshPredictions}
+                selectedSplit={selectedSplit}
             />
         );
       case ViewState.RESULTS:

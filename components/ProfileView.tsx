@@ -225,6 +225,7 @@ const ShareModal = ({ user, teams, onClose }: { user: User, teams: Team[], onClo
 };
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, sessionUserId }) => {
+    const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
     const [user, setUser] = useState<User | null>(null);
     const [teams, setTeams] = useState<Team[]>([]); // Store loaded teams
     const [isLoading, setIsLoading] = useState(true);
@@ -270,19 +271,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
             setTeams(Object.values(teamsMap));
 
             // --- DYNAMIC MAX SCORE CALCULATION ---
+            const isSpring = selectedSplit.toLowerCase().includes('spring');
+            
             // 1. Max Matchday: Count all matches in GROUPS stage
-            const matchdayMax = allMatches.filter(m => m.stage === Stage.GROUPS).length;
+            const matchdayCount = allMatches.filter(m => m.stage === Stage.GROUPS).length;
+            const matchdayMax = isSpring ? matchdayCount * 1.5 : matchdayCount;
 
-            // 2. Max Ranking: Teams Count * 6 (Perfect Hit)
-            const rankingMax = Object.keys(teamsMap).length * 6;
+            // 2. Max Ranking: Teams Count * 6 or 6.75 (Perfect Hit)
+            const teamsCount = Object.keys(teamsMap).length;
+            const rankingMax = isSpring ? teamsCount * 6.75 : teamsCount * 6;
 
-            // 3. Max Playoffs: Fixed theoretical max for LEC format (66 pts)
-            // R1 (4x3) + R2 (4x4) + R3 (2x6) + R4 (2x8) + R5 (1x10) = 12 + 16 + 12 + 16 + 10 = 66
-            const playoffsMax = 66;
+            // 3. Max Playoffs: Fixed theoretical max
+            // Winter: R1 (4x3) + R2 (4x4) + R3 (2x6) + R4 (2x8) + R5 (1x10) = 12 + 16 + 12 + 16 + 10 = 66
+            // Spring: R1 (2x7) + L-R1 (2x7) + FinalW (1x10) + L-Semi (1x8) + L-Final (1x10) + GranFinal (1x12) = 14 + 14 + 10 + 8 + 10 + 12 = 68
+            const playoffsMax = isSpring ? 68 : 66;
 
             setMaxScores({ 
-                matchday: matchdayMax || 55, // Fallback if no matches
-                ranking: rankingMax || 60,   // Fallback if no teams
+                matchday: matchdayMax || (isSpring ? 52.5 : 45), // Fallback
+                ranking: rankingMax || (isSpring ? 67.5 : 60),   // Fallback
                 playoffs: playoffsMax        // Fixed max
             });
 
@@ -973,7 +979,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                 
                 {/* Ranking: Count teams * 6 */}
                 <BreakdownBar 
-                    label="Ranking Winter 2026" 
+                    label={`Ranking ${selectedSplit.toLowerCase().includes('spring') ? 'Spring 2026' : 'Winter 2026'}`} 
                     value={user.scoreBreakdown.ranking} 
                     max={maxScores.ranking} 
                     color="bg-green-500" 

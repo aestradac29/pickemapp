@@ -198,6 +198,7 @@ const PlayerStatRow: React.FC<PlayerStatRowProps> = ({ player, stats, isWinner }
 };
 
 export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA, teamB, allPlayers, onClose }) => {
+    const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
     // Detect available games
     const hasDetailedGames = match.games && match.games.length > 0;
     const numGames = match.bestOf || 1;
@@ -363,7 +364,7 @@ export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA
                 </div>
                 
                 <div className="p-3 bg-[#091428] border-t border-gray-800 text-center text-[10px] text-gray-500 uppercase font-bold tracking-wider">
-                    Puntos calculados según reglas Fantasy Winter 2026
+                    Puntos calculados según reglas Fantasy {selectedSplit.toLowerCase().includes('spring') ? 'Spring 2026' : 'Winter 2026'}
                 </div>
             </div>
         </div>

@@ -37,6 +37,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
     isAdmin = false,
     onPredictionsSaved 
 }) => {
+  const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
   // Config
   const [totalRounds, setTotalRounds] = useState(3);
   const [currentDay, setCurrentDay] = useState(1);
@@ -227,6 +228,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
   // Helper to get Label matching the Bracket View
   const getBracketLabel = (match: Match) => {
+        const isSpring = selectedSplit.toLowerCase().includes('spring');
         // Sort identically to PlayoffBracket.tsx
         const sortedMatches = [...bracketMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         
@@ -242,18 +244,29 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
         const wIndex = winnersMatches.findIndex(m => m.id === match.id);
         if (wIndex !== -1) {
-            if (wIndex < 4) return `R1 ${wIndex + 1}`; 
-            if (wIndex < 6) return `R2 ${wIndex - 3}`; 
-            return `FINAL WINNERS`;
+            if (isSpring) {
+                if (wIndex < 2) return `R1 ${wIndex + 1}`;
+                return `FINAL WINNERS`;
+            } else {
+                if (wIndex < 4) return `R1 ${wIndex + 1}`; 
+                if (wIndex < 6) return `R2 ${wIndex - 3}`; 
+                return `FINAL WINNERS`;
+            }
         }
 
         const losersMatches = sortedMatches.filter(m => m.bracketStage === 'losers' && m.stage !== Stage.FINALS);
         const lIndex = losersMatches.findIndex(m => m.id === match.id);
         if (lIndex !== -1) {
-             if (lIndex < 2) return `L-R1 ${lIndex + 1}`;
-             if (lIndex < 4) return `L-R2 ${lIndex - 1}`;
-             if (lIndex === 4) return `L-SEMIFINAL`;
-             return `L-FINAL`;
+             if (isSpring) {
+                 if (lIndex < 2) return `R1-L ${lIndex + 1}`;
+                 if (lIndex === 2) return `L-SEMIFINAL`;
+                 return `L-FINAL`;
+             } else {
+                 if (lIndex < 2) return `L-R1 ${lIndex + 1}`;
+                 if (lIndex < 4) return `L-R2 ${lIndex - 1}`;
+                 if (lIndex === 4) return `L-SEMIFINAL`;
+                 return `L-FINAL`;
+             }
         }
 
         return `PARTIDO ${match.id}`;
@@ -495,7 +508,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                         {isEditMode ? 'ADMIN PLAYOFFS' : 'Fase Final'}
                     </h2>
                     <p className={`text-[10px] uppercase tracking-widest leading-none ${isEditMode ? 'text-red-300' : 'text-hextech-500/60'}`}>
-                        {isEditMode ? 'Configurando Cuadro' : 'Winter 2026'}
+                        {isEditMode ? 'Configurando Cuadro' : selectedSplit.toLowerCase().includes('spring') ? 'Spring 2026' : 'Winter 2026'}
                     </p>
                 </div>
             </div>
@@ -590,11 +603,22 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
         {/* --- SCORING LEGEND --- */}
         {!isEditMode && (
             <div className="flex flex-wrap justify-center gap-2 mb-4 animate-in fade-in slide-in-from-top-2">
-                <PointBadge points={3} label="R1 / L-R1" />
-                <PointBadge points={4} label="R2 / L-R2" />
-                <PointBadge points={6} label="L-Semi" />
-                <PointBadge points={8} label="Final W / L-Final" />
-                <PointBadge points={10} label="Gran Final" />
+                {selectedSplit.toLowerCase().includes('spring') ? (
+                    <>
+                        <PointBadge points={7} label="R1 / R1-L" />
+                        <PointBadge points={8} label="L-Semi" />
+                        <PointBadge points={10} label="Final W / L-Final" />
+                        <PointBadge points={12} label="Gran Final" />
+                    </>
+                ) : (
+                    <>
+                        <PointBadge points={3} label="R1 / L-R1" />
+                        <PointBadge points={4} label="R2 / L-R2" />
+                        <PointBadge points={6} label="L-Semi" />
+                        <PointBadge points={8} label="Final W / L-Final" />
+                        <PointBadge points={10} label="Gran Final" />
+                    </>
+                )}
             </div>
         )}
 
@@ -693,6 +717,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                         predictions={visiblePredictions}
                         onSelectWinner={handleSelectWinner}
                         isLocked={isGlobalPlayoffLock || isSpectating} 
+                        selectedSplit={selectedSplit}
                      />
                  )}
             </div>

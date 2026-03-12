@@ -627,8 +627,8 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
     setIsLoadingData(true);
     try {
         const [fetchedPlayers, fetchedTeams, fetchedMatches, config, fetchedUsers] = await Promise.all([
-            dataService.getPlayers(),
-            dataService.getTeams(),
+            dataService.getPlayers(false, selectedSplit),
+            dataService.getTeams(false, selectedSplit),
             dataService.getMatches(undefined, selectedSplit),
             dataService.getDaysConfig(selectedSplit),
             dataService.getAllUsers()

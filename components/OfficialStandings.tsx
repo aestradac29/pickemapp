@@ -139,6 +139,7 @@ export const OfficialStandings: React.FC = () => {
     const [teams, setTeams] = useState<Team[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+    const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'Winter 2026');
 
     useEffect(() => {
         const loadData = async () => {
@@ -250,7 +251,7 @@ export const OfficialStandings: React.FC = () => {
                 <h2 className="text-3xl font-bold text-white uppercase tracking-wider mb-2">Clasificación Oficial</h2>
                 <div className="flex items-center justify-center gap-2">
                     <span className="px-3 py-1 bg-[#c8aa6e]/20 text-[#c8aa6e] text-xs font-bold uppercase rounded border border-[#c8aa6e]/30">
-                        LEC Winter 2026
+                        LEC {selectedSplit.toLowerCase().includes('spring') ? 'Spring 2026' : 'Winter 2026'}
                     </span>
                     <span className="px-3 py-1 bg-gray-800 text-gray-400 text-xs font-bold uppercase rounded border border-gray-700">
                         Fase Regular
@@ -276,8 +277,10 @@ export const OfficialStandings: React.FC = () => {
                         <tbody className="divide-y divide-gray-800">
                             {standings.map((row, index) => {
                                 const rank = index + 1;
-                                const isPlayoffs = rank <= 8;
-                                const isEliminated = rank > 8; // Assuming 10 teams, usually bottom 2 out in new formats or traditional bottom out. Let's assume Top 8 qualify.
+                                const isSpring = selectedSplit.toLowerCase().includes('spring');
+                                const playoffThreshold = isSpring ? 6 : 8;
+                                const isPlayoffs = rank <= playoffThreshold;
+                                const isEliminated = rank > playoffThreshold; 
                                 
                                 const winrate = row.played > 0 ? Math.round((row.wins / row.played) * 100) : 0;
 
@@ -292,7 +295,7 @@ export const OfficialStandings: React.FC = () => {
                                         <td className="p-4 text-center">
                                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm mx-auto
                                                 ${rank === 1 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 
-                                                  rank <= 8 ? 'bg-[#1e293b] text-white border border-gray-600' :
+                                                  isPlayoffs ? 'bg-[#1e293b] text-white border border-gray-600' :
                                                   'bg-red-900/20 text-red-500 border border-red-900/30'}
                                             `}>
                                                 {rank}
@@ -313,7 +316,7 @@ export const OfficialStandings: React.FC = () => {
                                                     <span className={`font-bold ${isEliminated ? 'text-gray-500' : 'text-white'}`}>
                                                         {row.team.name}
                                                     </span>
-                                                    {index === 7 && <span className="text-[9px] text-[#c8aa6e] font-bold uppercase tracking-wide">Límite Playoffs</span>}
+                                                    {index === (selectedSplit.toLowerCase().includes('spring') ? 5 : 7) && <span className="text-[9px] text-[#c8aa6e] font-bold uppercase tracking-wide">Límite Playoffs</span>}
                                                 </div>
                                             </div>
                                         </td>
@@ -375,7 +378,7 @@ export const OfficialStandings: React.FC = () => {
                 <div className="p-4 bg-[#0f1d36] border-t border-gray-700 flex justify-center gap-6 text-[10px] uppercase font-bold text-gray-500">
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 bg-[#1e293b] border border-gray-600 rounded"></div>
-                        <span>Clasifican a Playoffs (Top 8)</span>
+                        <span>Clasifican a Playoffs (Top {selectedSplit.toLowerCase().includes('spring') ? '6' : '8'})</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 bg-red-900/20 border border-red-900/30 rounded"></div>

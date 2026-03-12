@@ -9,6 +9,7 @@ interface PlayoffBracketProps {
   predictions: { matchId: string; predictedWinnerId: string }[];
   onSelectWinner: (matchId: string, teamId: string) => void;
   isLocked: boolean;
+  selectedSplit?: string;
 }
 
 const BracketMatch = ({ 
@@ -163,8 +164,10 @@ const BracketMatch = ({
     );
 };
 
-export const PlayoffBracket: React.FC<PlayoffBracketProps> = ({ matches, teams, predictions, onSelectWinner, isLocked }) => {
+export const PlayoffBracket: React.FC<PlayoffBracketProps> = ({ matches, teams, predictions, onSelectWinner, isLocked, selectedSplit }) => {
     
+    const isSpring = selectedSplit?.toLowerCase().includes('spring');
+
     // Sort all matches by time
     const sortedMatches = [...matches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     
@@ -182,16 +185,36 @@ export const PlayoffBracket: React.FC<PlayoffBracketProps> = ({ matches, teams, 
         winnersMatches = winnersMatches.slice(0, winnersMatches.length - 1); // Lo quitamos del array de winners
     }
 
-    const upperRound1 = winnersMatches.slice(0, 4); // Top 8 
-    const upperRound2 = winnersMatches.slice(4, 6); // Top 4
-    const upperFinal = winnersMatches.slice(6, 7);  // Winner Final
+    let upperRound1: (Match | undefined)[] = [];
+    let upperRound2: (Match | undefined)[] = [];
+    let upperFinal: (Match | undefined)[] = [];
 
     // 3. Identify Losers Matches (exclude finals)
     const losersMatches = sortedMatches.filter(m => m.bracketStage === 'losers' && m.stage !== Stage.FINALS);
-    const lowerRound1 = losersMatches.slice(0, 2); 
-    const lowerRound2 = losersMatches.slice(2, 4); 
-    const lowerRound3 = losersMatches.slice(4, 5); // Semi
-    const lowerFinal  = losersMatches.slice(5, 6); // Final Lower
+    let lowerRound1: (Match | undefined)[] = [];
+    let lowerRound2: (Match | undefined)[] = [];
+    let lowerRound3: (Match | undefined)[] = [];
+    let lowerFinal: (Match | undefined)[] = [];
+
+    if (isSpring) {
+        // Spring: 6 teams. R1 (2), Final W (1). L-R1 (2), L-Semi (1), L-Final (1).
+        upperRound1 = winnersMatches.slice(0, 2); 
+        upperRound2 = winnersMatches.slice(2, 3); 
+        
+        lowerRound1 = losersMatches.slice(0, 2); 
+        lowerRound2 = losersMatches.slice(2, 3); 
+        lowerRound3 = losersMatches.slice(3, 4); 
+    } else {
+        // Winter (8 teams)
+        upperRound1 = winnersMatches.slice(0, 4); 
+        upperRound2 = winnersMatches.slice(4, 6); 
+        upperFinal = winnersMatches.slice(6, 7);  
+
+        lowerRound1 = losersMatches.slice(0, 2); 
+        lowerRound2 = losersMatches.slice(2, 4); 
+        lowerRound3 = losersMatches.slice(4, 5); 
+        lowerFinal  = losersMatches.slice(5, 6); 
+    }
 
     // Helper for columns
     const renderColumn = (matchesForColumn: (Match | undefined)[], labelPrefix: string, emptyCount: number, justify: string = 'justify-around') => {
@@ -237,18 +260,20 @@ export const PlayoffBracket: React.FC<PlayoffBracketProps> = ({ matches, teams, 
                         <div className="flex gap-6">
                             {/* R1 */}
                             <div className="relative">
-                                {renderColumn(upperRound1, "R1", 4)}
+                                {renderColumn(upperRound1, "R1", isSpring ? 2 : 4)}
                                 <div className="absolute right-0 top-[12%] bottom-[12%] w-px bg-gray-800 hidden md:block"></div>
                             </div>
-                            {/* R2 */}
+                            {/* R2 / Final W */}
                             <div className="relative">
-                                {renderColumn(upperRound2, "R2", 2)}
-                                <div className="absolute right-0 top-[25%] bottom-[25%] w-px bg-gray-800 hidden md:block"></div>
+                                {renderColumn(upperRound2, isSpring ? "Final W" : "R2", isSpring ? 1 : 2, isSpring ? 'justify-center' : 'justify-around')}
+                                {!isSpring && <div className="absolute right-0 top-[25%] bottom-[25%] w-px bg-gray-800 hidden md:block"></div>}
                             </div>
-                            {/* Winner Final */}
-                            <div>
-                                {renderColumn(upperFinal, "Final W", 1, 'justify-center')}
-                            </div>
+                            {/* Winner Final (Winter only) */}
+                            {!isSpring && (
+                                <div>
+                                    {renderColumn(upperFinal, "Final W", 1, 'justify-center')}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -259,24 +284,33 @@ export const PlayoffBracket: React.FC<PlayoffBracketProps> = ({ matches, teams, 
                             <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest">Lower Bracket</h3>
                         </div>
                         <div className="flex gap-6">
-                            {/* L-R1 */}
+                            {/* L-R1 / R1-L */}
                             <div>
-                                {renderColumn(lowerRound1, "L-R1", 2, 'justify-center')}
+                                {renderColumn(lowerRound1, isSpring ? "R1-L" : "L-R1", 2, 'justify-center')}
                             </div>
-                            {/* L-R2 */}
+                            {/* L-R2 / L-Semi */}
                             <div>
-                                {renderColumn(lowerRound2, "L-R2", 2, 'justify-center')}
+                                {renderColumn(lowerRound2, isSpring ? "L-Semi" : "L-R2", isSpring ? 1 : 2, 'justify-center')}
                             </div>
-                            {/* L-Semi & L-Final Stacked */}
+                            {/* L-Semi & L-Final Stacked (Winter) or just L-Final (Spring) */}
                             <div className="flex flex-col justify-center gap-8">
-                                <div className="relative">
-                                    <span className="absolute -top-3 left-0 text-[9px] text-gray-600 uppercase font-bold">Semifinal</span>
-                                    {renderColumn(lowerRound3, "L-Semi", 1, 'justify-center')}
-                                </div>
-                                <div className="relative">
-                                    <span className="absolute -top-3 left-0 text-[9px] text-gray-600 uppercase font-bold">Final Lower</span>
-                                    {renderColumn(lowerFinal, "L-Final", 1, 'justify-center')}
-                                </div>
+                                {!isSpring ? (
+                                    <>
+                                        <div className="relative">
+                                            <span className="absolute -top-3 left-0 text-[9px] text-gray-600 uppercase font-bold">Semifinal</span>
+                                            {renderColumn(lowerRound3, "L-Semi", 1, 'justify-center')}
+                                        </div>
+                                        <div className="relative">
+                                            <span className="absolute -top-3 left-0 text-[9px] text-gray-600 uppercase font-bold">Final Lower</span>
+                                            {renderColumn(lowerFinal, "L-Final", 1, 'justify-center')}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="relative">
+                                        <span className="absolute -top-3 left-0 text-[9px] text-gray-600 uppercase font-bold">Final Lower</span>
+                                        {renderColumn(lowerRound3, "L-Final", 1, 'justify-center')}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

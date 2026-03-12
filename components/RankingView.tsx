@@ -189,16 +189,20 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   const totalPoints = React.useMemo(() => {
     if (mode === 'official_result' || officialRanking.length === 0) return 0;
     
+    const isSpring = selectedSplit.toLowerCase().includes('spring');
+    const exactPoints = isSpring ? 6.75 : 6;
+    const offByOnePoints = isSpring ? 3.5 : 3;
+
     return rankedTeams.reduce((acc, team, index) => {
         const officialIndex = officialRanking.indexOf(team.id);
         if (officialIndex === -1) return acc;
         
         const diff = Math.abs(index - officialIndex);
-        if (diff === 0) return acc + 6;
-        if (diff === 1) return acc + 3;
+        if (diff === 0) return acc + exactPoints;
+        if (diff === 1) return acc + offByOnePoints;
         return acc;
     }, 0);
-  }, [rankedTeams, officialRanking, mode]);
+  }, [rankedTeams, officialRanking, mode, selectedSplit]);
 
   if (isLoading) {
       return (
@@ -222,7 +226,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <h2 className={`text-2xl font-bold uppercase ${mode === 'official_result' ? 'text-red-500' : 'text-[#c8aa6e]'}`}>
-                {mode === 'official_result' ? 'ADMIN: RESULTADO REAL' : `Clasificación ${selectedSplit === 'spring_2026' ? 'Spring 2026' : 'Winter 2026'}`}
+                {mode === 'official_result' ? 'ADMIN: RESULTADO REAL' : `Clasificación ${selectedSplit.toLowerCase().includes('spring') ? 'Spring 2026' : 'Winter 2026'}`}
             </h2>
             <p className="text-gray-400 text-sm">
                 {mode === 'official_result' 
@@ -290,11 +294,11 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
       <div className="flex items-center justify-center gap-3 mb-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-green-500/30 bg-green-900/10 backdrop-blur-sm">
                 <CheckCircle2 className="w-3 h-3 text-green-400" />
-                <span className="text-[10px] font-bold text-green-200 uppercase tracking-wider">Posición Exacta: <span className="text-white ml-1">+6 Pts</span></span>
+                <span className="text-[10px] font-bold text-green-200 uppercase tracking-wider">Posición Exacta: <span className="text-white ml-1">+{selectedSplit.toLowerCase().includes('spring') ? '6.75' : '6'} Pts</span></span>
             </div>
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-yellow-500/30 bg-yellow-900/10 backdrop-blur-sm">
                 <AlertCircle className="w-3 h-3 text-yellow-400" />
-                <span className="text-[10px] font-bold text-yellow-200 uppercase tracking-wider">Error por 1 posición: <span className="text-white ml-1">+3 Pts</span></span>
+                <span className="text-[10px] font-bold text-yellow-200 uppercase tracking-wider">Error por 1 posición: <span className="text-white ml-1">+{selectedSplit.toLowerCase().includes('spring') ? '3.5' : '3'} Pts</span></span>
             </div>
       </div>
 
@@ -324,7 +328,9 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
         </div>
 
         {rankedTeams.map((team, index) => {
-          const isEliminated = index >= 8;
+          const isSpring = selectedSplit.toLowerCase().includes('spring');
+          const eliminationThreshold = isSpring ? 6 : 8;
+          const isEliminated = index >= eliminationThreshold;
           
           // Logic for scoring display
           let scoreBadge = null;
@@ -340,7 +346,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
                       scoreBadge = (
                           <div className="flex items-center gap-1 text-green-400 text-xs font-bold bg-green-950/50 px-2 py-1 rounded border border-green-500/30">
                               <CheckCircle2 className="w-3 h-3" />
-                              <span>+6 Pts</span>
+                              <span>+{isSpring ? '6.75' : '6'} Pts</span>
                           </div>
                       );
                   } else if (diff === 1) {
@@ -348,7 +354,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
                       scoreBadge = (
                           <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold bg-yellow-950/50 px-2 py-1 rounded border border-yellow-500/30">
                               <AlertCircle className="w-3 h-3" />
-                              <span>+3 Pts</span>
+                              <span>+{isSpring ? '3.5' : '3'} Pts</span>
                               <span className="text-[9px] opacity-70 ml-1">(Real: {officialIndex + 1}º)</span>
                           </div>
                       );
@@ -368,7 +374,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
           return (
             <React.Fragment key={team.id}>
               {/* Separator for Elimination Zone */}
-              {index === 8 && (
+              {index === (selectedSplit.toLowerCase().includes('spring') ? 6 : 8) && (
                 <div className="py-6 flex items-center gap-3 opacity-90 animate-in fade-in">
                   <div className="h-px bg-red-900/50 flex-1"></div>
                   <div className="flex items-center gap-2 text-red-500/80 px-2 py-1 rounded bg-red-950/30 border border-red-900/30">

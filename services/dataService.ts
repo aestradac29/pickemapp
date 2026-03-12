@@ -19,12 +19,12 @@ export const dataService = {
         return 'winter_2026';
     },
 
-    _getDocName(baseName: string): string {
-        const splitId = this._getCurrentSplitId();
-        if (splitId === 'winter_2026') {
+    _getDocName(baseName: string, splitId?: string): string {
+        const targetSplitId = splitId || this._getCurrentSplitId();
+        if (targetSplitId === 'winter_2026') {
             return baseName;
         }
-        return `${baseName}_${splitId}`;
+        return `${baseName}_${targetSplitId}`;
     },
 
     // --- UTILS ---
@@ -44,7 +44,7 @@ export const dataService = {
     },
 
     // --- CONFIGURATION (Active Days & Locks) ---
-    async getDaysConfig(): Promise<{ 
+    async getDaysConfig(splitId?: string): Promise<{ 
         visibleDays: number[], 
         closedDays: number[], 
         playoffVisibleDays: number[], 
@@ -56,7 +56,7 @@ export const dataService = {
         albumEnabled?: boolean // Is the album feature enabled?
     }> {
         try {
-            const docRef = doc(db, "admin_data", this._getDocName("config"));
+            const docRef = doc(db, "admin_data", this._getDocName("config", splitId));
             const docSnap = await getDoc(docRef);
             
             // Default Values
@@ -122,18 +122,39 @@ export const dataService = {
         }
     },
 
-    async updateGlobalConfig(config: any) {
-        const docRef = doc(db, "admin_data", this._getDocName("config"));
+    async updateGlobalConfig(config: any, splitId?: string) {
+        const docRef = doc(db, "admin_data", this._getDocName("config", splitId));
         await setDoc(docRef, cleanPayload(config), { merge: true });
     },
 
     // Helper to get points for a playoff match based on its position
     getPlayoffMatchPoints(match: Match, allPlayoffMatches: Match[]): number {
+        const isSpring = this._getCurrentSplitId() === 'spring_2026';
         const sorted = [...allPlayoffMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         const winners = sorted.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
         const losers = sorted.filter(m => m.bracketStage === 'losers');
         const final = sorted.find(m => m.stage === Stage.FINALS || m.bracketStage === 'finals');
 
+        if (isSpring) {
+            // Spring Scoring:
+            // R1 & R1-L: 7 pts
+            if (winners.slice(0, 2).some(w => w.id === match.id)) return 7;
+            if (losers.slice(0, 2).some(l => l.id === match.id)) return 7;
+
+            // L-SEMI: 8 pts
+            if (losers.slice(2, 3).some(l => l.id === match.id)) return 8;
+
+            // FINAL-W & L-FINAL: 10 pts
+            if (winners.slice(2, 3).some(w => w.id === match.id)) return 10;
+            if (losers.slice(3, 4).some(l => l.id === match.id)) return 10;
+
+            // GRAN FINAL: 12 pts
+            if (final && final.id === match.id) return 12;
+
+            return 7; // Default for Spring
+        }
+
+        // Winter Scoring (Default):
         // R1 / L-R1: 3 pts
         if (winners.slice(0, 4).some(w => w.id === match.id)) return 3;
         if (losers.slice(0, 2).some(l => l.id === match.id)) return 3;
@@ -187,9 +208,9 @@ export const dataService = {
     },
 
     // NEW: Handle Round Transitions (Price Updates)
-    async processRoundTransition(newRound: number) {
+    async processRoundTransition(newRound: number, splitId?: string) {
         // 1. Get current state (Using fresh stats)
-        const currentPlayers = await this.getPlayers();
+        const currentPlayers = await this.getPlayers(false, splitId);
         
         // 2. Calculate new prices based on performance (Last Round vs Average)
         const updatedPlayers = currentPlayers.map(p => {
@@ -594,11 +615,12 @@ export const dataService = {
     },
 
     // --- MATCHES ---
-    async getMatches(day?: number): Promise<Match[]> {
+    async getMatches(day?: number, splitId?: string): Promise<Match[]> {
         try {
+            const targetSplitId = splitId || this._getCurrentSplitId();
             const [matchesSnap, teamsSnap] = await Promise.all([
-                getDoc(doc(db, "admin_data", this._getDocName("matches"))),
-                getDoc(doc(db, "admin_data", this._getDocName("teams")))
+                getDoc(doc(db, "admin_data", this._getDocName("matches", targetSplitId))),
+                getDoc(doc(db, "admin_data", this._getDocName("teams", targetSplitId)))
             ]);
             
             let teamsMap: Record<string, Team> = TEAMS; 
@@ -651,20 +673,37 @@ export const dataService = {
                     if (m.stage !== Stage.PLAYOFFS && m.stage !== Stage.FINALS) return m;
 
                     let assignedDay = m.day;
-                    
-                    // Jornada 1: R1 1-4 (First 4 winners)
-                    if (winners.slice(0, 4).some(w => w.id === m.id)) assignedDay = 1;
-                    
-                    // Jornada 2: R2 1-2, L-R1 1-2, L-R2 1-2, Final Winners
-                    else if (winners.slice(4, 6).some(w => w.id === m.id)) assignedDay = 2; // R2
-                    else if (winners.slice(6, 7).some(w => w.id === m.id)) assignedDay = 2; // Final Winners
-                    else if (losers.slice(0, 2).some(l => l.id === m.id)) assignedDay = 2;  // L-R1
-                    else if (losers.slice(2, 4).some(l => l.id === m.id)) assignedDay = 2;  // L-R2
-                    
-                    // Jornada 3: L-Semi, L-Final, Gran Final
-                    else if (losers.slice(4, 5).some(l => l.id === m.id)) assignedDay = 3;  // L-Semi
-                    else if (losers.slice(5, 6).some(l => l.id === m.id)) assignedDay = 3;  // L-Final
-                    else if (final && final.id === m.id) assignedDay = 3;                  // Gran Final
+                    const isSpring = targetSplitId === 'spring_2026';
+
+                    if (isSpring) {
+                        // Spring Playoffs (6 teams)
+                        // Jornada 1: R1 (First 2 winners)
+                        if (winners.slice(0, 2).some(w => w.id === m.id)) assignedDay = 1;
+                        
+                        // Jornada 2: Final W (1), L-R1 (2)
+                        else if (winners.slice(2, 3).some(w => w.id === m.id)) assignedDay = 2; // Final W
+                        else if (losers.slice(0, 2).some(l => l.id === m.id)) assignedDay = 2;  // L-R1
+                        
+                        // Jornada 3: L-Semi, L-Final, Gran Final
+                        else if (losers.slice(2, 3).some(l => l.id === m.id)) assignedDay = 3;  // L-Semi
+                        else if (losers.slice(3, 4).some(l => l.id === m.id)) assignedDay = 3;  // L-Final
+                        else if (final && final.id === m.id) assignedDay = 3;                  // Gran Final
+                    } else {
+                        // Winter Playoffs (8 teams)
+                        // Jornada 1: R1 1-4 (First 4 winners)
+                        if (winners.slice(0, 4).some(w => w.id === m.id)) assignedDay = 1;
+                        
+                        // Jornada 2: R2 1-2, L-R1 1-2, L-R2 1-2, Final Winners
+                        else if (winners.slice(4, 6).some(w => w.id === m.id)) assignedDay = 2; // R2
+                        else if (winners.slice(6, 7).some(w => w.id === m.id)) assignedDay = 2; // Final Winners
+                        else if (losers.slice(0, 2).some(l => l.id === m.id)) assignedDay = 2;  // L-R1
+                        else if (losers.slice(2, 4).some(l => l.id === m.id)) assignedDay = 2;  // L-R2
+                        
+                        // Jornada 3: L-Semi, L-Final, Gran Final
+                        else if (losers.slice(4, 5).some(l => l.id === m.id)) assignedDay = 3;  // L-Semi
+                        else if (losers.slice(5, 6).some(l => l.id === m.id)) assignedDay = 3;  // L-Final
+                        else if (final && final.id === m.id) assignedDay = 3;                  // Gran Final
+                    }
 
                     return { ...m, day: assignedDay };
                 });
@@ -817,8 +856,8 @@ export const dataService = {
     },
 
     // MANUAL FORCE RECALCULATION WRAPPER
-    async forceRecalculateAll() {
-        const matches = await this.getMatches();
+    async forceRecalculateAll(splitId?: string) {
+        const matches = await this.getMatches(undefined, splitId);
         await this.recalculateAllFantasyScores(matches);
     },
 
@@ -1134,7 +1173,8 @@ export const dataService = {
                     }
 
                     if (predictedWinnerId === m.winnerId) {
-                        matchdayScore += 1;
+                        const isSpring = this._getCurrentSplitId() === 'spring_2026';
+                        matchdayScore += isSpring ? 1.5 : 1;
                     }
                 });
 
@@ -1170,12 +1210,13 @@ export const dataService = {
 
                 let rankingScore = 0;
                 if (adminRanking && adminRanking.length > 0 && userRanking.length > 0) {
+                    const isSpring = this._getCurrentSplitId() === 'spring_2026';
                     userRanking.forEach((teamId: string, index: number) => {
                         const actualIndex = adminRanking.indexOf(teamId);
                         if (actualIndex !== -1) {
                             const diff = Math.abs(index - actualIndex);
-                            if (diff === 0) rankingScore += 6;
-                            else if (diff === 1) rankingScore += 3;
+                            if (diff === 0) rankingScore += isSpring ? 6.75 : 6;
+                            else if (diff === 1) rankingScore += isSpring ? 3.5 : 3;
                         }
                     });
                 }
@@ -1239,7 +1280,8 @@ export const dataService = {
                         }
 
                         if (predictedWinnerId === m.winnerId) {
-                            dayPoints += 1;
+                            const isSpring = this._getCurrentSplitId() === 'spring_2026';
+                            dayPoints += isSpring ? 1.5 : 1;
                         }
                     });
                     currentCumulative += dayPoints;
@@ -1434,41 +1476,49 @@ export const dataService = {
         });
         await setDoc(docRef, { list: cleanPayload(currentPreds) }, { merge: true });
     },
-    async getUserRanking(userId: string) {
+    async getUserRanking(userId: string, splitId?: string) {
         try {
-            const snap = await getDoc(doc(db, "users", userId, "picks", `${this._getCurrentSplitId()}_ranking`));
+            const targetSplitId = splitId || this._getCurrentSplitId();
+            const snap = await getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`));
             return snap.exists() ? snap.data().order || [] : [];
         } catch (e) { return []; }
     },
-    async saveUserRanking(userId: string, teamIds: string[]) {
-        await setDoc(doc(db, "users", userId, "picks", `${this._getCurrentSplitId()}_ranking`), { order: cleanPayload(teamIds) }, { merge: true });
+    async saveUserRanking(userId: string, teamIds: string[], splitId?: string) {
+        const targetSplitId = splitId || this._getCurrentSplitId();
+        await setDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`), { order: cleanPayload(teamIds) }, { merge: true });
     },
-    async getAdminRanking() {
+    async getAdminRanking(splitId?: string) {
         try {
-            const snap = await getDoc(doc(db, "admin_data", this._getDocName("results")));
-            return snap.exists() ? snap.data()[`${this._getCurrentSplitId()}_ranking`] || [] : [];
+            const targetSplitId = splitId || this._getCurrentSplitId();
+            const snap = await getDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)));
+            return snap.exists() ? snap.data()[`${targetSplitId}_ranking`] || [] : [];
         } catch (e) { return []; }
     },
-    async saveAdminRanking(teamIds: string[]) {
-        await setDoc(doc(db, "admin_data", this._getDocName("results")), { [`${this._getCurrentSplitId()}_ranking`]: cleanPayload(teamIds) }, { merge: true });
+    async saveAdminRanking(teamIds: string[], splitId?: string) {
+        const targetSplitId = splitId || this._getCurrentSplitId();
+        await setDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)), { [`${targetSplitId}_ranking`]: cleanPayload(teamIds) }, { merge: true });
     },
-    async getCrystalBall(userId: string) {
+    async getCrystalBall(userId: string, splitId?: string) {
         try {
-            const snap = await getDoc(doc(db, "users", userId, "picks", `${this._getCurrentSplitId()}_crystal`));
+            const targetSplitId = splitId || this._getCurrentSplitId();
+            const snap = await getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_crystal`));
             return snap.exists() ? snap.data().selections : {};
         } catch (e) { return {}; }
     },
-    async saveCrystalBall(userId: string, selections: any) {
-        await setDoc(doc(db, "users", userId, "picks", `${this._getCurrentSplitId()}_crystal`), { selections: cleanPayload(selections) }, { merge: true });
+    async saveCrystalBall(userId: string, selections: any, splitId?: string) {
+        const targetSplitId = splitId || this._getCurrentSplitId();
+        await setDoc(doc(db, "users", userId, "picks", `${targetSplitId}_crystal`), { selections: cleanPayload(selections) }, { merge: true });
     },
-    async getAdminCrystalBallResults() {
+    async getAdminCrystalBallResults(splitId?: string) {
         try {
-            const snap = await getDoc(doc(db, "admin_data", this._getDocName("results")));
-            return snap.exists() ? snap.data()[`${this._getCurrentSplitId()}_crystal`] || {} : {};
+            const targetSplitId = splitId || this._getCurrentSplitId();
+            const snap = await getDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)));
+            return snap.exists() ? snap.data()[`${targetSplitId}_crystal`] || {} : {};
         } catch (e) { return {}; }
     },
-    async saveAdminCrystalBallResults(selections: any) {
-        await setDoc(doc(db, "admin_data", this._getDocName("results")), { [`${this._getCurrentSplitId()}_crystal`]: cleanPayload(selections) }, { merge: true });
+    async saveAdminCrystalBallResults(selections: any, splitId?: string) {
+        const targetSplitId = splitId || this._getCurrentSplitId();
+        await setDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)), { [`${targetSplitId}_crystal`]: cleanPayload(selections) }, { merge: true });
     },
 
     // --- CARD COLLECTION SYSTEM ---

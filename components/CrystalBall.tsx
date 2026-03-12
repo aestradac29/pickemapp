@@ -10,6 +10,7 @@ import { Role, Player, Team, User as UserType } from '../types';
 interface CrystalBallProps {
     currentUserId?: string | null;
     isAdmin?: boolean;
+    selectedSplit?: string | null;
 }
 
 const RANKED_CATEGORIES = [
@@ -200,8 +201,8 @@ const ScoredSelect = ({ label, options, categoryKey, selections, onChange, place
     );
 };
 
-export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin }) => {
-  const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
+export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin, selectedSplit: propSplit }) => {
+  const selectedSplit = propSplit || localStorage.getItem('selectedSplit') || 'winter_2026';
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [officialResults, setOfficialResults] = useState<Record<string, string> | null>(null);
   const [championOptions, setChampionOptions] = useState<Option[]>([]);
@@ -227,8 +228,8 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
         setLoadingData(true);
         try {
             const [playersList, teamsMap, usersList] = await Promise.all([
-                dataService.getPlayers(),
-                dataService.getTeams(),
+                dataService.getPlayers(false, selectedSplit),
+                dataService.getTeams(false, selectedSplit),
                 dataService.getAllUsers()
             ]);
             setPlayers(playersList);
@@ -241,7 +242,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
         }
     };
     loadData();
-  }, []);
+  }, [selectedSplit]);
 
   useEffect(() => {
       // Set initial viewing user
@@ -297,7 +298,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
         }
     };
     loadSelections();
-  }, [viewingUserId, mode, isAdmin]);
+  }, [viewingUserId, mode, isAdmin, selectedSplit]);
 
   useEffect(() => {
     const fetchData = async () => {

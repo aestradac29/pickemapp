@@ -22,6 +22,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
     isAdmin = false,
     onPredictionsSaved 
 }) => {
+  const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
   const [currentDay, setCurrentDay] = useState(1);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
   const [closedDays, setClosedDays] = useState<number[]>([]); 
@@ -392,7 +393,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       }
   };
 
-  const days = Array.from({ length: 11 }, (_, i) => i + 1);
+  const daysCount = selectedSplit.toLowerCase().includes('spring') ? 7 : 11;
+  const days = Array.from({ length: daysCount }, (_, i) => i + 1);
   const validMatches = matches.filter(m => !m.id.startsWith('temp-'));
   const validMatchIds = validMatches.map(m => m.id);
   const currentDayPredictionsCount = predictions.filter(p => validMatchIds.includes(p.matchId)).length;
@@ -413,7 +415,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                         {isEditMode ? 'ADMINISTRADOR' : 'Fase Regular'}
                     </h2>
                     <p className={`text-[10px] uppercase tracking-widest leading-none ${isEditMode ? 'text-red-300' : 'text-blue-300/60'}`}>
-                        {isEditMode ? 'Modo Edición' : 'Winter 2026'}
+                        {isEditMode ? 'Modo Edición' : selectedSplit.toLowerCase().includes('spring') ? 'Spring 2026' : 'Winter 2026'}
                     </p>
                 </div>
             </div>
@@ -552,7 +554,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     <div className="flex justify-center -mt-2 mb-2 animate-in fade-in">
                         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-widest shadow-sm">
                             <Trophy className="w-3 h-3" />
-                            <span>Acierto: +1 Punto</span>
+                            <span>Acierto: +{selectedSplit.toLowerCase().includes('spring') ? '1.5' : '1'} Punto</span>
                         </div>
                     </div>
                 )}
