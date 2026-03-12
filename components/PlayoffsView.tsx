@@ -6,7 +6,7 @@ import { DaySelector } from './DaySelector';
 import { UserPrediction, Match, Team, Stage, Player, User } from '../types';
 import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, Trash, CirclePlus, GitMerge, List, User as UserIcon, LogOut } from 'lucide-react';
 import { dataService } from '../services/dataService';
-import { TEAMS } from '../constants';
+import { TEAMS, normalizeSplitId } from '../constants';
 import { StatsEntryModal } from './StatsEntryModal';
 import { StatsViewerModal } from './StatsViewerModal';
 
@@ -37,7 +37,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
     isAdmin = false,
     onPredictionsSaved 
 }) => {
-  const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
+  const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
   // Config
   const [totalRounds, setTotalRounds] = useState(3);
   const [currentDay, setCurrentDay] = useState(1);

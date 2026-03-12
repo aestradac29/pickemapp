@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ROLE_ICONS } from '../constants';
+import { ROLE_ICONS, normalizeSplitId } from '../constants';
 import { Sparkles, RefreshCw, Trophy, User, Sword, Shield, Hash, Loader2, Save, CheckCircle2, AlertCircle, Settings, Medal, Star, HelpCircle, XCircle, Lock, Eye, EyeOff } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { getChampions } from '../services/riotService';
@@ -202,7 +202,7 @@ const ScoredSelect = ({ label, options, categoryKey, selections, onChange, place
 };
 
 export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin, selectedSplit: propSplit }) => {
-  const selectedSplit = propSplit || localStorage.getItem('selectedSplit') || 'winter_2026';
+  const selectedSplit = normalizeSplitId(propSplit || localStorage.getItem('selectedSplit'));
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [officialResults, setOfficialResults] = useState<Record<string, string> | null>(null);
   const [championOptions, setChampionOptions] = useState<Option[]>([]);
@@ -446,7 +446,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
                 <h2 className={`text-3xl font-bold uppercase tracking-wider mb-1 text-transparent bg-clip-text ${mode === 'official_result' ? 'bg-gradient-to-r from-red-400 to-red-600' : 'bg-gradient-to-r from-purple-300 to-purple-600'}`}>
-                    {mode === 'official_result' ? 'ADMIN: RESULTADOS' : `Bola de Cristal ${selectedSplit === 'spring_2026' ? 'Spring 2026' : 'Winter 2026'}`}
+                    {mode === 'official_result' ? 'ADMIN: RESULTADOS' : `Bola de Cristal ${normalizeSplitId(selectedSplit) === 'spring_2026' ? 'Spring 2026' : 'Winter 2026'}`}
                 </h2>
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-purple-400" />

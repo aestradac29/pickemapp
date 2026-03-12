@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { normalizeSplitId } from '../constants';
 import { Team, Match, Stage } from '../types';
 import { dataService } from '../services/dataService';
 import { Loader2, TrendingUp, TrendingDown, Minus, Trophy, X, Calendar, ChevronRight } from 'lucide-react';
@@ -139,7 +140,7 @@ export const OfficialStandings: React.FC = () => {
     const [teams, setTeams] = useState<Team[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-    const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'Winter 2026');
+    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
 
     useEffect(() => {
         const loadData = async () => {

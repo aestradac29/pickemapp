@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { dataService } from '../services/dataService';
 import { Player, Team, Match, Role, Stage, PlayerGameStats } from '../types';
-import { ROLE_ICONS } from '../constants';
+import { ROLE_ICONS, normalizeSplitId } from '../constants';
 import { Loader2, Crown, Star, Medal, Trophy, Calendar, Users, Skull, TrendingDown, AlertTriangle, Swords } from 'lucide-react';
 import { DaySelector } from './DaySelector';
 
@@ -13,7 +13,7 @@ interface ScoredPlayer extends Player {
 export const HallOfFame: React.FC = () => {
     const [viewMode, setViewMode] = useState<'GROUPS' | 'PLAYOFFS'>('GROUPS');
     const [currentDay, setCurrentDay] = useState(1);
-    const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
+    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
     
     const [matches, setMatches] = useState<Match[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);

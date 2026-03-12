@@ -5,7 +5,7 @@ import { dataService } from '../services/dataService';
 import { getChampions } from '../services/riotService';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { PenLine, Save, Loader2, CheckCircle2, User as UserIcon, Trophy, Sparkles, Swords, Medal, AlertCircle, Link, Image as ImageIcon, Gift, Lock, Star, Crown, CircleDashed, LayoutTemplate, Share2, Copy, Download, Camera, Zap, Eye } from 'lucide-react';
-import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS } from '../constants';
+import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, normalizeSplitId } from '../constants';
 import html2canvas from 'html2canvas';
 
 interface ProfileViewProps {
@@ -225,7 +225,7 @@ const ShareModal = ({ user, teams, onClose }: { user: User, teams: Team[], onClo
 };
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, sessionUserId }) => {
-    const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
+    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
     const [user, setUser] = useState<User | null>(null);
     const [teams, setTeams] = useState<Team[]>([]); // Store loaded teams
     const [isLoading, setIsLoading] = useState(true);

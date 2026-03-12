@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { normalizeSplitId } from '../constants';
 import { Team, User } from '../types';
 import { GripVertical, Save, Trophy, AlertOctagon, Loader2, CheckCircle2, AlertCircle, Settings, Lock, XCircle, Eye } from 'lucide-react';
 import { dataService } from '../services/dataService';
@@ -10,7 +11,7 @@ interface RankingViewProps {
 }
 
 export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin }) => {
-  const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
+  const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
   const [rankedTeams, setRankedTeams] = useState<Team[]>([]);
   const [officialRanking, setOfficialRanking] = useState<string[]>([]); // Estado para guardar el ranking oficial
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);

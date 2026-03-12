@@ -19,8 +19,16 @@ export const dataService = {
         return 'winter_2026';
     },
 
+    _normalizeSplitId(splitId?: string): string {
+        if (!splitId) return this._getCurrentSplitId();
+        const s = splitId.toLowerCase();
+        if (s.includes('spring')) return 'spring_2026';
+        if (s.includes('summer')) return 'summer_2026';
+        return 'winter_2026';
+    },
+
     _getDocName(baseName: string, splitId?: string): string {
-        const targetSplitId = splitId || this._getCurrentSplitId();
+        const targetSplitId = this._normalizeSplitId(splitId);
         if (targetSplitId === 'winter_2026') {
             return baseName;
         }
@@ -353,8 +361,8 @@ export const dataService = {
     // --- TEAMS ---
     async getTeams(ignoreSplit: boolean = false, splitId?: string): Promise<Record<string, Team>> {
         try {
-            const targetSplitId = splitId || this._getCurrentSplitId();
-            const docName = splitId === 'winter_2026' ? 'teams' : (splitId ? `teams_${splitId}` : this._getDocName("teams"));
+            const targetSplitId = this._normalizeSplitId(splitId);
+            const docName = targetSplitId === 'winter_2026' ? 'teams' : `teams_${targetSplitId}`;
             const docRef = doc(db, "admin_data", docName);
             const docSnap = await getDoc(docRef);
 
@@ -409,7 +417,8 @@ export const dataService = {
         } catch (e) {
             console.error("Error getting teams:", e);
             const result = { ...TEAMS };
-            if (!ignoreSplit && (splitId || this._getCurrentSplitId()) === 'spring_2026') {
+            const targetSplitId = this._normalizeSplitId(splitId);
+            if (!ignoreSplit && targetSplitId === 'spring_2026') {
                 if (result['rat']) delete result['rat'];
                 if (result['kcb']) delete result['kcb'];
             }
@@ -433,8 +442,8 @@ export const dataService = {
     // --- PLAYERS & PRICES ---
     async getPlayers(ignoreSplit: boolean = false, splitId?: string): Promise<Player[]> {
         try {
-            const targetSplitId = splitId || this._getCurrentSplitId();
-            const docName = splitId === 'winter_2026' ? 'players' : (splitId ? `players_${splitId}` : this._getDocName("players"));
+            const targetSplitId = this._normalizeSplitId(splitId);
+            const docName = targetSplitId === 'winter_2026' ? 'players' : `players_${targetSplitId}`;
             const playersDocRef = doc(db, "admin_data", docName);
             const playersSnap = await getDoc(playersDocRef);
             let playersList: Player[] = [];
@@ -617,7 +626,7 @@ export const dataService = {
     // --- MATCHES ---
     async getMatches(day?: number, splitId?: string): Promise<Match[]> {
         try {
-            const targetSplitId = splitId || this._getCurrentSplitId();
+            const targetSplitId = this._normalizeSplitId(splitId);
             const [matchesSnap, teamsSnap] = await Promise.all([
                 getDoc(doc(db, "admin_data", this._getDocName("matches", targetSplitId))),
                 getDoc(doc(db, "admin_data", this._getDocName("teams", targetSplitId)))
@@ -1478,46 +1487,46 @@ export const dataService = {
     },
     async getUserRanking(userId: string, splitId?: string) {
         try {
-            const targetSplitId = splitId || this._getCurrentSplitId();
+            const targetSplitId = this._normalizeSplitId(splitId);
             const snap = await getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`));
             return snap.exists() ? snap.data().order || [] : [];
         } catch (e) { return []; }
     },
     async saveUserRanking(userId: string, teamIds: string[], splitId?: string) {
-        const targetSplitId = splitId || this._getCurrentSplitId();
+        const targetSplitId = this._normalizeSplitId(splitId);
         await setDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`), { order: cleanPayload(teamIds) }, { merge: true });
     },
     async getAdminRanking(splitId?: string) {
         try {
-            const targetSplitId = splitId || this._getCurrentSplitId();
+            const targetSplitId = this._normalizeSplitId(splitId);
             const snap = await getDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)));
             return snap.exists() ? snap.data()[`${targetSplitId}_ranking`] || [] : [];
         } catch (e) { return []; }
     },
     async saveAdminRanking(teamIds: string[], splitId?: string) {
-        const targetSplitId = splitId || this._getCurrentSplitId();
+        const targetSplitId = this._normalizeSplitId(splitId);
         await setDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)), { [`${targetSplitId}_ranking`]: cleanPayload(teamIds) }, { merge: true });
     },
     async getCrystalBall(userId: string, splitId?: string) {
         try {
-            const targetSplitId = splitId || this._getCurrentSplitId();
+            const targetSplitId = this._normalizeSplitId(splitId);
             const snap = await getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_crystal`));
             return snap.exists() ? snap.data().selections : {};
         } catch (e) { return {}; }
     },
     async saveCrystalBall(userId: string, selections: any, splitId?: string) {
-        const targetSplitId = splitId || this._getCurrentSplitId();
+        const targetSplitId = this._normalizeSplitId(splitId);
         await setDoc(doc(db, "users", userId, "picks", `${targetSplitId}_crystal`), { selections: cleanPayload(selections) }, { merge: true });
     },
     async getAdminCrystalBallResults(splitId?: string) {
         try {
-            const targetSplitId = splitId || this._getCurrentSplitId();
+            const targetSplitId = this._normalizeSplitId(splitId);
             const snap = await getDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)));
             return snap.exists() ? snap.data()[`${targetSplitId}_crystal`] || {} : {};
         } catch (e) { return {}; }
     },
     async saveAdminCrystalBallResults(selections: any, splitId?: string) {
-        const targetSplitId = splitId || this._getCurrentSplitId();
+        const targetSplitId = this._normalizeSplitId(splitId);
         await setDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)), { [`${targetSplitId}_crystal`]: cleanPayload(selections) }, { merge: true });
     },
 

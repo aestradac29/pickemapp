@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Match, Team, Player, PlayerGameStats, Role } from '../types';
 import { X, Trophy, Skull, Target, Swords, HeartHandshake, Crosshair, Droplet, Crown, AlertTriangle, Shield, ChevronDown, ChevronUp, Flame, Eye, Activity } from 'lucide-react';
-import { ROLE_ICONS } from '../constants';
+import { ROLE_ICONS, normalizeSplitId } from '../constants';
 
 interface StatsViewerModalProps {
     match: Match;
@@ -198,7 +198,7 @@ const PlayerStatRow: React.FC<PlayerStatRowProps> = ({ player, stats, isWinner }
 };
 
 export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA, teamB, allPlayers, onClose }) => {
-    const [selectedSplit] = useState<string>(() => localStorage.getItem('selectedSplit') || 'winter_2026');
+    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
     // Detect available games
     const hasDetailedGames = match.games && match.games.length > 0;
     const numGames = match.bestOf || 1;

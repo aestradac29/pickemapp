@@ -2,6 +2,15 @@
 import { Team, Region, Match, Stage, User, Role, Player } from './types';
 import { Sparkles, Trophy, Flame, Eye, Crown, Zap, Target, Shield, Clock, Map, Gem, Share2 } from 'lucide-react';
 
+// Helper to normalize split IDs from display names
+export const normalizeSplitId = (splitName: string | null | undefined): string => {
+  if (!splitName) return 'winter_2026';
+  const s = splitName.toLowerCase();
+  if (s.includes('spring')) return 'spring_2026';
+  if (s.includes('summer')) return 'summer_2026';
+  return 'winter_2026';
+};
+
 // Role Icons (Official LoL Assets - SVG versions from CommunityDragon for best quality)
 export const ROLE_ICONS: Record<Role, string> = {
   [Role.TOP]: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/svg/position-top.svg",
