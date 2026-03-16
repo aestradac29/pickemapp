@@ -194,7 +194,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
         {options.map((option) => (
           <button
             key={option.id}
-            onClick={() => !option.locked && onChangeView(option.id)}
+            onClick={() => {
+                console.log('Clicked option:', option.id);
+                !option.locked && onChangeView(option.id);
+            }}
             disabled={option.locked}
             className={`
               relative group flex flex-col items-center justify-center p-6 h-48

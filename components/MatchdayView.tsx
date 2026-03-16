@@ -23,6 +23,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
     isAdmin = false,
     onPredictionsSaved 
 }) => {
+  console.log('MatchdayView mounted');
   const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
   const [currentDay, setCurrentDay] = useState(1);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
@@ -603,8 +604,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     </div>
                 ) : (
                     matches.map(match => {
-                        const recA = match.teamA ? teamRecords[match.teamA.id] : undefined;
-                        const recB = match.teamB ? teamRecords[match.teamB.id] : undefined;
+                        const recA = teamRecords[match.teamA.id];
+                        const recB = teamRecords[match.teamB.id];
                         const strRecA = recA ? `${recA.w}-${recA.l}` : undefined;
                         const strRecB = recB ? `${recB.w}-${recB.l}` : undefined;
 
