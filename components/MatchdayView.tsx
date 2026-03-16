@@ -14,15 +14,17 @@ interface MatchdayViewProps {
     initialPredictions?: UserPrediction[];
     isAdmin?: boolean;
     onPredictionsSaved?: () => Promise<void> | void; 
+    selectedSplit: string | null;
 }
 
 export const MatchdayView: React.FC<MatchdayViewProps> = ({ 
     currentUserId, 
     initialPredictions = [], 
     isAdmin = false,
-    onPredictionsSaved 
+    onPredictionsSaved,
+    selectedSplit
 }) => {
-  const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+  const normalizedSplit = normalizeSplitId(selectedSplit);
   const [currentDay, setCurrentDay] = useState(1);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
   const [closedDays, setClosedDays] = useState<number[]>([]); 
@@ -78,13 +80,15 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         setNewMatch(null); 
         try {
             // Cargar TODOS los datos necesarios
+            console.log("Fetching data for split:", selectedSplit);
             const [fetchedMatches, teamsMap, config, playersList, usersList] = await Promise.all([
-                dataService.getMatches(), 
-                dataService.getTeams(),
-                dataService.getDaysConfig(),
-                dataService.getPlayers(),
+                dataService.getMatches(undefined, selectedSplit), 
+                dataService.getTeams(selectedSplit),
+                dataService.getDaysConfig(selectedSplit),
+                dataService.getPlayers(selectedSplit),
                 dataService.getAllUsers()
             ]);
+            console.log("Config loaded:", config);
             
             setAllMatches(fetchedMatches);
             setAllTeams(Object.values(teamsMap));
@@ -100,7 +104,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         }
     };
     loadData();
-  }, []);
+  }, [normalizedSplit]);
 
   // Fetch predictions when viewingUserId changes
   useEffect(() => {
@@ -317,7 +321,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           : [...visibleDays, currentDay];
       
       setVisibleDays(newVisibleDays);
-      await dataService.updateGlobalConfig({ visibleDays: newVisibleDays, closedDays });
+      await dataService.updateGlobalConfig({ visibleDays: newVisibleDays, closedDays }, selectedSplit);
   };
 
   const handleToggleLock = async () => {
@@ -327,7 +331,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           : [...closedDays, currentDay];
       
       setClosedDays(newClosedDays);
-      await dataService.updateGlobalConfig({ visibleDays, closedDays: newClosedDays });
+      await dataService.updateGlobalConfig({ visibleDays, closedDays: newClosedDays }, selectedSplit);
   };
 
   const handleSaveStats = async (games: any) => {

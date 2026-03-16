@@ -79,7 +79,7 @@ export const dataService = {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 config = {
-                    visibleDays: data.activeDays || [1],
+                    visibleDays: data.visibleDays || data.activeDays || [1],
                     closedDays: data.closedDays || [],
                     playoffVisibleDays: data.playoffVisibleDays || [1],
                     playoffClosedDays: data.playoffClosedDays || [],

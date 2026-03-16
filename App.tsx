@@ -266,6 +266,7 @@ const App: React.FC = () => {
                 initialPredictions={predictions} 
                 isAdmin={isAdmin}
                 onPredictionsSaved={refreshPredictions}
+                selectedSplit={selectedSplit}
             />
         );
       case ViewState.PLAYOFFS:
