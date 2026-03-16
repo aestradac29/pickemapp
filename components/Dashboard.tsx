@@ -67,7 +67,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-gray-300',
       border: 'hover:border-gray-300',
       bg: 'hover:bg-gray-300/10',
-      locked: !isWinterSplit
+      locked: !isAccessibleSplit
     },
     {
       id: ViewState.PLAYOFFS,
@@ -87,7 +87,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-purple-400',
       border: 'hover:border-purple-400',
       bg: 'hover:bg-purple-400/10',
-      locked: !isWinterSplit
+      locked: !isAccessibleSplit
     },
     {
       id: ViewState.FANTASY,
@@ -97,7 +97,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-[#0ac8b9]', // Cyan for Fantasy
       border: 'hover:border-[#0ac8b9]',
       bg: 'hover:bg-[#0ac8b9]/10',
-      locked: !isWinterSplit
+      locked: !isAccessibleSplit
     },
     {
       id: ViewState.TEAMS,
@@ -107,7 +107,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-orange-400',
       border: 'hover:border-orange-400',
       bg: 'hover:bg-orange-400/10',
-      locked: !isWinterSplit
+      locked: !isAccessibleSplit
     },
     {
       id: ViewState.RESULTS,
@@ -117,7 +117,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-green-400',
       border: 'hover:border-green-400',
       bg: 'hover:bg-green-400/10',
-      locked: !isWinterSplit
+      locked: !isAccessibleSplit
     },
     {
       id: ViewState.OFFICIAL_STANDINGS,
@@ -127,7 +127,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-amber-400',
       border: 'hover:border-amber-400',
       bg: 'hover:bg-amber-400/10',
-      locked: !isWinterSplit
+      locked: !isAccessibleSplit
     },
     {
       id: ViewState.HALL_OF_FAME,
@@ -137,7 +137,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-yellow-400',
       border: 'hover:border-yellow-400',
       bg: 'hover:bg-yellow-400/10',
-      locked: !isWinterSplit
+      locked: !isAccessibleSplit
     }
   ];
 
