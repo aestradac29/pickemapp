@@ -55,6 +55,7 @@ export const dataService = {
     async getDaysConfig(splitId?: string): Promise<{ 
         visibleDays: number[], 
         closedDays: number[], 
+        openedDays: number[],
         playoffVisibleDays: number[], 
         playoffClosedDays: number[],
         playoffRounds?: number, 
@@ -69,7 +70,7 @@ export const dataService = {
             
             // Default Values
             let config = {
-                visibleDays: [1], closedDays: [], 
+                visibleDays: [1], closedDays: [], openedDays: [],
                 playoffVisibleDays: [1], playoffClosedDays: [],
                 playoffRounds: 3, playoffsAccessible: false,
                 fantasyRound: 1, fantasyLocked: false,
@@ -81,6 +82,7 @@ export const dataService = {
                 config = {
                     visibleDays: data.visibleDays || data.activeDays || [1],
                     closedDays: data.closedDays || [],
+                    openedDays: data.openedDays || [],
                     playoffVisibleDays: data.playoffVisibleDays || [1],
                     playoffClosedDays: data.playoffClosedDays || [],
                     playoffRounds: data.playoffRounds || 3, 
@@ -121,7 +123,7 @@ export const dataService = {
         } catch (e) {
             console.error("Error loading config", e);
             return { 
-                visibleDays: [1], closedDays: [], 
+                visibleDays: [1], closedDays: [], openedDays: [],
                 playoffVisibleDays: [1], playoffClosedDays: [],
                 playoffRounds: 3, playoffsAccessible: false,
                 fantasyRound: 1, fantasyLocked: false,
@@ -727,7 +729,7 @@ export const dataService = {
                     generatedMatches = [...generatedMatches, ...dayMatches];
                 }
                 allMatches = [...seedMatches, ...generatedMatches];
-                await setDoc(doc(db, "admin_data", this._getDocName("matches", targetSplitId)), { allMatches: cleanPayload(allMatches) });
+                await setDoc(doc(db, "admin_data", this._getDocName("matches")), { allMatches: cleanPayload(allMatches) });
             }
 
             if (day) {
