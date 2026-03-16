@@ -727,7 +727,7 @@ export const dataService = {
                     generatedMatches = [...generatedMatches, ...dayMatches];
                 }
                 allMatches = [...seedMatches, ...generatedMatches];
-                await setDoc(doc(db, "admin_data", this._getDocName("matches")), { allMatches: cleanPayload(allMatches) });
+                await setDoc(doc(db, "admin_data", this._getDocName("matches", targetSplitId)), { allMatches: cleanPayload(allMatches) });
             }
 
             if (day) {

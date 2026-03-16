@@ -21,6 +21,14 @@ export const MatchConfirmationModal: React.FC<MatchConfirmationModalProps> = ({ 
 
     const getTeamName = (teamId: string) => TEAMS[teamId]?.name || teamId;
 
+    const formatForDateTimeLocal = (dateStr: string) => {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr.slice(0, 16);
+        const offset = date.getTimezoneOffset() * 60000;
+        return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+    };
+
     return ReactDOM.createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
             <div className="w-full max-w-4xl flex flex-col shadow-2xl">
@@ -57,7 +65,7 @@ export const MatchConfirmationModal: React.FC<MatchConfirmationModalProps> = ({ 
                                     <label className="text-[10px] text-gray-400 uppercase">Hora Inicio</label>
                                     <input 
                                         type="datetime-local" 
-                                        value={match.startTime.slice(0, 16)} 
+                                        value={formatForDateTimeLocal(match.startTime)} 
                                         onChange={(e) => updateMatch(index, 'startTime', new Date(e.target.value).toISOString())}
                                         className="bg-gray-800 text-white p-2 rounded text-sm w-full"
                                     />

@@ -13,7 +13,7 @@ interface MatchdayImageUploaderProps {
 export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ currentDay, onMatchesCreated }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [pendingMatches, setPendingMatches] = useState<{ teamAId: string; teamBId: string; startTime: string }[]>([]);
+    const [pendingMatches, setPendingMatches] = useState<{ teamAId: string; teamBId: string; startTime: string; bestOf?: number }[]>([]);
     const [showModal, setShowModal] = useState(false);
 
     const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,8 +29,8 @@ export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ cu
             reader.onloadend = async () => {
                 const base64Image = (reader.result as string).split(',')[1];
                 
-                const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
-                const ai = apiKey ? new GoogleGenAI({ apiKey }) : new GoogleGenAI();
+                const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || "";
+                const ai = new GoogleGenAI({ apiKey });
 
                 const response = await ai.models.generateContent({
                     model: "gemini-3-flash-preview",
@@ -43,7 +43,7 @@ export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ cu
                                 },
                             },
                             {
-                                text: `Extract ALL matches from this image. Return a JSON array of objects, each with: "teamAId" (string, e.g., 'fnc', 'g2', 'nvi', 'shf'), "teamBId" (string), "startTime" (ISO string). Assume the matches are for day ${currentDay}. 
+                                text: `Extract ALL matches from this image. Return a JSON array of objects, each with: "teamAId" (string, e.g., 'fnc', 'g2', 'nvi', 'shf'), "teamBId" (string), "startTime" (string, format YYYY-MM-DDTHH:mm as it appears in the image, do NOT add timezone), "bestOf" (number, 1, 3, or 5). Assume the matches are for day ${currentDay}. 
                                 
                                 IMPORTANT: Be extremely accurate with team identification. 
                                 - Use 'nvi' for Natus Vincere.
@@ -61,16 +61,22 @@ export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ cu
                                 properties: {
                                     teamAId: { type: Type.STRING },
                                     teamBId: { type: Type.STRING },
-                                    startTime: { type: Type.STRING },
+                                    startTime: { type: Type.STRING, description: "Local time format YYYY-MM-DDTHH:mm" },
+                                    bestOf: { type: Type.NUMBER },
                                 },
-                                required: ["teamAId", "teamBId", "startTime"],
+                                required: ["teamAId", "teamBId", "startTime", "bestOf"],
                             },
                         },
                     },
                 });
 
                 const matches = JSON.parse(response.text || '[]');
-                setPendingMatches(matches.filter(Boolean));
+                // Ensure startTime is treated as local if it doesn't have a timezone
+                const processedMatches = matches.filter(Boolean).map((m: any) => ({
+                    ...m,
+                    startTime: m.startTime.includes('Z') || m.startTime.includes('+') ? m.startTime : new Date(m.startTime).toISOString()
+                }));
+                setPendingMatches(processedMatches);
                 setShowModal(true);
                 setIsProcessing(false);
             };
