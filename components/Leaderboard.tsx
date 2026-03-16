@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { User, Team } from '../types';
 import { Trophy, Medal, TrendingUp, Swords, ListOrdered, Sparkles, UserPlus, Globe, Eye } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
-import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS, FANTASY_SCHEDULE } from '../constants';
+import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS, getFantasySchedule, normalizeSplitId } from '../constants';
 
 interface LeaderboardProps {
   users: User[];
@@ -13,6 +13,7 @@ interface LeaderboardProps {
 type LeaderboardCategory = 'global' | 'matchday' | 'ranking' | 'playoffs' | 'crystalBall' | 'fantasy';
 
 export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }) => {
+  const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
   const [activeCategory, setActiveCategory] = useState<LeaderboardCategory>('global');
 
   if (!users || users.length === 0) {
@@ -104,7 +105,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
   });
 
   // Prepare data for FANTASY chart (Use FANTASY_SCHEDULE labels)
-  const fantasyChartData = FANTASY_SCHEDULE.map((round, index) => {
+  const fantasyChartData = getFantasySchedule(selectedSplit).map((round, index) => {
       const point: any = { name: `F${round.id}` }; // F1, F2...
       
       users.forEach(user => {
@@ -407,7 +408,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
         </div>
       )}
 
-      {/* Stats Chart - Fantasy Tab (7 Rounds) */}
+      {/* Stats Chart - Fantasy Tab */}
       {activeCategory === 'fantasy' && (
         <div className="bg-[#091428]/80 backdrop-blur-sm rounded-xl border border-gray-800 p-6 shadow-xl animate-in slide-in-from-bottom-4">
             <h3 className="text-lg font-bold text-[#0ac8b9] mb-4 flex items-center gap-2 uppercase tracking-wide">

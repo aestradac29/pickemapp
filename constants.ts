@@ -59,15 +59,32 @@ export const COUNTRIES = [
 ];
 
 // Fantasy Schedule Definition
-export const FANTASY_SCHEDULE = [
-    { id: 1, label: 'Jornada 1', matchdays: [1, 2, 3], stage: Stage.GROUPS },
-    { id: 2, label: 'Jornada 2', matchdays: [4, 5, 6], stage: Stage.GROUPS },
-    { id: 3, label: 'Jornada 3', matchdays: [7, 8, 9], stage: Stage.GROUPS },
-    { id: 4, label: 'Jornada 4', matchdays: [10, 11], stage: Stage.GROUPS },
-    { id: 5, label: 'Playoffs R1', matchdays: [1], stage: Stage.PLAYOFFS }, 
-    { id: 6, label: 'Playoffs R2', matchdays: [2], stage: Stage.PLAYOFFS },
-    { id: 7, label: 'Playoffs R3', matchdays: [3], stage: Stage.PLAYOFFS },
-];
+export const getFantasySchedule = (splitId: string) => {
+    const normalizedSplitId = normalizeSplitId(splitId);
+    if (normalizedSplitId === 'spring_2026') {
+        return [
+            { id: 1, label: 'Jornada 1', matchdays: [1], stage: Stage.GROUPS },
+            { id: 2, label: 'Jornada 2', matchdays: [2], stage: Stage.GROUPS },
+            { id: 3, label: 'Jornada 3', matchdays: [3], stage: Stage.GROUPS },
+            { id: 4, label: 'Jornada 4', matchdays: [4], stage: Stage.GROUPS },
+            { id: 5, label: 'Jornada 5', matchdays: [5], stage: Stage.GROUPS },
+            { id: 6, label: 'Jornada 6', matchdays: [6], stage: Stage.GROUPS },
+            { id: 7, label: 'Jornada 7', matchdays: [7], stage: Stage.GROUPS },
+            { id: 8, label: 'Playoffs R1', matchdays: [1], stage: Stage.PLAYOFFS }, 
+            { id: 9, label: 'Playoffs R2', matchdays: [2], stage: Stage.PLAYOFFS },
+            { id: 10, label: 'Playoffs R3', matchdays: [3], stage: Stage.PLAYOFFS },
+        ];
+    }
+    return [
+        { id: 1, label: 'Jornada 1', matchdays: [1, 2, 3], stage: Stage.GROUPS },
+        { id: 2, label: 'Jornada 2', matchdays: [4, 5, 6], stage: Stage.GROUPS },
+        { id: 3, label: 'Jornada 3', matchdays: [7, 8, 9], stage: Stage.GROUPS },
+        { id: 4, label: 'Jornada 4', matchdays: [10, 11], stage: Stage.GROUPS },
+        { id: 5, label: 'Playoffs R1', matchdays: [1], stage: Stage.PLAYOFFS }, 
+        { id: 6, label: 'Playoffs R2', matchdays: [2], stage: Stage.PLAYOFFS },
+        { id: 7, label: 'Playoffs R3', matchdays: [3], stage: Stage.PLAYOFFS },
+    ];
+};
 
 // Cosmetic Styles (Frames & Banners)
 export const FRAME_STYLES: Record<string, string> = {

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { dataService } from '../services/dataService';
 import { Team, Player, Role, Match, Stage } from '../types';
-import { ROLE_ICONS, FANTASY_SCHEDULE } from '../constants';
+import { ROLE_ICONS, getFantasySchedule, normalizeSplitId } from '../constants';
 import { Loader2, Users, TrendingUp, TrendingDown, Coins, X, Activity, Target, Skull, Trophy, ListOrdered, LayoutGrid, Minus, Calendar, ChevronRight } from 'lucide-react';
 
 interface PlayerHistoryModalProps {
@@ -188,6 +188,7 @@ const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ player, team, m
 };
 
 export const TeamsView: React.FC = () => {
+    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
     const [teams, setTeams] = useState<Record<string, Team>>({});
     const [players, setPlayers] = useState<Player[]>([]);
     const [matches, setMatches] = useState<Match[]>([]);
@@ -281,7 +282,7 @@ export const TeamsView: React.FC = () => {
 
         players.forEach(p => {
             data[p.id] = {};
-            FANTASY_SCHEDULE.forEach(round => {
+            getFantasySchedule(selectedSplit).forEach(round => {
                 let roundPoints = 0;
                 // Find matches for this round that involve this player's team
                 const roundMatches = matches.filter(m =>
@@ -629,9 +630,9 @@ export const TeamsView: React.FC = () => {
                                         <th className="p-3 w-12 text-center sticky left-0 bg-[#0f1d36] z-10">#</th>
                                         <th className="p-3 sticky left-12 bg-[#0f1d36] z-10 border-r border-gray-700">Jugador</th>
                                         <th className="p-3 text-center bg-[#1a2c4e] text-white border-x border-gray-700 min-w-[80px]">Total</th>
-                                        {FANTASY_SCHEDULE.map(r => (
+                                        {getFantasySchedule(selectedSplit).map(r => (
                                             <th key={r.id} className="p-3 text-center min-w-[60px] whitespace-nowrap">
-                                                {r.stage === Stage.GROUPS ? `J${r.matchdays.join('-')}` : `PO${r.id - 4}`}
+                                                {r.stage === Stage.GROUPS ? `J${r.matchdays.join('-')}` : r.label.replace('Playoffs R', 'PO')}
                                             </th>
                                         ))}
                                     </tr>
@@ -674,7 +675,7 @@ export const TeamsView: React.FC = () => {
                                                 </td>
 
                                                 {/* Round Columns */}
-                                                {FANTASY_SCHEDULE.map(r => {
+                                                {getFantasySchedule(selectedSplit).map(r => {
                                                     const pts = pointsByRound[p.id]?.[r.id] || 0;
                                                     const hasPlayed = pts !== 0;
                                                     return (

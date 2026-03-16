@@ -3,9 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { Player, Team, Role, Match, Stage } from '../types';
 import { dataService } from '../services/dataService';
 import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download, TrendingUp, History, Hash } from 'lucide-react';
-import { ROLE_ICONS, COUNTRIES, FANTASY_SCHEDULE } from '../constants';
+import { ROLE_ICONS, COUNTRIES, getFantasySchedule, normalizeSplitId } from '../constants';
 
 export const DatabaseManager: React.FC = () => {
+    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
     const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'prices'>('players');
     
     // Data State
@@ -128,6 +129,7 @@ export const DatabaseManager: React.FC = () => {
 
         // Iterar desde J1 hasta la ronda ANTERIOR a la objetivo
         // Ejemplo: Si objetivo es J4, simulamos J1, J2, J3.
+        const FANTASY_SCHEDULE = getFantasySchedule(selectedSplit);
         for (let r = 1; r < simulationTargetRound; r++) {
             const roundConfig = FANTASY_SCHEDULE.find(sch => sch.id === r);
             if (!roundConfig) continue;
@@ -760,7 +762,7 @@ export const DatabaseManager: React.FC = () => {
                                         onChange={(e) => setSimulationTargetRound(Number(e.target.value))}
                                         className="bg-black border border-purple-500/50 text-white text-xs rounded px-2 py-1 outline-none"
                                     >
-                                        {FANTASY_SCHEDULE.map(r => (
+                                        {getFantasySchedule(selectedSplit).map(r => (
                                             <option key={r.id} value={r.id}>{r.label}</option>
                                         ))}
                                     </select>

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ROLE_ICONS, FANTASY_SCHEDULE, COUNTRIES } from '../constants';
+import { ROLE_ICONS, getFantasySchedule, COUNTRIES } from '../constants';
 import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User, PlayerGameStats } from '../types';
 import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, TrendingDown, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole, Skull, Crosshair, Droplet } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
@@ -580,7 +580,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
       const map: Record<string, number> = {};
       
       // Get round definition
-      const roundConfig = FANTASY_SCHEDULE.find(r => r.id === viewRoundId);
+      const roundConfig = getFantasySchedule(selectedSplit).find(r => r.id === viewRoundId);
       if (!roundConfig || allMatches.length === 0) return map;
 
       // Filter matches that belong to this round (matchdays) AND match the stage
@@ -657,7 +657,9 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
 
   const loadHistory = async (userId: string) => {
       const history = [];
-      for (let i = 1; i <= 7; i++) {
+      const schedule = getFantasySchedule(selectedSplit);
+      for (const roundConfig of schedule) {
+          const i = roundConfig.id;
           const rData = await dataService.getFantasyTeam(userId, i, selectedSplit);
           if (rData) history.push({ round: i, score: rData.score || 0, team: rData.team });
           else history.push({ round: i, score: 0, team: null });
@@ -862,7 +864,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
       const player = players.find(p => p.id === playerId);
       if (!player) return [];
 
-      const currentRoundConfig = FANTASY_SCHEDULE.find(r => r.id === viewRoundId);
+      const currentRoundConfig = getFantasySchedule(selectedSplit).find(r => r.id === viewRoundId);
       if (!currentRoundConfig) return [];
 
       const roundMatches = allMatches.filter(m => 
@@ -907,7 +909,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
   const isHistoricalView = viewRoundId < activeConfigRound;
 
   // Determine correct round label
-  const currentRoundConfig = FANTASY_SCHEDULE.find(r => r.id === viewRoundId);
+  const currentRoundConfig = getFantasySchedule(selectedSplit).find(r => r.id === viewRoundId);
   const dynamicRoundLabel = currentRoundConfig 
       ? (currentRoundConfig.stage === Stage.GROUPS ? `Puntos J${currentRoundConfig.matchdays.join('-')}` : `Puntos ${currentRoundConfig.label}`) 
       : `Puntos R${viewRoundId}`;
@@ -946,7 +948,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                                 className="bg-black border border-gray-600 text-white text-xs rounded px-2 py-1 pr-6 cursor-pointer hover:border-white focus:outline-none focus:border-red-500 transition-colors"
                                 disabled={isAdminSaving}
                             >
-                                {FANTASY_SCHEDULE.map(r => (
+                                {getFantasySchedule(selectedSplit).map(r => (
                                     <option key={r.id} value={r.id}>Activa: {r.label}</option>
                                 ))}
                             </select>
@@ -1025,7 +1027,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                               onChange={(e) => setViewRoundId(Number(e.target.value))}
                               className="bg-[#0f1923] text-white border border-gray-600 text-sm rounded-lg px-3 py-2 outline-none focus:border-[#0ac8b9]"
                           >
-                              {FANTASY_SCHEDULE.map(r => (
+                              {getFantasySchedule(selectedSplit).map(r => (
                                   <option key={r.id} value={r.id}>{r.label} {r.id === activeConfigRound ? '(Actual)' : ''}</option>
                               ))}
                           </select>
@@ -1249,7 +1251,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                   </div>
                   <div className="divide-y divide-gray-800">
                       {historyScores.map((roundData) => {
-                          const config = FANTASY_SCHEDULE.find(f => f.id === roundData.round);
+                          const config = getFantasySchedule(selectedSplit).find(f => f.id === roundData.round);
                           const isCurrent = roundData.round === activeConfigRound;
                           return (
                               <div key={roundData.round} className="p-4 flex items-center justify-between hover:bg-[#0f1923] transition-colors">

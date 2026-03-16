@@ -1,6 +1,6 @@
 
 import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame, Notification, Card, UserCard, TradeOffer, UserPackState, CardType } from '../types';
-import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, FANTASY_SCHEDULE } from '../constants';
+import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, getFantasySchedule } from '../constants';
 import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where } from "firebase/firestore";
@@ -94,7 +94,7 @@ export const dataService = {
             // --- AUTOMATIC LOCK LOGIC ---
             // If manual lock is FALSE, check the time of the first match of the current fantasy round
             if (!config.fantasyLocked) {
-                const currentRoundDef = FANTASY_SCHEDULE.find(r => r.id === config.fantasyRound);
+                const currentRoundDef = getFantasySchedule(splitId || this._getCurrentSplitId()).find(r => r.id === config.fantasyRound);
                 if (currentRoundDef) {
                     const matches = await this.getMatches();
                     // Filter matches belonging to this fantasy round
@@ -1016,7 +1016,7 @@ export const dataService = {
         const updates = users.map(async (user: any) => {
             let totalFantasyScore = 0;
             
-            for (const roundConfig of FANTASY_SCHEDULE) {
+            for (const roundConfig of getFantasySchedule(currentSplitId)) {
                 const roundId = roundConfig.id;
                 const roundDocName = this._getFantasyRoundDocName(roundId, currentSplitId);
                 const roundRef = doc(db, "users", user.id, "fantasy_rounds", roundDocName);
@@ -1251,21 +1251,26 @@ export const dataService = {
 
                 let fantasyTotal = 0;
                 const fantasyHistory = [];
-                for(let r=1; r<=7; r++) {
-                    const roundDocName = this._getFantasyRoundDocName(r, this._getCurrentSplitId());
+                const currentSplitId = this._getCurrentSplitId();
+                const schedule = getFantasySchedule(currentSplitId);
+                for(const roundConfig of schedule) {
+                    const r = roundConfig.id;
+                    const roundDocName = this._getFantasyRoundDocName(r, currentSplitId);
                     const roundRef = doc(db, "users", userId, "fantasy_rounds", roundDocName);
                     const roundSnap = await getDoc(roundRef);
                     const points = roundSnap.exists() ? (roundSnap.data().score || 0) : 0;
                     
-                    const label = r <= 4 ? `J${FANTASY_SCHEDULE[r-1].matchdays.join('-')}` : `PO R${r-4}`;
+                    const label = roundConfig.stage === Stage.GROUPS ? `J${roundConfig.matchdays.join('-')}` : roundConfig.label.replace('Playoffs R', 'PO R');
                     fantasyHistory.push({ day: label, points: points });
                     fantasyTotal += points;
                 }
 
                 const pointsHistory: { day: string; points: number }[] = [];
                 let currentCumulative = 0;
+                const isSpring = currentSplitId === 'spring_2026';
+                const maxDays = isSpring ? 7 : 11;
 
-                for (let d = 1; d <= 11; d++) {
+                for (let d = 1; d <= maxDays; d++) {
                     const dayMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.day === d && m.winnerId);
                     let dayPoints = 0;
                     dayMatches.forEach(m => {
