@@ -10,7 +10,6 @@ interface DaySelectorProps {
     unlockedDayLimit?: number; 
     activeDays?: number[]; // visibleDays
     closedDays?: number[]; // manuallyClosedDays
-    openedDays?: number[]; // explicitlyOpenedDays
     labelPrefix?: string; // New prop for customization
 }
 
@@ -22,7 +21,6 @@ export const DaySelector: React.FC<DaySelectorProps> = ({
     onSelect,
     activeDays,
     closedDays,
-    openedDays,
     labelPrefix = "Jornada"
 }) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -49,14 +47,13 @@ export const DaySelector: React.FC<DaySelectorProps> = ({
                     // Logic for display icons
                     const isVisible = activeDays ? activeDays.includes(day) : day === 1;
                     const isManuallyClosed = closedDays ? closedDays.includes(day) : false;
-                    const isExplicitlyOpened = openedDays ? openedDays.includes(day) : false;
                     
                     // If Admin: See icons to know state.
                     // If User: If Hidden -> EyeOff (or dimmed), if Closed -> Lock.
                     
                     // Priority: Hidden > Closed > Open
                     const showHiddenIcon = !isVisible;
-                    const showLockIcon = isVisible && isManuallyClosed && !isExplicitlyOpened;
+                    const showLockIcon = isVisible && isManuallyClosed;
                     
                     // User view specifics
                     const isHiddenForUser = !isEditMode && !isVisible;

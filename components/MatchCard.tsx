@@ -8,8 +8,6 @@ interface MatchCardProps {
   selectedWinnerId?: string;
   onSelectWinner: (matchId: string, teamId: string) => void;
   isDayLocked?: boolean; // Prop para bloqueo global de jornada
-  isExplicitlyOpened?: boolean; // Nuevo: Override para ignorar bloqueo por tiempo
-  isAdmin?: boolean; // Nuevo: Para permitir acciones de admin
   customTitle?: string; // Nuevo prop para mostrar "R1 1", "L-SEMI", etc.
   teamARecord?: string; // Nuevo: Record del equipo A (ej: "3-0")
   teamBRecord?: string; // Nuevo: Record del equipo B
@@ -127,8 +125,6 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     selectedWinnerId, 
     onSelectWinner,
     isDayLocked = false,
-    isExplicitlyOpened = false,
-    isAdmin = false,
     customTitle,
     teamARecord,
     teamBRecord,
@@ -162,8 +158,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   // Effective Lock: Global Day Lock OR Individual Time Lock
   const isTbd = match.teamA?.id === 'tbd' || match.teamB?.id === 'tbd';
   const isTimeLocked = new Date() > new Date(match.startTime) && !match.isCompleted;
-  // If isExplicitlyOpened is true, we ignore the time lock
-  const isLocked = (isDayLocked || (isTimeLocked && !isExplicitlyOpened) || isTbd) && !isAdmin;
+  const isLocked = isDayLocked || isTimeLocked || isTbd;
 
   // Has Stats Data?
   const hasStats = ((match.games && match.games.length > 0) || (match.stats && Object.keys(match.stats).length > 0)) && !isTbd;
@@ -504,14 +499,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
         {/* RIGHT SIDE HEADER ACTIONS */}
         <div className="flex items-center gap-2">
             {match.isCompleted && <span className="text-green-400 font-bold uppercase flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Finalizado</span>}
-            {isLocked && !match.isCompleted && (
-                <span 
-                    className="text-red-400 font-bold uppercase flex items-center gap-1 cursor-help"
-                    title={`Debug: DayLocked=${isDayLocked}, TimeLocked=${isTimeLocked}, ExplicitOpen=${isExplicitlyOpened}, TBD=${isTbd}`}
-                >
-                    <Lock className="w-3 h-3"/> Cerrado
-                </span>
-            )}
+            {isLocked && !match.isCompleted && <span className="text-red-400 font-bold uppercase flex items-center gap-1"><Lock className="w-3 h-3"/> Cerrado</span>}
             <span className={isLocked || match.isCompleted ? 'opacity-50' : ''}>
                 {new Date(match.startTime).toLocaleDateString([], {day: '2-digit', month: '2-digit'})} - {new Date(match.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
             </span>

@@ -27,7 +27,6 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   const [currentDay, setCurrentDay] = useState(1);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
   const [closedDays, setClosedDays] = useState<number[]>([]); 
-  const [openedDays, setOpenedDays] = useState<number[]>([]); 
   
   // State for ALL matches loaded from DB
   const [allMatches, setAllMatches] = useState<Match[]>([]);
@@ -93,9 +92,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
             setAllPlayers(playersList);
             setAllUsers(usersList);
             
-            setVisibleDays(config.visibleDays || []);
-            setClosedDays(config.closedDays || []);
-            setOpenedDays(config.openedDays || []);
+            setVisibleDays(config.visibleDays);
+            setClosedDays(config.closedDays);
         } catch (error) {
             console.error("Error fetching data", error);
         } finally {
@@ -164,6 +162,13 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       fetchPicks();
   }, [viewingUserId, currentUserId, allMatches.length]); // Depend on matches length to re-run if matches load late
 
+  // Derive matches for current day from allMatches state
+  const matches = useMemo(() => {
+      return allMatches
+        .filter(m => m.day === currentDay && m.stage === Stage.GROUPS)
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  }, [allMatches, currentDay]);
+
   // Calculate Standing Records
   const teamRecords = useMemo(() => {
       const records: Record<string, { w: number, l: number }> = {};
@@ -209,43 +214,10 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   // --- LOGIC RULES ---
   const isDayVisible = visibleDays.includes(currentDay);
   const isManuallyClosed = closedDays.includes(currentDay);
-  const isExplicitlyOpened = openedDays.includes(currentDay);
-  
-  const matches = useMemo(() => {
-      return allMatches
-        .filter(m => m.day === currentDay && m.stage === Stage.GROUPS)
-        .sort((a, b) => {
-            const timeA = a.startTime ? new Date(a.startTime).getTime() : 0;
-            const timeB = b.startTime ? new Date(b.startTime).getTime() : 0;
-            return timeA - timeB;
-        });
-  }, [allMatches, currentDay]);
-
   const now = new Date();
-  const firstMatchTime = matches.length > 0 && matches[0].startTime ? new Date(matches[0].startTime) : null;
-  
-  // A day is time-locked if the first match has started
-  const isTimeLocked = firstMatchTime && !isNaN(firstMatchTime.getTime()) ? now >= firstMatchTime : false;
-  
-  // Final lock logic: 
-  // 1. If manually closed -> Locked
-  // 2. If explicitly opened -> Open (overrides time lock)
-  // 3. If time passed -> Locked
-  // 4. Otherwise -> Open
-  const isLockedForUser = isManuallyClosed || (isTimeLocked && !isExplicitlyOpened);
-
-  useEffect(() => {
-      if (isAdmin && isEditMode) {
-          console.log(`Day ${currentDay} Debug:`, {
-              isManuallyClosed,
-              isTimeLocked,
-              isExplicitlyOpened,
-              isLockedForUser,
-              firstMatchTime: firstMatchTime?.toISOString(),
-              now: now.toISOString()
-          });
-      }
-  }, [currentDay, isManuallyClosed, isTimeLocked, isExplicitlyOpened, isLockedForUser, isAdmin, isEditMode]);
+  const firstMatchTime = matches.length > 0 ? new Date(matches[0].startTime) : null;
+  const isTimeLocked = firstMatchTime ? now >= firstMatchTime : false;
+  const isLockedForUser = isManuallyClosed || isTimeLocked;
   
   // Derived state for Spectating
   const isSpectating = viewingUserId !== currentUserId;
@@ -253,13 +225,12 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
   const handleSelectWinner = (matchId: string, teamId: string) => {
     if (isEditMode || isSpectating) return; // Disable picking if spectating
-    if (isLockedForUser && !isAdmin) return; 
+    if (isLockedForUser) return; 
 
     const match = matches.find(m => m.id === matchId);
     if (match) {
         const startTime = new Date(match.startTime);
-        // Individual match lock: Only if NOT explicitly opened
-        if (now >= startTime && !match.isCompleted && !isAdmin && !isExplicitlyOpened) return; 
+        if (now >= startTime && !match.isCompleted && !isAdmin) return; 
     }
     
     setPredictions(prev => {
@@ -342,73 +313,22 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
   const handleToggleVisibility = async () => {
       if (!isAdmin) return;
+      let newVisibleDays = visibleDays.includes(currentDay) 
+          ? visibleDays.filter(d => d !== currentDay) 
+          : [...visibleDays, currentDay];
       
-      setVisibleDays(prev => {
-          const newVisibleDays = prev.includes(currentDay) 
-              ? prev.filter(d => d !== currentDay) 
-              : [...prev, currentDay];
-          
-          dataService.updateGlobalConfig({ 
-              visibleDays: newVisibleDays, 
-              closedDays,
-              openedDays
-          }, selectedSplit);
-          
-          return newVisibleDays;
-      });
+      setVisibleDays(newVisibleDays);
+      await dataService.updateGlobalConfig({ visibleDays: newVisibleDays, closedDays });
   };
 
   const handleToggleLock = async () => {
       if (!isAdmin) return;
+      let newClosedDays = closedDays.includes(currentDay)
+          ? closedDays.filter(d => d !== currentDay)
+          : [...closedDays, currentDay];
       
-      // If it's currently time-locked, "opening" it means adding it to openedDays
-      // If it's manually closed, "opening" it means removing it from closedDays
-      
-      if (isManuallyClosed) {
-          // It's manually closed -> Open it
-          setClosedDays(prev => {
-              const newClosedDays = prev.filter(d => d !== currentDay);
-              dataService.updateGlobalConfig({ 
-                  visibleDays, 
-                  closedDays: newClosedDays,
-                  openedDays
-              }, selectedSplit);
-              return newClosedDays;
-          });
-      } else if (isTimeLocked && !isExplicitlyOpened) {
-          // It's auto-locked by time -> Force open it
-          setOpenedDays(prev => {
-              const newOpenedDays = [...prev, currentDay];
-              dataService.updateGlobalConfig({ 
-                  visibleDays, 
-                  closedDays,
-                  openedDays: newOpenedDays
-              }, selectedSplit);
-              return newOpenedDays;
-          });
-      } else if (isTimeLocked && isExplicitlyOpened) {
-          // It was forced open -> Close it (back to auto-lock)
-          setOpenedDays(prev => {
-              const newOpenedDays = prev.filter(d => d !== currentDay);
-              dataService.updateGlobalConfig({ 
-                  visibleDays, 
-                  closedDays,
-                  openedDays: newOpenedDays
-              }, selectedSplit);
-              return newOpenedDays;
-          });
-      } else {
-          // It's open -> Manually close it
-          setClosedDays(prev => {
-              const newClosedDays = [...prev, currentDay];
-              dataService.updateGlobalConfig({ 
-                  visibleDays, 
-                  closedDays: newClosedDays,
-                  openedDays
-              }, selectedSplit);
-              return newClosedDays;
-          });
-      }
+      setClosedDays(newClosedDays);
+      await dataService.updateGlobalConfig({ visibleDays, closedDays: newClosedDays });
   };
 
   const handleSaveStats = async (games: any) => {
@@ -552,7 +472,6 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
             isEditMode={isEditMode}
             activeDays={visibleDays}
             closedDays={closedDays}
-            openedDays={openedDays}
             checkUnsaved={checkUnsavedChanges}
             onSelect={setCurrentDay}
         />
@@ -575,15 +494,13 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                 <button 
                     onClick={handleToggleLock}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase border transition-all ${
-                        !isLockedForUser 
+                        !isManuallyClosed 
                         ? 'bg-green-900/50 border-green-500 text-green-300 hover:bg-green-900' 
                         : 'bg-red-900/50 border-red-500 text-red-300 hover:bg-red-900'
                     }`}
                 >
-                    {isLockedForUser ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                    {isLockedForUser ? 'Cerrada' : 'Abierta'}
-                    {isTimeLocked && !isManuallyClosed && !isExplicitlyOpened && <span className="ml-1 opacity-50 text-[8px]">(Auto)</span>}
-                    {isExplicitlyOpened && <span className="ml-1 opacity-50 text-[8px]">(Forzada)</span>}
+                    {isManuallyClosed ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                    {isManuallyClosed ? 'Cerrada' : 'Abierta'}
                 </button>
                 <MatchdayImageUploader 
                     currentDay={currentDay} 
@@ -686,8 +603,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     </div>
                 ) : (
                     matches.map(match => {
-                        const recA = match.teamA ? teamRecords[match.teamA.id] : undefined;
-                        const recB = match.teamB ? teamRecords[match.teamB.id] : undefined;
+                        const recA = teamRecords[match.teamA.id];
+                        const recB = teamRecords[match.teamB.id];
                         const strRecA = recA ? `${recA.w}-${recA.l}` : undefined;
                         const strRecB = recB ? `${recB.w}-${recB.l}` : undefined;
 
@@ -706,10 +623,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                                 selectedWinnerId={canSeePick ? userPick : undefined}
                                 onSelectWinner={handleSelectWinner}
                                 isEditing={isEditMode}
-                                isAdmin={isAdmin}
                                 // If spectating, treat as locked (read-only)
                                 isDayLocked={isLockedForUser || isSpectating}
-                                isExplicitlyOpened={isExplicitlyOpened}
                                 teamARecord={strRecA}
                                 teamBRecord={strRecB}
                                 onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
@@ -728,7 +643,6 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                             match={newMatch}
                             teams={allTeams}
                             isEditing={true}
-                            isAdmin={isAdmin}
                             onSelectWinner={() => {}}
                             onUpdate={(updates) => handleAdminUpdate(newMatch.id, updates)}
                             onCancel={() => setNewMatch(null)}
