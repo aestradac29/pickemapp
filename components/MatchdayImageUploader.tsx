@@ -30,7 +30,6 @@ export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ cu
                 const base64Image = (reader.result as string).split(',')[1];
                 
                 const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
-                console.log('GEMINI_API_KEY:', apiKey);
                 const ai = apiKey ? new GoogleGenAI({ apiKey }) : new GoogleGenAI();
 
                 const response = await ai.models.generateContent({
