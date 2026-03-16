@@ -1,5 +1,5 @@
 
-import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame, Notification, Card, UserCard, TradeOffer, UserPackState, CardType } from '../types';
+import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame, Notification, Card, UserCard, TradeOffer, UserPackState, CardType, Region } from '../types';
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, getFantasySchedule } from '../constants';
 import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
@@ -641,7 +641,7 @@ export const dataService = {
 
             if (matchesSnap.exists()) {
                 const rawMatches = matchesSnap.data().allMatches || [];
-                allMatches = rawMatches.map((m: Match) => {
+                allMatches = rawMatches.filter(Boolean).map((m: Match) => {
                     let finalDay = m.day;
                     if (!finalDay && m.id.startsWith('d') && m.id.includes('-m')) {
                         try {
@@ -665,8 +665,8 @@ export const dataService = {
                     return {
                         ...m,
                         day: finalDay,
-                        teamA: (m.teamA && teamsMap[m.teamA.id]) || m.teamA, 
-                        teamB: (m.teamB && teamsMap[m.teamB.id]) || m.teamB
+                        teamA: (m.teamA && teamsMap[m.teamA.id]) || m.teamA || { id: 'tbd', name: 'TBD', shortName: 'TBD', region: Region.LEC, color: '#6b7280' }, 
+                        teamB: (m.teamB && teamsMap[m.teamB.id]) || m.teamB || { id: 'tbd', name: 'TBD', shortName: 'TBD', region: Region.LEC, color: '#6b7280' }
                     };
                 });
 

@@ -160,7 +160,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                   if (match.stage !== Stage.PLAYOFFS && match.stage !== Stage.FINALS) return;
 
                   const isStarted = new Date(match.startTime) <= now;
-                  const isTbd = match.teamA.id === 'tbd' || match.teamB.id === 'tbd';
+                  const isTbd = match.teamA?.id === 'tbd' || match.teamB?.id === 'tbd';
                   
                   if (isStarted && !isTbd) {
                       const hasPrediction = filledPicks.some(p => p.matchId === match.id);

@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
 import { DaySelector } from './DaySelector';
+import { MatchdayImageUploader } from './MatchdayImageUploader';
 import { UserPrediction, Match, Team, Stage, Player, User } from '../types';
 import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, LogOut, User as UserIcon } from 'lucide-react';
 import { dataService } from '../services/dataService';
@@ -14,17 +15,15 @@ interface MatchdayViewProps {
     initialPredictions?: UserPrediction[];
     isAdmin?: boolean;
     onPredictionsSaved?: () => Promise<void> | void; 
-    selectedSplit: string | null;
 }
 
 export const MatchdayView: React.FC<MatchdayViewProps> = ({ 
     currentUserId, 
     initialPredictions = [], 
     isAdmin = false,
-    onPredictionsSaved,
-    selectedSplit
+    onPredictionsSaved 
 }) => {
-  const normalizedSplit = normalizeSplitId(selectedSplit);
+  const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
   const [currentDay, setCurrentDay] = useState(1);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
   const [closedDays, setClosedDays] = useState<number[]>([]); 
@@ -80,15 +79,13 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         setNewMatch(null); 
         try {
             // Cargar TODOS los datos necesarios
-            console.log("Fetching data for split:", selectedSplit);
             const [fetchedMatches, teamsMap, config, playersList, usersList] = await Promise.all([
-                dataService.getMatches(undefined, selectedSplit), 
-                dataService.getTeams(selectedSplit),
-                dataService.getDaysConfig(selectedSplit),
-                dataService.getPlayers(selectedSplit),
+                dataService.getMatches(), 
+                dataService.getTeams(),
+                dataService.getDaysConfig(),
+                dataService.getPlayers(),
                 dataService.getAllUsers()
             ]);
-            console.log("Config loaded:", config);
             
             setAllMatches(fetchedMatches);
             setAllTeams(Object.values(teamsMap));
@@ -104,7 +101,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         }
     };
     loadData();
-  }, [normalizedSplit]);
+  }, []);
 
   // Fetch predictions when viewingUserId changes
   useEffect(() => {
@@ -321,7 +318,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           : [...visibleDays, currentDay];
       
       setVisibleDays(newVisibleDays);
-      await dataService.updateGlobalConfig({ visibleDays: newVisibleDays, closedDays }, selectedSplit);
+      await dataService.updateGlobalConfig({ visibleDays: newVisibleDays, closedDays });
   };
 
   const handleToggleLock = async () => {
@@ -331,7 +328,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           : [...closedDays, currentDay];
       
       setClosedDays(newClosedDays);
-      await dataService.updateGlobalConfig({ visibleDays, closedDays: newClosedDays }, selectedSplit);
+      await dataService.updateGlobalConfig({ visibleDays, closedDays: newClosedDays });
   };
 
   const handleSaveStats = async (games: any) => {
@@ -505,6 +502,13 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     {isManuallyClosed ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                     {isManuallyClosed ? 'Cerrada' : 'Abierta'}
                 </button>
+                <MatchdayImageUploader 
+                    currentDay={currentDay} 
+                    onMatchesCreated={async () => {
+                        const updatedMatches = await dataService.getMatches();
+                        setAllMatches(updatedMatches);
+                    }}
+                />
             </div>
         )}
       </div>
@@ -599,8 +603,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     </div>
                 ) : (
                     matches.map(match => {
-                        const recA = teamRecords[match.teamA.id];
-                        const recB = teamRecords[match.teamB.id];
+                        const recA = match.teamA ? teamRecords[match.teamA.id] : undefined;
+                        const recB = match.teamB ? teamRecords[match.teamB.id] : undefined;
                         const strRecA = recA ? `${recA.w}-${recA.l}` : undefined;
                         const strRecB = recB ? `${recB.w}-${recB.l}` : undefined;
 

@@ -870,11 +870,11 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
       const roundMatches = allMatches.filter(m => 
           (currentRoundConfig.stage === Stage.GROUPS ? m.stage === Stage.GROUPS : m.stage !== Stage.GROUPS) &&
           currentRoundConfig.matchdays.includes(m.day || 0) &&
-          (m.teamA.id === player.teamId || m.teamB.id === player.teamId)
+          (m.teamA?.id === player.teamId || m.teamB?.id === player.teamId)
       );
 
       return roundMatches.map(m => {
-          const oppId = m.teamA.id === player.teamId ? m.teamB.id : m.teamA.id;
+          const oppId = m.teamA?.id === player.teamId ? m.teamB?.id : m.teamA?.id;
           return teams[oppId];
       }).filter(Boolean);
   };

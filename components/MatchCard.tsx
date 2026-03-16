@@ -139,8 +139,8 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   
   // Local Edit State
   const [editState, setEditState] = useState({
-      teamA: match.teamA.id,
-      teamB: match.teamB.id,
+      teamA: match.teamA?.id || 'tbd',
+      teamB: match.teamB?.id || 'tbd',
       startTime: match.startTime,
       winnerId: match.winnerId || '',
       status: match.isCompleted ? 'finished' : 'scheduled',
@@ -156,7 +156,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Effective Lock: Global Day Lock OR Individual Time Lock
-  const isTbd = match.teamA.id === 'tbd' || match.teamB.id === 'tbd';
+  const isTbd = match.teamA?.id === 'tbd' || match.teamB?.id === 'tbd';
   const isTimeLocked = new Date() > new Date(match.startTime) && !match.isCompleted;
   const isLocked = isDayLocked || isTimeLocked || isTbd;
 
@@ -169,20 +169,20 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   
   if (match.games && match.games.length > 0) {
       match.games.forEach(g => {
-          if (g.winnerId === match.teamA.id) scoreA++;
-          if (g.winnerId === match.teamB.id) scoreB++;
+          if (g.winnerId === match.teamA?.id) scoreA++;
+          if (g.winnerId === match.teamB?.id) scoreB++;
       });
   } else if (match.winnerId) {
       // Fallback for simple BO1
-      if (match.winnerId === match.teamA.id) scoreA = 1;
-      else scoreB = 1;
+      if (match.winnerId === match.teamA?.id) scoreA = 1;
+      else if (match.winnerId === match.teamB?.id) scoreB = 1;
   }
 
   // Sync state with props when match changes
   useEffect(() => {
     setEditState({
-      teamA: match.teamA.id,
-      teamB: match.teamB.id,
+      teamA: match.teamA?.id || 'tbd',
+      teamB: match.teamB?.id || 'tbd',
       startTime: match.startTime,
       winnerId: match.winnerId || '',
       status: match.isCompleted ? 'finished' : 'scheduled',

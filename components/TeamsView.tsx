@@ -25,7 +25,7 @@ const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ player, team, m
             // Skip matches where player has no stats (unless marked completed, but even then we need stats)
             if (!match.isCompleted && !match.stats && (!match.games || match.games.length === 0)) return;
 
-            const opponentId = match.teamA.id === team.id ? match.teamB.id : match.teamA.id;
+            const opponentId = match.teamA?.id === team.id ? match.teamB?.id : match.teamA?.id;
             const opponent = teams[opponentId];
 
             // Handle Detailed Games (BO3/BO5)

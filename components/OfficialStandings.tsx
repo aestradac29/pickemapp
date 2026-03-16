@@ -24,7 +24,7 @@ const TeamScheduleModal: React.FC<TeamScheduleModalProps> = ({ team, matches, on
     // Filter matches involving this team
     const teamMatches = useMemo(() => {
         return matches
-            .filter(m => m.teamA.id === team.id || m.teamB.id === team.id)
+            .filter(m => m.teamA?.id === team.id || m.teamB?.id === team.id)
             .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     }, [matches, team]);
 
@@ -78,7 +78,7 @@ const TeamScheduleModal: React.FC<TeamScheduleModalProps> = ({ team, matches, on
                         </div>
                     ) : (
                         teamMatches.map(match => {
-                            const isHome = match.teamA.id === team.id;
+                            const isHome = match.teamA?.id === team.id;
                             const opponent = isHome ? match.teamB : match.teamA;
                             const isWin = match.winnerId === team.id;
                             const isLoss = match.winnerId && match.winnerId !== team.id;
@@ -185,7 +185,7 @@ export const OfficialStandings: React.FC = () => {
         // Calculate Stats
         regularSeasonMatches.forEach(m => {
             const winnerId = m.winnerId!;
-            const loserId = m.teamA.id === winnerId ? m.teamB.id : m.teamA.id;
+            const loserId = m.teamA?.id === winnerId ? m.teamB?.id : m.teamA?.id;
 
             if (stats[winnerId]) {
                 stats[winnerId].played++;
@@ -210,7 +210,7 @@ export const OfficialStandings: React.FC = () => {
             // Simplified approach: Iterate reversed match history per team
             let currentStreak = 0;
             const teamMatches = regularSeasonMatches
-                .filter(m => m.teamA.id === row.team.id || m.teamB.id === row.team.id)
+                .filter(m => m.teamA?.id === row.team.id || m.teamB?.id === row.team.id)
                 .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()); // Reverse Chrono
 
             for (const m of teamMatches) {
