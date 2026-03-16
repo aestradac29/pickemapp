@@ -23,7 +23,6 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
     isAdmin = false,
     onPredictionsSaved 
 }) => {
-  console.log('MatchdayView mounted');
   const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
   const [currentDay, setCurrentDay] = useState(1);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
