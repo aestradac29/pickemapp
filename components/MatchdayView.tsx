@@ -253,12 +253,13 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
   const handleSelectWinner = (matchId: string, teamId: string) => {
     if (isEditMode || isSpectating) return; // Disable picking if spectating
-    if (isLockedForUser) return; 
+    if (isLockedForUser && !isAdmin) return; 
 
     const match = matches.find(m => m.id === matchId);
     if (match) {
         const startTime = new Date(match.startTime);
-        if (now >= startTime && !match.isCompleted && !isAdmin) return; 
+        // Individual match lock: Only if NOT explicitly opened
+        if (now >= startTime && !match.isCompleted && !isAdmin && !isExplicitlyOpened) return; 
     }
     
     setPredictions(prev => {
@@ -705,8 +706,10 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                                 selectedWinnerId={canSeePick ? userPick : undefined}
                                 onSelectWinner={handleSelectWinner}
                                 isEditing={isEditMode}
+                                isAdmin={isAdmin}
                                 // If spectating, treat as locked (read-only)
                                 isDayLocked={isLockedForUser || isSpectating}
+                                isExplicitlyOpened={isExplicitlyOpened}
                                 teamARecord={strRecA}
                                 teamBRecord={strRecB}
                                 onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
@@ -725,6 +728,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                             match={newMatch}
                             teams={allTeams}
                             isEditing={true}
+                            isAdmin={isAdmin}
                             onSelectWinner={() => {}}
                             onUpdate={(updates) => handleAdminUpdate(newMatch.id, updates)}
                             onCancel={() => setNewMatch(null)}
