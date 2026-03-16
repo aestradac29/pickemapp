@@ -603,8 +603,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     </div>
                 ) : (
                     matches.map(match => {
-                        const recA = teamRecords[match.teamA.id];
-                        const recB = teamRecords[match.teamB.id];
+                        const recA = match.teamA ? teamRecords[match.teamA.id] : undefined;
+                        const recB = match.teamB ? teamRecords[match.teamB.id] : undefined;
                         const strRecA = recA ? `${recA.w}-${recA.l}` : undefined;
                         const strRecB = recB ? `${recB.w}-${recB.l}` : undefined;
 

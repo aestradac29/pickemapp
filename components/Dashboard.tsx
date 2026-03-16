@@ -16,7 +16,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
   const [albumEnabled, setAlbumEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAccessibleSplit = (selectedSplit?.toLowerCase().includes('winter') || selectedSplit?.toLowerCase().includes('spring')) ?? true;
+  const isWinterSplit = selectedSplit?.toLowerCase().includes('winter') ?? true;
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -57,7 +57,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-blue-500',
       border: 'hover:border-blue-500',
       bg: 'hover:bg-blue-500/10',
-      locked: !isAccessibleSplit
+      locked: !isWinterSplit
     },
     {
       id: ViewState.RANKING,
@@ -67,7 +67,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-gray-300',
       border: 'hover:border-gray-300',
       bg: 'hover:bg-gray-300/10',
-      locked: !isAccessibleSplit
+      locked: !isWinterSplit
     },
     {
       id: ViewState.PLAYOFFS,
@@ -77,7 +77,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-[#c8aa6e]',
       border: 'hover:border-[#c8aa6e]',
       bg: 'hover:bg-[#c8aa6e]/10',
-      locked: (!isAccessibleSplit) || (!playoffsAccessible && !isAdmin) // Bloqueado para usuarios normales si no está accesible
+      locked: (!isWinterSplit) || (!playoffsAccessible && !isAdmin) // Bloqueado para usuarios normales si no está accesible
     },
     {
       id: ViewState.CRYSTAL_BALL,
@@ -87,7 +87,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-purple-400',
       border: 'hover:border-purple-400',
       bg: 'hover:bg-purple-400/10',
-      locked: !isAccessibleSplit
+      locked: !isWinterSplit
     },
     {
       id: ViewState.FANTASY,
@@ -97,7 +97,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-[#0ac8b9]', // Cyan for Fantasy
       border: 'hover:border-[#0ac8b9]',
       bg: 'hover:bg-[#0ac8b9]/10',
-      locked: !isAccessibleSplit
+      locked: !isWinterSplit
     },
     {
       id: ViewState.TEAMS,
@@ -107,7 +107,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-orange-400',
       border: 'hover:border-orange-400',
       bg: 'hover:bg-orange-400/10',
-      locked: !isAccessibleSplit
+      locked: !isWinterSplit
     },
     {
       id: ViewState.RESULTS,
@@ -117,7 +117,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-green-400',
       border: 'hover:border-green-400',
       bg: 'hover:bg-green-400/10',
-      locked: !isAccessibleSplit
+      locked: !isWinterSplit
     },
     {
       id: ViewState.OFFICIAL_STANDINGS,
@@ -127,7 +127,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-amber-400',
       border: 'hover:border-amber-400',
       bg: 'hover:bg-amber-400/10',
-      locked: !isAccessibleSplit
+      locked: !isWinterSplit
     },
     {
       id: ViewState.HALL_OF_FAME,
@@ -137,7 +137,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-yellow-400',
       border: 'hover:border-yellow-400',
       bg: 'hover:bg-yellow-400/10',
-      locked: !isAccessibleSplit
+      locked: !isWinterSplit
     }
   ];
 
@@ -222,7 +222,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
             </h3>
             
             <p className="text-gray-500 text-xs group-hover:text-gray-300 transition-colors">
-                {option.locked ? (!isAccessibleSplit ? 'Próximamente' : 'Fase Regular en curso') : option.subtitle}
+                {option.locked ? (!isWinterSplit ? 'Próximamente' : 'Fase Regular en curso') : option.subtitle}
             </p>
             
             {/* Corner Accents (Only if not locked) */}
