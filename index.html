@@ -90,6 +90,11 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #c8aa6e; 
       }
+      /* Invert dark logos for better visibility on dark background */
+      img[src*="GIANTXlogo_square.png"],
+      img[src*="SK_Gaminglogo_square.png"] {
+        filter: brightness(0) invert(1);
+      }
     </style>
   <script type="importmap">
 {
