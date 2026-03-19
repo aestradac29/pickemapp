@@ -15,6 +15,7 @@ interface PlayoffsViewProps {
     initialPredictions?: UserPrediction[];
     isAdmin?: boolean;
     onPredictionsSaved?: () => Promise<void> | void; 
+    selectedSplit?: string | null;
 }
 
 const PointBadge = ({ points, label }: { points: number, label: string }) => {
@@ -35,9 +36,10 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
     currentUserId, 
     initialPredictions = [], 
     isAdmin = false,
-    onPredictionsSaved 
+    onPredictionsSaved,
+    selectedSplit: propSelectedSplit
 }) => {
-  const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+  const selectedSplit = propSelectedSplit || normalizeSplitId(localStorage.getItem('selectedSplit'));
   // Config
   const [totalRounds, setTotalRounds] = useState(3);
   const [currentDay, setCurrentDay] = useState(1);
@@ -100,11 +102,11 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
         setNewMatch(null); 
         try {
             const [fetchedMatches, teamsMap, config, playersList, usersList] = await Promise.all([
-                dataService.getMatches(), 
-                dataService.getTeams(),
-                dataService.getDaysConfig(),
-                dataService.getPlayers(),
-                dataService.getAllUsers()
+                dataService.getMatches(undefined, selectedSplit), 
+                dataService.getTeams(false, selectedSplit),
+                dataService.getDaysConfig(selectedSplit),
+                dataService.getPlayers(false, selectedSplit),
+                dataService.getAllUsers(selectedSplit)
             ]);
             
             setAllMatches(fetchedMatches);
@@ -126,7 +128,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
         }
     };
     loadData();
-  }, []);
+  }, [selectedSplit]);
 
   // Fetch predictions when viewingUserId changes
   useEffect(() => {
@@ -140,7 +142,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           } else {
               setIsLoadingPicks(true);
               try {
-                  userPicks = await dataService.getUserPredictions(viewingUserId);
+                  userPicks = await dataService.getUserPredictions(viewingUserId, selectedSplit);
               } catch (e) {
                   console.error("Error fetching user picks", e);
                   userPicks = [];
@@ -187,7 +189,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           setPredictions(userPicks);
       };
       fetchPicks();
-  }, [viewingUserId, currentUserId, initialPredictions, allMatches.length]);
+  }, [viewingUserId, currentUserId, initialPredictions, allMatches.length, selectedSplit]);
 
   const isDayVisible = visibleDays.includes(currentDay);
   const isManuallyClosed = closedDays.includes(currentDay);

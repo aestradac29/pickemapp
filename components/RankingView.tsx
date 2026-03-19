@@ -4,14 +4,16 @@ import { normalizeSplitId } from '../constants';
 import { Team, User } from '../types';
 import { GripVertical, Save, Trophy, AlertOctagon, Loader2, CheckCircle2, AlertCircle, Settings, Lock, XCircle, Eye } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import { OfficialStandings } from './OfficialStandings';
 
 interface RankingViewProps {
     currentUserId?: string | null;
     isAdmin?: boolean;
+    selectedSplit?: string | null;
 }
 
-export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin }) => {
-  const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin, selectedSplit: propSelectedSplit }) => {
+  const selectedSplit = propSelectedSplit || normalizeSplitId(localStorage.getItem('selectedSplit'));
   const [rankedTeams, setRankedTeams] = useState<Team[]>([]);
   const [officialRanking, setOfficialRanking] = useState<string[]>([]); // Estado para guardar el ranking oficial
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -37,19 +39,19 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   useEffect(() => {
     const loadUsers = async () => {
         try {
-            const users = await dataService.getAllUsers();
+            const users = await dataService.getAllUsers(selectedSplit);
             setAllUsers(users);
         } catch (e) {
             console.error("Error loading users", e);
         }
     };
     loadUsers();
-  }, []);
+  }, [selectedSplit]);
 
   useEffect(() => {
     loadTeamsAndRanking();
     checkLockStatus();
-  }, [mode, viewingUserId, isAdmin]); // Reload when mode switches or user changes
+  }, [mode, viewingUserId, isAdmin, selectedSplit]); // Reload when mode switches or user changes
 
   const checkLockStatus = async () => {
       // Official result editing is never locked for admin (needed for scoring)
@@ -93,7 +95,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
         let orderedIds: string[] = [];
 
         // 2. Determinar qué lista mostrar (Usuario Seleccionado vs Admin Editor)
-        if (isAdmin && mode === 'official_result') {
+        if (mode === 'official_result') {
             orderedIds = adminRankingIds;
         } else if (viewingUserId) {
             // Cargar ranking del usuario que estamos VIENDO (viewingUserId)
@@ -126,8 +128,8 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   const isViewingOther = viewingUserId !== currentUserId;
   const viewingUser = allUsers.find(u => u.id === viewingUserId);
 
-  // Drag logic: Allow if Official Result Mode OR (Prediction Mode + Not Locked + Own Profile)
-  const canDrag = mode === 'official_result' || (!isLocked && !isViewingOther);
+  // Drag logic: Allow if (Admin + Official Result Mode) OR (Prediction Mode + Not Locked + Own Profile)
+  const canDrag = (isAdmin && mode === 'official_result') || (!isLocked && !isViewingOther && mode === 'prediction');
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     if (!canDrag) return;
@@ -157,6 +159,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   const handleSave = async () => {
       // Bloquear guardado SOLO si está bloqueado en modo predicción o viendo a otro (en predicción)
       if (mode === 'prediction' && (isLocked || isViewingOther)) return;
+      if (mode === 'official_result' && !isAdmin) return;
 
       if (!currentUserId && !isAdmin) {
           alert("Debes iniciar sesión.");
@@ -173,7 +176,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
               await dataService.saveAdminRanking(teamIds, selectedSplit);
               // Actualizamos el estado local también para reflejar cambios inmediatos en la UI si cambiamos de modo
               setOfficialRanking(teamIds); 
-          } else if (currentUserId) {
+          } else if (currentUserId && mode === 'prediction') {
               await dataService.saveUserRanking(currentUserId, teamIds, selectedSplit);
           }
           setSaveStatus('success');
@@ -201,6 +204,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
         const diff = Math.abs(index - officialIndex);
         if (diff === 0) return acc + exactPoints;
         if (diff === 1) return acc + offByOnePoints;
+        if (isSpring && index < 6 && officialIndex < 6) return acc + 1;
         return acc;
     }, 0);
   }, [rankedTeams, officialRanking, mode, selectedSplit]);
@@ -226,12 +230,12 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
       {/* Header Area with Admin & User Select */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <h2 className={`text-2xl font-bold uppercase ${mode === 'official_result' ? 'text-red-500' : 'text-[#c8aa6e]'}`}>
-                {mode === 'official_result' ? 'ADMIN: RESULTADO REAL' : `Clasificación ${selectedSplit.toLowerCase().includes('spring') ? 'Spring 2026' : 'Winter 2026'}`}
+            <h2 className={`text-2xl font-bold uppercase ${mode === 'official_result' ? (isAdmin ? 'text-red-500' : 'text-amber-500') : 'text-[#c8aa6e]'}`}>
+                {mode === 'official_result' ? (isAdmin ? 'ADMIN: RESULTADO REAL' : 'CLASIFICACIÓN OFICIAL') : `Clasificación ${selectedSplit.toLowerCase().includes('spring') ? 'Spring 2026' : 'Winter 2026'}`}
             </h2>
             <p className="text-gray-400 text-sm">
                 {mode === 'official_result' 
-                    ? 'Establece el orden REAL para calcular puntuaciones.' 
+                    ? (isAdmin ? 'Establece el orden REAL para calcular puntuaciones.' : 'Orden real de la Fase Regular.')
                     : 'Predicción del orden final de la Fase Regular.'}
             </p>
           </div>
@@ -259,21 +263,21 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
                 </div>
              )}
 
-             {/* Admin Mode Toggle */}
-             {isAdmin && (
+             {/* Mode Toggle (Visible to all in Spring, or to Admins always) */}
+             {(isAdmin || selectedSplit.toLowerCase().includes('spring')) && (
                   <div className="bg-[#0f1d36] border border-gray-700 p-1 rounded-lg flex items-center gap-1">
                       <button 
                         onClick={() => { setMode('prediction'); setViewingUserId(currentUserId); }}
                         className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-colors ${mode === 'prediction' ? 'bg-[#c8aa6e] text-[#0a1428]' : 'text-gray-400 hover:text-white'}`}
                       >
-                          Ver
+                          Ranking
                       </button>
                       <button 
                         onClick={() => { setMode('official_result'); setViewingUserId(currentUserId); }}
-                        className={`px-3 py-1.5 rounded text-xs font-bold uppercase flex items-center gap-2 transition-colors ${mode === 'official_result' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-3 py-1.5 rounded text-xs font-bold uppercase flex items-center gap-2 transition-colors ${mode === 'official_result' ? (isAdmin ? 'bg-red-600 text-white' : 'bg-amber-500 text-[#0a1428]') : 'text-gray-400 hover:text-white'}`}
                       >
-                          <Settings className="w-3 h-3" />
-                          Admin
+                          {isAdmin && <Settings className="w-3 h-3" />}
+                          {isAdmin ? 'Admin' : 'Oficial'}
                       </button>
                   </div>
              )}
@@ -292,7 +296,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
       )}
 
       {/* SCORING LEGEND */}
-      <div className="flex items-center justify-center gap-3 mb-6 animate-in fade-in slide-in-from-bottom-2">
+      <div className="flex flex-wrap items-center justify-center gap-3 mb-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-green-500/30 bg-green-900/10 backdrop-blur-sm">
                 <CheckCircle2 className="w-3 h-3 text-green-400" />
                 <span className="text-[10px] font-bold text-green-200 uppercase tracking-wider">Posición Exacta: <span className="text-white ml-1">+{selectedSplit.toLowerCase().includes('spring') ? '6.75' : '6'} Pts</span></span>
@@ -301,6 +305,12 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
                 <AlertCircle className="w-3 h-3 text-yellow-400" />
                 <span className="text-[10px] font-bold text-yellow-200 uppercase tracking-wider">Error por 1 posición: <span className="text-white ml-1">+{selectedSplit.toLowerCase().includes('spring') ? '3.5' : '3'} Pts</span></span>
             </div>
+            {selectedSplit.toLowerCase().includes('spring') && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-blue-500/30 bg-blue-900/10 backdrop-blur-sm">
+                    <CheckCircle2 className="w-3 h-3 text-blue-400" />
+                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider">Acierta Clasifica: <span className="text-white ml-1">+1 Pts</span></span>
+                </div>
+            )}
       </div>
 
       {/* Total Score Badge if Results Exist */}
@@ -320,15 +330,20 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
         </div>
       )}
 
-      <div className={`bg-[#091428]/80 backdrop-blur rounded-xl border p-4 space-y-2 relative transition-colors ${mode === 'official_result' ? 'border-red-900/50 shadow-[0_0_20px_rgba(220,38,38,0.1)]' : 'border-gray-700'}`}>
-        
-        {/* Header Playoffs */}
-        <div className="flex items-center gap-2 pb-2 mb-2 border-b border-[#c8aa6e]/20 text-[#c8aa6e]">
-          <Trophy className="w-4 h-4" />
-          <span className="text-xs font-bold uppercase tracking-widest">Zona de Playoffs</span>
-        </div>
+      {mode === 'official_result' && (
+          <OfficialStandings selectedSplit={selectedSplit} hideHeader={true} />
+      )}
 
-        {rankedTeams.map((team, index) => {
+      {(mode === 'prediction' || isAdmin) && (
+          <div className={`bg-[#091428]/80 backdrop-blur rounded-xl border p-4 space-y-2 relative transition-colors ${mode === 'official_result' ? 'border-red-900/50 shadow-[0_0_20px_rgba(220,38,38,0.1)] mt-8' : 'border-gray-700'}`}>
+            
+            {/* Header Playoffs */}
+            <div className="flex items-center gap-2 pb-2 mb-2 border-b border-[#c8aa6e]/20 text-[#c8aa6e]">
+              <Trophy className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-widest">Zona de Playoffs</span>
+            </div>
+
+            {rankedTeams.map((team, index) => {
           const isSpring = selectedSplit.toLowerCase().includes('spring');
           const eliminationThreshold = isSpring ? 6 : 8;
           const isEliminated = index >= eliminationThreshold;
@@ -356,6 +371,15 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
                           <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold bg-yellow-950/50 px-2 py-1 rounded border border-yellow-500/30">
                               <AlertCircle className="w-3 h-3" />
                               <span>+{isSpring ? '3.5' : '3'} Pts</span>
+                              <span className="text-[9px] opacity-70 ml-1">(Real: {officialIndex + 1}º)</span>
+                          </div>
+                      );
+                  } else if (isSpring && index < 6 && officialIndex < 6) {
+                      diffClass = 'border-blue-500/50 bg-blue-900/10';
+                      scoreBadge = (
+                          <div className="flex items-center gap-1 text-blue-400 text-xs font-bold bg-blue-950/50 px-2 py-1 rounded border border-blue-500/30">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>+1 Pts</span>
                               <span className="text-[9px] opacity-70 ml-1">(Real: {officialIndex + 1}º)</span>
                           </div>
                       );
@@ -456,9 +480,10 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
           );
         })}
       </div>
+      )}
 
-      {/* Footer Actions (Only show Save if NOT viewing other user's prediction OR in Official Result Mode) */}
-      {(!isViewingOther || mode === 'official_result') && (
+      {/* Footer Actions (Only show Save if NOT viewing other user's prediction OR in Official Result Mode for Admins) */}
+      {((!isViewingOther && mode === 'prediction') || (isAdmin && mode === 'official_result')) && (
         <div className="mt-6 flex justify-center sticky bottom-8 z-20 pointer-events-none">
             <button 
                 onClick={handleSave}

@@ -230,7 +230,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
             const [playersList, teamsMap, usersList] = await Promise.all([
                 dataService.getPlayers(false, selectedSplit),
                 dataService.getTeams(false, selectedSplit),
-                dataService.getAllUsers()
+                dataService.getAllUsers(selectedSplit)
             ]);
             setPlayers(playersList);
             setTeams(Object.values(teamsMap));

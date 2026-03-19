@@ -5,6 +5,7 @@ import { MatchCard } from './components/MatchCard';
 import { Leaderboard } from './components/Leaderboard';
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
+import { RankingCombinedView } from './components/RankingCombinedView';
 import { RankingView } from './components/RankingView';
 import { CrystalBall } from './components/CrystalBall';
 import { FantasyView } from './components/FantasyView';
@@ -236,7 +237,7 @@ const App: React.FC = () => {
       case ViewState.DASHBOARD:
         return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
       case ViewState.RANKING:
-        return <RankingView currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit} />;
+        return <RankingCombinedView currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit} />;
       case ViewState.CRYSTAL_BALL:
         return <CrystalBall currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit} />;
       case ViewState.FANTASY:

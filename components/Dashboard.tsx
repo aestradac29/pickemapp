@@ -48,6 +48,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       await dataService.updateGlobalConfig({ albumEnabled: newValue });
   };
 
+  const isSpring = selectedSplit?.toLowerCase().includes('spring');
+
   const options = [
     {
       id: ViewState.MATCHDAY,
@@ -61,8 +63,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
     },
     {
       id: ViewState.RANKING,
-      title: 'Tu Ranking',
-      subtitle: 'Predicción Top 12',
+      title: 'Ranking y Oficial',
+      subtitle: 'Predicción y Tabla Real',
       icon: ListOrdered,
       color: 'text-gray-300',
       border: 'hover:border-gray-300',
@@ -117,16 +119,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       color: 'text-green-400',
       border: 'hover:border-green-400',
       bg: 'hover:bg-green-400/10',
-      locked: !isAccessibleSplit
-    },
-    {
-      id: ViewState.OFFICIAL_STANDINGS,
-      title: 'Clasificación Oficial',
-      subtitle: 'Tabla real LEC Winter',
-      icon: Table2,
-      color: 'text-amber-400',
-      border: 'hover:border-amber-400',
-      bg: 'hover:bg-amber-400/10',
       locked: !isAccessibleSplit
     },
     {

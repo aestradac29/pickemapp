@@ -135,20 +135,25 @@ const TeamScheduleModal: React.FC<TeamScheduleModalProps> = ({ team, matches, on
     );
 };
 
-export const OfficialStandings: React.FC = () => {
+export interface OfficialStandingsProps {
+    selectedSplit?: string | null;
+    hideHeader?: boolean;
+}
+
+export const OfficialStandings: React.FC<OfficialStandingsProps> = ({ selectedSplit: propSelectedSplit, hideHeader }) => {
     const [matches, setMatches] = useState<Match[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+    const selectedSplit = propSelectedSplit || normalizeSplitId(localStorage.getItem('selectedSplit'));
 
     useEffect(() => {
         const loadData = async () => {
             setIsLoading(true);
             try {
                 const [m, tMap] = await Promise.all([
-                    dataService.getMatches(),
-                    dataService.getTeams()
+                    dataService.getMatches(undefined, selectedSplit),
+                    dataService.getTeams(false, selectedSplit)
                 ]);
                 setMatches(m);
                 setTeams(Object.values(tMap));
@@ -159,7 +164,7 @@ export const OfficialStandings: React.FC = () => {
             }
         };
         loadData();
-    }, []);
+    }, [selectedSplit]);
 
     const standings = useMemo(() => {
         const stats: Record<string, StandingRow> = {};
@@ -246,19 +251,21 @@ export const OfficialStandings: React.FC = () => {
     }
 
     return (
-        <div className="max-w-4xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4">
+        <div className={`max-w-4xl mx-auto ${hideHeader ? 'pb-4' : 'pb-20'} animate-in fade-in slide-in-from-bottom-4`}>
             
-            <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white uppercase tracking-wider mb-2">Clasificación Oficial</h2>
-                <div className="flex items-center justify-center gap-2">
-                    <span className="px-3 py-1 bg-[#c8aa6e]/20 text-[#c8aa6e] text-xs font-bold uppercase rounded border border-[#c8aa6e]/30">
-                        LEC {selectedSplit.toLowerCase().includes('spring') ? 'Spring 2026' : 'Winter 2026'}
-                    </span>
-                    <span className="px-3 py-1 bg-gray-800 text-gray-400 text-xs font-bold uppercase rounded border border-gray-700">
-                        Fase Regular
-                    </span>
+            {!hideHeader && (
+                <div className="text-center mb-8">
+                    <h2 className="text-3xl font-bold text-white uppercase tracking-wider mb-2">Clasificación Oficial</h2>
+                    <div className="flex items-center justify-center gap-2">
+                        <span className="px-3 py-1 bg-[#c8aa6e]/20 text-[#c8aa6e] text-xs font-bold uppercase rounded border border-[#c8aa6e]/30">
+                            LEC {selectedSplit.toLowerCase().includes('spring') ? 'Spring 2026' : 'Winter 2026'}
+                        </span>
+                        <span className="px-3 py-1 bg-gray-800 text-gray-400 text-xs font-bold uppercase rounded border border-gray-700">
+                            Fase Regular
+                        </span>
+                    </div>
                 </div>
-            </div>
+            )}
 
             <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-2xl">
                 <div className="overflow-x-auto">

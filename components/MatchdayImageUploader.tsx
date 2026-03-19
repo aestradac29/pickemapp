@@ -48,7 +48,8 @@ export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ cu
                                 IMPORTANT: Be extremely accurate with team identification. 
                                 - Use 'nvi' for Natus Vincere.
                                 - Use 'shf' for Shifters.
-                                - Ensure you extract every single match visible in the image.`,
+                                - Ensure you extract every single match visible in the image.
+                                - The current date is ${new Date().toISOString()}. The year is ${new Date().getFullYear()}. If the image only shows a time or a day of the week, infer the correct upcoming date. Do NOT use dates in the past. Always use the current year ${new Date().getFullYear()} unless explicitly stated otherwise.`,
                             },
                         ],
                     },

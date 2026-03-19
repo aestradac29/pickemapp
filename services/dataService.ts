@@ -55,6 +55,7 @@ export const dataService = {
     async getDaysConfig(splitId?: string): Promise<{ 
         visibleDays: number[], 
         closedDays: number[], 
+        openedDays?: number[],
         playoffVisibleDays: number[], 
         playoffClosedDays: number[],
         playoffRounds?: number, 
@@ -69,7 +70,7 @@ export const dataService = {
             
             // Default Values
             let config = {
-                visibleDays: [1], closedDays: [], 
+                visibleDays: [1], closedDays: [], openedDays: [],
                 playoffVisibleDays: [1], playoffClosedDays: [],
                 playoffRounds: 3, playoffsAccessible: false,
                 fantasyRound: 1, fantasyLocked: false,
@@ -81,6 +82,7 @@ export const dataService = {
                 config = {
                     visibleDays: data.visibleDays || data.activeDays || [1],
                     closedDays: data.closedDays || [],
+                    openedDays: data.openedDays || [],
                     playoffVisibleDays: data.playoffVisibleDays || [1],
                     playoffClosedDays: data.playoffClosedDays || [],
                     playoffRounds: data.playoffRounds || 3, 
@@ -1130,13 +1132,14 @@ export const dataService = {
         }
     },
 
-    async getAllUsers(): Promise<User[]> {
+    async getAllUsers(splitId?: string): Promise<User[]> {
         try {
+            const targetSplitId = this._normalizeSplitId(splitId);
             const [allMatches, adminRanking, config, adminCrystalBall] = await Promise.all([
-                this.getMatches(),
-                this.getAdminRanking(),
-                this.getDaysConfig(),
-                this.getAdminCrystalBallResults()
+                this.getMatches(undefined, targetSplitId),
+                this.getAdminRanking(targetSplitId),
+                this.getDaysConfig(targetSplitId),
+                this.getAdminCrystalBallResults(targetSplitId)
             ]);
 
             const usersRef = collection(db, "users");
@@ -1148,9 +1151,9 @@ export const dataService = {
                 const userId = userDoc.id;
 
                 const [picksSnap, rankingSnap, crystalSnap] = await Promise.all([
-                    getDoc(doc(db, "users", userId, "picks", this._getCurrentSplitId())),
-                    getDoc(doc(db, "users", userId, "picks", `${this._getCurrentSplitId()}_ranking`)),
-                    getDoc(doc(db, "users", userId, "picks", `${this._getCurrentSplitId()}_crystal`))
+                    getDoc(doc(db, "users", userId, "picks", targetSplitId)),
+                    getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`)),
+                    getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_crystal`))
                 ]);
 
                 const userPredictions = picksSnap.exists() ? picksSnap.data().list || [] : [];
@@ -1226,6 +1229,7 @@ export const dataService = {
                             const diff = Math.abs(index - actualIndex);
                             if (diff === 0) rankingScore += isSpring ? 6.75 : 6;
                             else if (diff === 1) rankingScore += isSpring ? 3.5 : 3;
+                            else if (isSpring && index < 6 && actualIndex < 6) rankingScore += 1;
                         }
                     });
                 }
@@ -1470,9 +1474,9 @@ export const dataService = {
         await setDoc(docRef, cleanPayload(updates), { merge: true });
     },
 
-    async getUserPredictions(userId: string) {
+    async getUserPredictions(userId: string, splitId?: string) {
         try {
-            const docRef = doc(db, "users", userId, "picks", this._getCurrentSplitId());
+            const docRef = doc(db, "users", userId, "picks", this._normalizeSplitId(splitId));
             const docSnap = await getDoc(docRef);
             return docSnap.exists() ? docSnap.data().list || [] : [];
         } catch (e) { return []; }

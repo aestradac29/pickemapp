@@ -15,15 +15,17 @@ interface MatchdayViewProps {
     initialPredictions?: UserPrediction[];
     isAdmin?: boolean;
     onPredictionsSaved?: () => Promise<void> | void; 
+    selectedSplit?: string | null;
 }
 
 export const MatchdayView: React.FC<MatchdayViewProps> = ({ 
     currentUserId, 
     initialPredictions = [], 
     isAdmin = false,
-    onPredictionsSaved 
+    onPredictionsSaved,
+    selectedSplit: propSelectedSplit
 }) => {
-  const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+  const selectedSplit = propSelectedSplit || normalizeSplitId(localStorage.getItem('selectedSplit'));
   const [currentDay, setCurrentDay] = useState(1);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
   const [closedDays, setClosedDays] = useState<number[]>([]); 
@@ -81,11 +83,11 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         try {
             // Cargar TODOS los datos necesarios
             const [fetchedMatches, teamsMap, config, playersList, usersList] = await Promise.all([
-                dataService.getMatches(), 
-                dataService.getTeams(),
-                dataService.getDaysConfig(),
-                dataService.getPlayers(),
-                dataService.getAllUsers()
+                dataService.getMatches(undefined, selectedSplit), 
+                dataService.getTeams(false, selectedSplit),
+                dataService.getDaysConfig(selectedSplit),
+                dataService.getPlayers(false, selectedSplit),
+                dataService.getAllUsers(selectedSplit)
             ]);
             
             setAllMatches(fetchedMatches);
@@ -103,7 +105,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         }
     };
     loadData();
-  }, []);
+  }, [selectedSplit]);
 
   // Fetch predictions when viewingUserId changes
   useEffect(() => {
@@ -117,7 +119,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           } else {
               setIsLoadingPicks(true);
               try {
-                  userPicks = await dataService.getUserPredictions(viewingUserId);
+                  userPicks = await dataService.getUserPredictions(viewingUserId, selectedSplit);
               } catch (e) {
                   console.error("Error fetching user picks", e);
                   userPicks = [];
@@ -162,7 +164,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       };
       
       fetchPicks();
-  }, [viewingUserId, currentUserId, allMatches.length]); // Depend on matches length to re-run if matches load late
+  }, [viewingUserId, currentUserId, allMatches.length, selectedSplit]); // Depend on matches length to re-run if matches load late
 
   // Calculate Standing Records
   const teamRecords = useMemo(() => {
