@@ -10,7 +10,7 @@ interface LeaderboardProps {
   onViewProfile?: (userId: string) => void;
 }
 
-type LeaderboardCategory = 'global' | 'matchday' | 'ranking' | 'playoffs' | 'crystalBall' | 'fantasy';
+type LeaderboardCategory = 'global' | 'matchday' | 'ranking' | 'playoffs' | 'fantasy';
 
 export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }) => {
   const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
@@ -89,7 +89,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
     { id: 'matchday', label: 'Jornada', icon: Swords },
     { id: 'ranking', label: 'Ranking', icon: ListOrdered },
     { id: 'playoffs', label: 'Playoffs', icon: Trophy },
-    { id: 'crystalBall', label: 'Bola de Cristal', icon: Sparkles },
     { id: 'fantasy', label: 'Fantasy', icon: UserPlus },
   ];
 
@@ -177,7 +176,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
               Puntuación Global = Jornadas + Ranking + Playoffs (Desempate: Aciertos Jornada)
           </div>
       )}
-      {(activeCategory === 'fantasy' || activeCategory === 'crystalBall') && (
+      {(activeCategory === 'fantasy') && (
           <div className="text-center text-xs text-[#c8aa6e] bg-[#c8aa6e]/10 border border-[#c8aa6e]/30 p-2 rounded-lg">
               Competición Independiente (Posición compartida en empates)
           </div>

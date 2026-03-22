@@ -81,9 +81,19 @@ const RulesModal = ({ onClose, selectedSplit }: { onClose: () => void, selectedS
                     <div className="space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                             <div className="w-6"><img src={ROLE_ICONS.TOP} className="w-4 h-4 opacity-70" /></div>
-                            <div className="flex-1 bg-black/20 p-2 rounded border border-gray-800 flex justify-between">
-                                <span className="text-gray-300">Daño Equipo &gt;= 25%</span>
-                                <span className="text-[#0ac8b9] font-bold">+3.0</span>
+                            <div className="flex-1 bg-black/20 p-2 rounded border border-gray-800 flex flex-col gap-1">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-300">Daño Equipo &gt;= 25%</span>
+                                    <span className="text-[#0ac8b9] font-bold">+3.0</span>
+                                </div>
+                                <div className="flex justify-between text-[10px] text-gray-500">
+                                    <span>Turret Dmg &gt;= 5000</span>
+                                    <span className="text-[#0ac8b9] font-bold">+1.5</span>
+                                </div>
+                                <div className="flex justify-between text-[10px] text-gray-500">
+                                    <span>Min/Min &gt;= 8.5</span>
+                                    <span className="text-[#0ac8b9] font-bold">+1.5</span>
+                                </div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -101,9 +111,15 @@ const RulesModal = ({ onClose, selectedSplit }: { onClose: () => void, selectedS
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="w-6"><img src={ROLE_ICONS.MID} className="w-4 h-4 opacity-70" /></div>
-                            <div className="flex-1 bg-black/20 p-2 rounded border border-gray-800 flex justify-between">
-                                <span className="text-gray-300">Daño Equipo &gt;= 30%</span>
-                                <span className="text-[#0ac8b9] font-bold">+3.0</span>
+                            <div className="flex-1 bg-black/20 p-2 rounded border border-gray-800 flex flex-col gap-1">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-300">Daño Equipo &gt;= 30%</span>
+                                    <span className="text-[#0ac8b9] font-bold">+3.0</span>
+                                </div>
+                                <div className="flex justify-between text-[10px] text-gray-500">
+                                    <span>Turret Dmg &gt;= 5000</span>
+                                    <span className="text-[#0ac8b9] font-bold">+1.5</span>
+                                </div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">

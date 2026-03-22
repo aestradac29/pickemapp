@@ -152,8 +152,7 @@ export const BADGE_DEFINITIONS: Record<string, { label: string, icon: any, color
     'veteran': { label: 'Veterano', icon: Trophy, color: 'text-gray-300 border-gray-500/50 bg-gray-800/50', description: 'Alcanzar 100 puntos totales.' },
     'strategist': { label: 'Estratega', icon: Map, color: 'text-emerald-400 border-emerald-500/50 bg-emerald-900/20', description: 'Acertar el orden exacto del Top 3 en el Ranking.' },
     'collector': { label: 'Coleccionista', icon: Gem, color: 'text-pink-400 border-pink-500/50 bg-pink-900/20', description: 'Desbloquear 10 recompensas cosméticas.' },
-    'social': { label: 'Social', icon: Share2, color: 'text-indigo-400 border-indigo-500/50 bg-indigo-900/20', description: 'Compartir tu perfil 5 veces.' },
-    'analyst': { label: 'Analista', icon: Target, color: 'text-teal-400 border-teal-500/50 bg-teal-900/20', description: 'Acertar al MVP en la Bola de Cristal.' }
+    'social': { label: 'Social', icon: Share2, color: 'text-indigo-400 border-indigo-500/50 bg-indigo-900/20', description: 'Compartir tu perfil 5 veces.' }
 };
 
 // Helper: URLs directas a la Wiki. Gracias al meta tag "no-referrer" en index.html, esto funcionará sin bloqueos CORS.

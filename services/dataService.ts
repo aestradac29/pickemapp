@@ -905,7 +905,7 @@ export const dataService = {
                 kills:0, deaths:0, assists:0, cs:0,
                 isMvp: false, firstBlood: false, 
                 doubleKills:0, tripleKills:0, quadraKills:0, pentaKills:0,
-                teamDamagePercentage:0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false,
+                teamDamagePercentage:0, turretDamage: 0, minionsPerMinute: 0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false,
                 totalPoints: 0
             };
 
@@ -944,7 +944,9 @@ export const dataService = {
                         player.role,
                         false, // isCaptain handled later
                         match.bracketStage,
-                        match.stage
+                        match.stage,
+                        match.splitId,
+                        match.bestOf || 1
                     );
                     totalScore += gameScore;
                 }
@@ -1135,11 +1137,10 @@ export const dataService = {
     async getAllUsers(splitId?: string): Promise<User[]> {
         try {
             const targetSplitId = this._normalizeSplitId(splitId);
-            const [allMatches, adminRanking, config, adminCrystalBall] = await Promise.all([
+            const [allMatches, adminRanking, config] = await Promise.all([
                 this.getMatches(undefined, targetSplitId),
                 this.getAdminRanking(targetSplitId),
-                this.getDaysConfig(targetSplitId),
-                this.getAdminCrystalBallResults(targetSplitId)
+                this.getDaysConfig(targetSplitId)
             ]);
 
             const usersRef = collection(db, "users");
@@ -1150,15 +1151,13 @@ export const dataService = {
                 const userData = userDoc.data();
                 const userId = userDoc.id;
 
-                const [picksSnap, rankingSnap, crystalSnap] = await Promise.all([
+                const [picksSnap, rankingSnap] = await Promise.all([
                     getDoc(doc(db, "users", userId, "picks", targetSplitId)),
-                    getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`)),
-                    getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_crystal`))
+                    getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`))
                 ]);
 
                 const userPredictions = picksSnap.exists() ? picksSnap.data().list || [] : [];
                 const userRanking = rankingSnap.exists() ? rankingSnap.data().order || [] : [];
-                const userCrystalBall = crystalSnap.exists() ? crystalSnap.data().selections || {} : {};
 
                 let matchdayScore = 0;
                 const regularMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.winnerId);
@@ -1230,25 +1229,6 @@ export const dataService = {
                             if (diff === 0) rankingScore += isSpring ? 6.75 : 6;
                             else if (diff === 1) rankingScore += isSpring ? 3.5 : 3;
                             else if (isSpring && index < 6 && actualIndex < 6) rankingScore += 1;
-                        }
-                    });
-                }
-
-                let crystalScore = 0;
-                if (adminCrystalBall) {
-                    const singles = ['winter_champ', 'mvp', 'rookie', 'best_top', 'best_jng', 'best_mid', 'best_adc', 'best_sup', 'total_pentakills'];
-                    singles.forEach(key => {
-                        if (userCrystalBall[key] && userCrystalBall[key] === adminCrystalBall[key]) {
-                            crystalScore += (['winter_champ', 'mvp', 'rookie'].includes(key) ? 10 : 5);
-                        }
-                    });
-                    const rankedCats = ['fastest_win_team', 'longest_win_team', 'highest_kda', 'most_picked', 'most_banned', 'highest_wr', 'lowest_wr', 'most_kills'];
-                    rankedCats.forEach(cat => {
-                        const userVal = userCrystalBall[cat];
-                        if (userVal) {
-                            if (userVal === adminCrystalBall[`${cat}_1`]) crystalScore += 5;
-                            else if (userVal === adminCrystalBall[`${cat}_2`]) crystalScore += 3;
-                            else if (userVal === adminCrystalBall[`${cat}_3`]) crystalScore += 1;
                         }
                     });
                 }
@@ -1346,7 +1326,6 @@ export const dataService = {
                     matchday: matchdayScore,
                     ranking: rankingScore,
                     playoffs: playoffsScore,
-                    crystalBall: crystalScore,
                     fantasy: parseFloat(fantasyTotal.toFixed(2))
                 };
 

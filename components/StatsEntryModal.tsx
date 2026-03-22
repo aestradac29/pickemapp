@@ -31,7 +31,7 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
         kills:0, deaths:0, assists:0, cs:0, totalPoints:0, 
         isMvp: false, firstBlood: false, 
         doubleKills:0, tripleKills:0, quadraKills:0, pentaKills:0,
-        teamDamagePercentage:0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false
+        teamDamagePercentage:0, turretDamage: 0, minionsPerMinute: 0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false
     };
     
     // Indicadores visuales para los bonus (informativo)
@@ -212,19 +212,49 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                             </span>
                             <div className="grid grid-cols-2 gap-2">
                                 {(player.role === Role.TOP || player.role === Role.MID) && (
-                                    <div className="flex flex-col gap-1 col-span-2">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-[9px] opacity-80">% Daño Equipo</span>
-                                            <span className="text-[9px] font-bold">{player.role === Role.TOP ? '>= 25%' : '>= 30%'}</span>
+                                    <>
+                                        <div className="flex flex-col gap-1 col-span-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[9px] opacity-80">% Daño Equipo</span>
+                                                <span className="text-[9px] font-bold">{player.role === Role.TOP ? '>= 25%' : '>= 30%'}</span>
+                                            </div>
+                                            <input 
+                                                type="number" 
+                                                placeholder="0-100" 
+                                                className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
+                                                value={s.teamDamagePercentage}
+                                                onChange={(e) => onStatChange(player.id, 'teamDamagePercentage', Number(e.target.value))}
+                                            />
                                         </div>
-                                        <input 
-                                            type="number" 
-                                            placeholder="0-100" 
-                                            className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
-                                            value={s.teamDamagePercentage}
-                                            onChange={(e) => onStatChange(player.id, 'teamDamagePercentage', Number(e.target.value))}
-                                        />
-                                    </div>
+                                        <div className="flex flex-col gap-1 col-span-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[9px] opacity-80">Daño a Torretas</span>
+                                                <span className="text-[9px] font-bold">&gt;= 5000</span>
+                                            </div>
+                                            <input 
+                                                type="number" 
+                                                placeholder="0" 
+                                                className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
+                                                value={s.turretDamage}
+                                                onChange={(e) => onStatChange(player.id, 'turretDamage', Number(e.target.value))}
+                                            />
+                                        </div>
+                                        {player.role === Role.TOP && (
+                                            <div className="flex flex-col gap-1 col-span-2">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] opacity-80">Minions/Min</span>
+                                                    <span className="text-[9px] font-bold">&gt;= 8.5</span>
+                                                </div>
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="0.0" 
+                                                    className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
+                                                    value={s.minionsPerMinute}
+                                                    onChange={(e) => onStatChange(player.id, 'minionsPerMinute', Number(e.target.value))}
+                                                />
+                                            </div>
+                                        )}
+                                    </>
                                 )}
 
                                 {player.role === Role.JUNGLE && (
@@ -357,7 +387,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                             kills: 0, deaths: 0, assists: 0, cs: 0,
                             isMvp: false, firstBlood: false,
                             doubleKills:0, tripleKills:0, quadraKills:0, pentaKills:0,
-                            teamDamagePercentage:0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false,
+                            teamDamagePercentage:0, turretDamage: 0, minionsPerMinute: 0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false,
                             totalPoints: 0
                         };
                     }
@@ -437,7 +467,8 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
             false,
             match.bracketStage,
             match.stage,
-            selectedSplit
+            selectedSplit,
+            match.bestOf || 1
         );
     };
 

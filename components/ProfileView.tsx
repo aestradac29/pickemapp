@@ -707,10 +707,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 relative z-0">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 relative z-0">
                 <StatCard icon={Trophy} label="Puntos Totales" value={user.score} type="gold" />
                 <StatCard icon={Swords} label="Fase Regular" value={user.scoreBreakdown.matchday} type="blue" />
-                <StatCard icon={Sparkles} label="Bola Cristal" value={user.scoreBreakdown.crystalBall} type="purple" />
                 <StatCard icon={UserIcon} label="Fantasy" value={user.scoreBreakdown.fantasy} type="cyan" />
             </div>
 
@@ -993,13 +992,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                     color="bg-red-500" 
                 />
                 
-                <div className="mt-6 pt-6 border-t border-gray-800 grid grid-cols-2 gap-4">
-                    <div className="bg-[#0a1428] p-3 rounded border border-gray-700 flex flex-col justify-center">
-                        <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Aciertos Bola de Cristal</div>
-                        <div className="text-purple-400 font-bold text-xl">
-                            {user.scoreBreakdown.crystalBall} <span className="text-sm text-purple-400/50">/ 100</span>
-                        </div>
-                    </div>
+                <div className="mt-6 pt-6 border-t border-gray-800 grid grid-cols-1 gap-4">
                     <div className="bg-[#0a1428] p-3 rounded border border-gray-700 flex flex-col justify-center">
                         <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Liga Fantasy</div>
                         <div className="text-[#0ac8b9] font-bold text-xl">

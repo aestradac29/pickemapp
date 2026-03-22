@@ -122,6 +122,8 @@ export interface PlayerGameStats {
 
     // Role Specific Inputs
     teamDamagePercentage: number; // 0-100 (Top/Mid)
+    turretDamage: number;         // (Top/Mid)
+    minionsPerMinute: number;     // (Top)
     dragonsKilled: number;        // (Jungle)
     baronsKilled: number;         // (Jungle)
     damagePerMinute: number;      // (ADC)

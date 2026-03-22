@@ -88,14 +88,6 @@ Estas tablas guardan lo que hacen tus usuarios en la app.
 - `sup_player_id`: String (FK -> players.id)
 - `locked_at`: Timestamp (Fecha en que se guardó/bloqueó)
 
-### `crystal_ball_selections` (Bola de Cristal)
-*Predicciones a largo plazo.*
-- `id`: UUID (PK)
-- `user_id`: UUID (FK -> profiles.id)
-- `split_id`: String (FK -> splits.id)
-- `category`: String (ej: `'mvp'`, `'winner_team'`, `'most_picked_champ'`)
-- `selection_value`: String (ID del equipo, jugador o nombre del campeón)
-
 ---
 
 ## Pasos para la Integración

@@ -66,7 +66,7 @@ export const AdminAssistant: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
             
             Contexto de la App:
             - Es una web de Pick'ems de League of Legends.
-            - Gestiona usuarios, predicciones, fantasy, ranking y crystal ball.
+            - Gestiona usuarios, predicciones, fantasy y ranking.
             - El split actual suele ser 'winter_2026' o 'spring_2026'.
           `,
           tools: [

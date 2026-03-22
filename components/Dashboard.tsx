@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ViewState } from '../types';
-import { Trophy, ListOrdered, Sparkles, CalendarCheck, Swords, UserPlus, Lock, Unlock, Database, Users, Table2, Crown } from 'lucide-react';
+import { Trophy, ListOrdered, CalendarCheck, Swords, UserPlus, Lock, Unlock, Database, Users, Table2, Crown } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
 interface DashboardProps {

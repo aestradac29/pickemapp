@@ -28,7 +28,10 @@ const POINTS_SYSTEM = {
 
     // Role Specifics
     TOP_DMG_PERCENT: 3,    // Top > 25% Dmg
+    TOP_TURRET_DMG: 1.5,   // Top Turret Dmg >= 5000
+    TOP_MPM: 1.5,          // Top MPM >= 8.5
     MID_DMG_PERCENT: 3,    // Mid > 30% Dmg
+    MID_TURRET_DMG: 1.5,   // Mid Turret Dmg >= 5000
     ADC_DPM_1000: 3,       // ADC DPM >= 1000
     SUPP_ASSIST_10: 2,     // Supp >= 10 Assists
     SUPP_FIRST_DRAGON: 1,  // Supp Team gets 1st Dragon
@@ -45,7 +48,8 @@ export const fantasyService = {
         isCaptain: boolean = false,
         bracketStage: string = 'winners',
         stage: string = Stage.GROUPS,
-        split: string = 'winter_2026'
+        split: string = 'winter_2026',
+        bestOf: number = 1
     ) {
         let score = 0;
         
@@ -85,6 +89,9 @@ export const fantasyService = {
             case Role.TOP:
                 // Si hace 25% o mas del daño de equipo
                 if (stats.teamDamagePercentage >= 25) score += POINTS_SYSTEM.TOP_DMG_PERCENT;
+                // Bonus nuevos
+                if (stats.turretDamage >= 5000) score += POINTS_SYSTEM.TOP_TURRET_DMG;
+                if (stats.minionsPerMinute >= 8.5) score += POINTS_SYSTEM.TOP_MPM;
                 break;
             
             case Role.JUNGLE:
@@ -97,6 +104,8 @@ export const fantasyService = {
             case Role.MID:
                 // Si hace 30% o mas del daño de equipo
                 if (stats.teamDamagePercentage >= 30) score += POINTS_SYSTEM.MID_DMG_PERCENT;
+                // Bonus nuevos
+                if (stats.turretDamage >= 5000) score += POINTS_SYSTEM.MID_TURRET_DMG;
                 break;
 
             case Role.ADC:
@@ -126,7 +135,12 @@ export const fantasyService = {
 
         score = score * bracketMultiplier;
 
-        // 5. CAPTAIN MULTIPLIER
+        // 5. SPRING SPLIT BALANCING (BO3 vs BO5)
+        if (normalizedSplit === 'spring_2026' && bestOf === 5) {
+            score = score * (3 / 5);
+        }
+
+        // 6. CAPTAIN MULTIPLIER
         if (isCaptain) {
             score = score * 1.5;
         }
