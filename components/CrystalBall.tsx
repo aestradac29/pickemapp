@@ -350,6 +350,7 @@ export const CrystalBall: React.FC<CrystalBallProps> = ({ currentUserId, isAdmin
   };
 
   const checkCompletion = () => {
+      if (mode === 'official_result') return true;
       const required = getRequiredKeys(mode);
       const missing = required.filter(key => !selections[key]);
       return missing.length === 0;
