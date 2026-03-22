@@ -21,7 +21,6 @@ export enum ViewState {
   OFFICIAL_STANDINGS = 'OFFICIAL_STANDINGS', // NEW: Real LEC Standings
   PLAYOFFS = 'PLAYOFFS', // Playoffs
   MATCHDAY = 'MATCHDAY', // Jornada (Regular Season)
-  CRYSTAL_BALL = 'CRYSTAL_BALL', // Bola de cristal
   FANTASY = 'FANTASY', // Fantasy Team
   RESULTS = 'RESULTS', // Resultados jornada
   PROFILE = 'PROFILE', // New Profile View
@@ -185,7 +184,6 @@ export interface User {
     matchday: number;
     ranking: number;
     playoffs: number;
-    crystalBall: number;
     fantasy: number;
   };
   rank: number;

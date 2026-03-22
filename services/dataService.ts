@@ -1516,28 +1516,6 @@ export const dataService = {
         const targetSplitId = this._normalizeSplitId(splitId);
         await setDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)), { [`${targetSplitId}_ranking`]: cleanPayload(teamIds) }, { merge: true });
     },
-    async getCrystalBall(userId: string, splitId?: string) {
-        try {
-            const targetSplitId = this._normalizeSplitId(splitId);
-            const snap = await getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_crystal`));
-            return snap.exists() ? snap.data().selections : {};
-        } catch (e) { return {}; }
-    },
-    async saveCrystalBall(userId: string, selections: any, splitId?: string) {
-        const targetSplitId = this._normalizeSplitId(splitId);
-        await setDoc(doc(db, "users", userId, "picks", `${targetSplitId}_crystal`), { selections: cleanPayload(selections) }, { merge: true });
-    },
-    async getAdminCrystalBallResults(splitId?: string) {
-        try {
-            const targetSplitId = this._normalizeSplitId(splitId);
-            const snap = await getDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)));
-            return snap.exists() ? snap.data()[`${targetSplitId}_crystal`] || {} : {};
-        } catch (e) { return {}; }
-    },
-    async saveAdminCrystalBallResults(selections: any, splitId?: string) {
-        const targetSplitId = this._normalizeSplitId(splitId);
-        await setDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)), { [`${targetSplitId}_crystal`]: cleanPayload(selections) }, { merge: true });
-    },
 
     // --- CARD COLLECTION SYSTEM ---
     async getCardsForSplit(splitId: string): Promise<Card[]> {

@@ -82,16 +82,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       locked: (!isAccessibleSplit) || (!playoffsAccessible && !isAdmin) // Bloqueado para usuarios normales si no está accesible
     },
     {
-      id: ViewState.CRYSTAL_BALL,
-      title: 'Bola de Cristal',
-      subtitle: 'Predicciones especiales',
-      icon: Sparkles,
-      color: 'text-purple-400',
-      border: 'hover:border-purple-400',
-      bg: 'hover:bg-purple-400/10',
-      locked: !isAccessibleSplit
-    },
-    {
       id: ViewState.FANTASY,
       title: 'Fantasy Team',
       subtitle: 'Crea tu alineación ideal',

@@ -7,7 +7,6 @@ import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { RankingCombinedView } from './components/RankingCombinedView';
 import { RankingView } from './components/RankingView';
-import { CrystalBall } from './components/CrystalBall';
 import { FantasyView } from './components/FantasyView';
 import { MatchdayView } from './components/MatchdayView';
 import { PlayoffsView } from './components/PlayoffsView';
@@ -238,8 +237,6 @@ const App: React.FC = () => {
         return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
       case ViewState.RANKING:
         return <RankingCombinedView currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit} />;
-      case ViewState.CRYSTAL_BALL:
-        return <CrystalBall currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit} />;
       case ViewState.FANTASY:
         return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit || 'winter_2026'} />;
       case ViewState.OFFICIAL_STANDINGS:
