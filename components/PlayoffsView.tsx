@@ -869,6 +869,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
               onClose={() => setStatsMatch(null)}
               onSave={handleSaveStats}
               isSaving={isSavingStats}
+              selectedSplit={selectedSplit}
           />
       )}
 

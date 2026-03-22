@@ -810,6 +810,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
               onClose={() => setStatsMatch(null)}
               onSave={handleSaveStats}
               isSaving={isSavingStats}
+              selectedSplit={selectedSplit}
           />
       )}
 

@@ -1,5 +1,5 @@
-
 import { Role, PlayerGameStats, Stage } from '../types';
+import { normalizeSplitId } from '../constants';
 
 /*
     === SERVICIO FANTASY ===
@@ -13,7 +13,6 @@ const POINTS_SYSTEM = {
     DEATH: -1,
     ASSIST: 1,
     CS: 0.01,
-    WIN_BONUS: 1,
     
     // Global Bonuses
     MVP_BONUS: 3,
@@ -45,9 +44,13 @@ export const fantasyService = {
         role: Role, 
         isCaptain: boolean = false,
         bracketStage: string = 'winners',
-        stage: string = Stage.GROUPS
+        stage: string = Stage.GROUPS,
+        split: string = 'winter_2026'
     ) {
         let score = 0;
+        
+        const normalizedSplit = normalizeSplitId(split);
+        const winBonus = normalizedSplit === 'spring_2026' ? 3 : 1;
 
         // 1. BASE STATS
         score += stats.kills * POINTS_SYSTEM.KILL;
@@ -56,7 +59,7 @@ export const fantasyService = {
         score += stats.cs * POINTS_SYSTEM.CS;
         
         // 2. GLOBAL BONUSES
-        if ((stats as any).win) score += POINTS_SYSTEM.WIN_BONUS; // 'win' passed dynamically from the specific game result
+        if ((stats as any).win) score += winBonus; // 'win' passed dynamically from the specific game result
         if (stats.isMvp) score += POINTS_SYSTEM.MVP_BONUS;
         if (stats.firstBlood) score += POINTS_SYSTEM.FIRST_BLOOD;
         

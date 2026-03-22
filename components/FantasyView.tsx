@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ROLE_ICONS, getFantasySchedule, COUNTRIES } from '../constants';
+import { ROLE_ICONS, getFantasySchedule, COUNTRIES, normalizeSplitId } from '../constants';
 import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User, PlayerGameStats } from '../types';
 import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, TrendingDown, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole, Skull, Crosshair, Droplet } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
@@ -10,7 +10,10 @@ import { dataService } from '../services/dataService';
 const MAX_BUDGET = 1500;
 
 // --- RULES MODAL COMPONENT ---
-const RulesModal = ({ onClose }: { onClose: () => void }) => (
+const RulesModal = ({ onClose, selectedSplit }: { onClose: () => void, selectedSplit: string }) => {
+    const normalizedSplit = normalizeSplitId(selectedSplit);
+    const winBonus = normalizedSplit === 'spring_2026' ? 3 : 1;
+    return (
     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
         <div className="w-full max-w-2xl bg-[#091428] border-2 border-[#0ac8b9] rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="p-4 bg-[#0f1d36] border-b border-[#0ac8b9]/30 flex justify-between items-center">
@@ -39,7 +42,7 @@ const RulesModal = ({ onClose }: { onClose: () => void }) => (
                             <span className="text-gray-400">CS</span> <span className="text-yellow-400 font-bold">+0.01</span>
                         </div>
                         <div className="bg-black/20 p-2 rounded border border-gray-800 flex justify-between col-span-2">
-                            <span className="text-gray-400">Victoria (Game)</span> <span className="text-green-400 font-bold">+1.0</span>
+                            <span className="text-gray-400">Victoria (Game)</span> <span className="text-green-400 font-bold">+{winBonus}.0</span>
                         </div>
                     </div>
                 </div>
@@ -150,6 +153,7 @@ const RulesModal = ({ onClose }: { onClose: () => void }) => (
         </div>
     </div>
 );
+};
 
 interface PlayerCardProps {
   role: Role;
@@ -918,7 +922,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
     <div className="w-[98%] max-w-[2400px] mx-auto animate-in fade-in pb-20 pt-4 relative">
         
       {/* RULES MODAL RENDER */}
-      {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+      {showRules && <RulesModal onClose={() => setShowRules(false)} selectedSplit={selectedSplit} />}
 
       {/* HEADER BAR */}
       <div className="flex flex-col gap-6 mb-6">

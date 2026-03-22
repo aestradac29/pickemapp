@@ -14,6 +14,7 @@ interface StatsEntryModalProps {
     onClose: () => void;
     onSave: (games: MatchGame[]) => void;
     isSaving?: boolean;
+    selectedSplit: string;
 }
 
 interface PlayerRowProps {
@@ -301,7 +302,7 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
     );
 };
 
-export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, teamB, allPlayers, onClose, onSave, isSaving }) => {
+export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, teamB, allPlayers, onClose, onSave, isSaving, selectedSplit }) => {
     // Determine number of games based on BO format
     const numGames = match.bestOf || 1;
     const gameIndices = Array.from({ length: numGames }, (_, i) => i + 1);
@@ -435,7 +436,8 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
             player.role,
             false,
             match.bracketStage,
-            match.stage
+            match.stage,
+            selectedSplit
         );
     };
 
