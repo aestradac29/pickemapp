@@ -104,10 +104,10 @@ const ShareModal = ({ user, teams, onClose }: { user: User, teams: Team[], onClo
     const [isGenerating, setIsGenerating] = useState(false);
 
     // Calculate level for sharing image
-    const level = Math.floor((user.score * XP_MULTIPLIER) / XP_PER_LEVEL) + 1;
+    const level = Math.floor(((user.totalScore || user.score) * XP_MULTIPLIER) / XP_PER_LEVEL) + 1;
 
     const handleCopy = () => {
-        const text = `🏆 Pick'em Pro Profile\n👤 ${user.name}\n🏅 Rank #${user.rank}\n✨ ${user.score} Puntos\n🔗 Únete: app.pickempro.gg`;
+        const text = `🏆 Pick'em Pro Profile\n👤 ${user.name}\n🏅 Rank #${user.rank}\n✨ ${user.totalScore || user.score} Puntos\n🔗 Únete: app.pickempro.gg`;
         navigator.clipboard.writeText(text);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -339,7 +339,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
         if (!isOwnProfile || !sessionUserId || !user) return;
         
         // Calculate dynamic level with multiplier
-        const currentLevel = Math.floor((user.score * XP_MULTIPLIER) / XP_PER_LEVEL) + 1;
+        const currentLevel = Math.floor(((user.totalScore || user.score) * XP_MULTIPLIER) / XP_PER_LEVEL) + 1;
         if (currentLevel < reward.level) return;
 
         setEquippingId(reward.id);
@@ -476,7 +476,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
     const currentAvatarChampId = championOptions.find(c => c.image === editForm.avatar)?.id;
 
     // --- LEVEL & PROGRESS CALCULATIONS (WITH MULTIPLIER) ---
-    const totalXp = user.score * XP_MULTIPLIER;
+    const totalXp = (user.totalScore || user.score) * XP_MULTIPLIER;
     const level = Math.floor(totalXp / XP_PER_LEVEL) + 1;
     const xpInCurrentLevel = totalXp % XP_PER_LEVEL;
     const progressPercent = (xpInCurrentLevel / XP_PER_LEVEL) * 100;

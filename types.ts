@@ -181,7 +181,8 @@ export interface User {
   badges?: string[]; // New: Unlocked Achievement Badges IDs
   badgeProgress?: Record<string, { current: number, target: number }>; // New: Progress for achievements
   equippedBadges?: string[]; // New: Currently equipped badges (Max 3)
-  score: number; // Global Score (Matchday + Ranking + Playoffs)
+  score: number; // Global Score (Matchday + Ranking + Playoffs) for the selected split
+  totalScore?: number; // Lifetime Score across all splits
   scoreBreakdown: {
     matchday: number;
     ranking: number;

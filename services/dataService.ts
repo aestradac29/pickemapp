@@ -1392,9 +1392,20 @@ export const dataService = {
                     hasBadgeChanges = true;
                 }
 
-                // Si encontramos nuevos logros, guardarlos en segundo plano para persistencia
-                if (hasBadgeChanges) {
-                    await this.updateUserProfile(userId, { badges: Array.from(currentBadges) });
+                const splitScores = userData.splitScores || {};
+                let hasScoreChanges = false;
+                if (splitScores[targetSplitId] !== globalScore) {
+                    splitScores[targetSplitId] = globalScore;
+                    hasScoreChanges = true;
+                }
+                const totalScore: number = (Object.values(splitScores) as number[]).reduce((sum: number, score: number) => sum + (Number(score) || 0), 0);
+
+                // Si encontramos nuevos logros o cambios en el score, guardarlos en segundo plano para persistencia
+                if (hasBadgeChanges || hasScoreChanges) {
+                    const updates: any = {};
+                    if (hasBadgeChanges) updates.badges = Array.from(currentBadges);
+                    if (hasScoreChanges) updates.splitScores = splitScores;
+                    this.updateUserProfile(userId, updates).catch(console.error);
                 }
 
                 return {
@@ -1408,6 +1419,7 @@ export const dataService = {
                     badgeProgress: userData.badgeProgress || {},
                     equippedBadges: userData.equippedBadges || [],
                     score: globalScore,
+                    totalScore: totalScore,
                     scoreBreakdown: breakdown,
                     rank: 0, // Placeholder, calculated below
                     pointsHistory: pointsHistory, 
