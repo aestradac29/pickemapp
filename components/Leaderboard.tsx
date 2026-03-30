@@ -43,7 +43,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
 
           // Global Tie-Breaker: Most correct matchday picks
           if (activeCategory === 'global') {
-              return b.scoreBreakdown.matchday - a.scoreBreakdown.matchday;
+              return b.scoreBreakdown.matchdayCount - a.scoreBreakdown.matchdayCount;
           }
 
           // Other categories: No secondary sort (shared position)
@@ -343,7 +343,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
                         {/* Show Matchday hits in Global tab to explain tie-breaker */}
                         {activeCategory === 'global' && (
                             <p className="text-[9px] text-gray-400/80 uppercase tracking-tight">
-                                Jornadas acertadas: {user.scoreBreakdown.matchday}
+                                Jornadas acertadas: {user.scoreBreakdown.matchdayCount}
                             </p>
                         )}
                     </div>

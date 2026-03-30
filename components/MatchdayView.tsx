@@ -647,7 +647,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     <div className="flex justify-center -mt-2 mb-2 animate-in fade-in">
                         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-widest shadow-sm">
                             <Trophy className="w-3 h-3" />
-                            <span>Acierto: +{selectedSplit.toLowerCase().includes('spring') ? '1.5' : '1'} Punto</span>
+                            <span>Acierto: +1.5 Puntos</span>
                         </div>
                     </div>
                 )}

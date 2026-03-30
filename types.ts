@@ -185,6 +185,7 @@ export interface User {
   totalScore?: number; // Lifetime Score across all splits
   scoreBreakdown: {
     matchday: number;
+    matchdayCount: number; // New: Number of correct matchday picks
     ranking: number;
     playoffs: number;
     fantasy: number;
