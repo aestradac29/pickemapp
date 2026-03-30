@@ -343,7 +343,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
                         {/* Show Matchday hits in Global tab to explain tie-breaker */}
                         {activeCategory === 'global' && (
                             <p className="text-[9px] text-gray-400/80 uppercase tracking-tight">
-                                Jornadas acertadas: {user.scoreBreakdown.matchday}
+                                Partidos acertados: {selectedSplit === 'spring_2026' ? Math.round(user.scoreBreakdown.matchday / 1.5) : user.scoreBreakdown.matchday}
                             </p>
                         )}
                     </div>

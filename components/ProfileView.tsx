@@ -709,7 +709,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
             {/* Stats Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 relative z-0">
                 <StatCard icon={Trophy} label="Puntos Totales" value={user.score} type="gold" />
-                <StatCard icon={Swords} label="Fase Regular" value={user.scoreBreakdown.matchday} type="blue" />
+                <StatCard icon={Swords} label="Partidos acertados" value={selectedSplit === 'spring_2026' ? Math.round(user.scoreBreakdown.matchday / 1.5) : user.scoreBreakdown.matchday} type="blue" />
                 <StatCard icon={UserIcon} label="Fantasy" value={user.scoreBreakdown.fantasy} type="cyan" />
             </div>
 
