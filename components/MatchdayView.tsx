@@ -417,9 +417,9 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       if (!statsMatch) return;
       setIsSavingStats(true);
       try {
-          await dataService.saveMatchStatsAndCalculate(statsMatch.id, games);
+          await dataService.saveMatchStatsAndCalculate(statsMatch.id, games, selectedSplit);
           setStatsMatch(null); 
-          const updated = await dataService.getMatches();
+          const updated = await dataService.getMatches(undefined, selectedSplit);
           setAllMatches(updated);
       } catch (e) {
           console.error(e);
@@ -461,7 +461,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       }, 60000);
 
       try {
-          await dataService.savePredictions(dayPredictions);
+          await dataService.savePredictions(dayPredictions, selectedSplit);
           if (onPredictionsSaved) await onPredictionsSaved();
           setSaveStatus('success');
           setTimeout(() => setSaveStatus('idle'), 3000);

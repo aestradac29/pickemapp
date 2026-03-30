@@ -138,8 +138,8 @@ export const dataService = {
     },
 
     // Helper to get points for a playoff match based on its position
-    getPlayoffMatchPoints(match: Match, allPlayoffMatches: Match[]): number {
-        const isSpring = this._getCurrentSplitId() === 'spring_2026';
+    getPlayoffMatchPoints(match: Match, allPlayoffMatches: Match[], splitId?: string): number {
+        const isSpring = this._normalizeSplitId(splitId) === 'spring_2026';
         const sorted = [...allPlayoffMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         const winners = sorted.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
         const losers = sorted.filter(m => m.bracketStage === 'losers');
@@ -259,22 +259,22 @@ export const dataService = {
 
         // 3.5. CARRY OVER TEAMS (Rollover Lineups)
         // This ensures every user starts the new round with their previous team physically saved.
-        await this.carryOverFantasyTeams(newRound);
+        await this.carryOverFantasyTeams(newRound, splitId);
 
         // 4. Update Config to new round & UNLOCK explicitly (admin triggers next round, so it starts open)
         await this.updateGlobalConfig({ 
             fantasyRound: newRound,
             fantasyLocked: false // Reset manual lock if it was set
-        });
+        }, splitId);
     },
 
     // Explicitly copy previous teams to the new round for all users
-    async carryOverFantasyTeams(newRound: number) {
+    async carryOverFantasyTeams(newRound: number, splitId?: string) {
         if (newRound <= 1) return; // No rollover for first round
 
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
-        const currentSplitId = this._getCurrentSplitId();
+        const currentSplitId = this._normalizeSplitId(splitId);
         
         const updates = userSnapshot.docs.map(async (userDoc) => {
             const userId = userDoc.id;
@@ -869,7 +869,7 @@ export const dataService = {
     // MANUAL FORCE RECALCULATION WRAPPER
     async forceRecalculateAll(splitId?: string) {
         const matches = await this.getMatches(undefined, splitId);
-        await this.recalculateAllFantasyScores(matches);
+        await this.recalculateAllFantasyScores(matches, splitId);
     },
 
     // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
@@ -997,14 +997,14 @@ export const dataService = {
         await setDoc(doc(db, "admin_data", this._getDocName("matches")), { allMatches: cleanPayload(allMatches) }, { merge: true });
 
         // 4. Trigger Recalculation
-        await this.recalculateAllFantasyScores(allMatches);
+        await this.recalculateAllFantasyScores(allMatches, this._getCurrentSplitId());
     },
 
-    async recalculateAllFantasyScores(allMatches: Match[]) {
+    async recalculateAllFantasyScores(allMatches: Match[], splitId?: string) {
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
         const users = userSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        const currentSplitId = this._getCurrentSplitId();
+        const currentSplitId = this._normalizeSplitId(splitId);
 
         // Map stats by Match ID -> Player ID
         const matchStatsMap: Record<string, Record<string, number>> = {};
@@ -1184,7 +1184,7 @@ export const dataService = {
                     }
 
                     if (predictedWinnerId === m.winnerId) {
-                        const isSpring = this._getCurrentSplitId() === 'spring_2026';
+                        const isSpring = targetSplitId === 'spring_2026';
                         matchdayScore += isSpring ? 1.5 : 1;
                     }
                 });
@@ -1215,13 +1215,13 @@ export const dataService = {
                     }
 
                     if (predictedWinnerId === m.winnerId) {
-                        playoffsScore += this.getPlayoffMatchPoints(m, playoffMatches);
+                        playoffsScore += this.getPlayoffMatchPoints(m, playoffMatches, targetSplitId);
                     }
                 });
 
                 let rankingScore = 0;
                 if (adminRanking && adminRanking.length > 0 && userRanking.length > 0) {
-                    const isSpring = this._getCurrentSplitId() === 'spring_2026';
+                    const isSpring = targetSplitId === 'spring_2026';
                     userRanking.forEach((teamId: string, index: number) => {
                         const actualIndex = adminRanking.indexOf(teamId);
                         if (actualIndex !== -1) {
@@ -1235,11 +1235,10 @@ export const dataService = {
 
                 let fantasyTotal = 0;
                 const fantasyHistory = [];
-                const currentSplitId = this._getCurrentSplitId();
-                const schedule = getFantasySchedule(currentSplitId);
+                const schedule = getFantasySchedule(targetSplitId);
                 for(const roundConfig of schedule) {
                     const r = roundConfig.id;
-                    const roundDocName = this._getFantasyRoundDocName(r, currentSplitId);
+                    const roundDocName = this._getFantasyRoundDocName(r, targetSplitId);
                     const roundRef = doc(db, "users", userId, "fantasy_rounds", roundDocName);
                     const roundSnap = await getDoc(roundRef);
                     const points = roundSnap.exists() ? (roundSnap.data().score || 0) : 0;
@@ -1251,7 +1250,7 @@ export const dataService = {
 
                 const pointsHistory: { day: string; points: number }[] = [];
                 let currentCumulative = 0;
-                const isSpring = currentSplitId === 'spring_2026';
+                const isSpring = targetSplitId === 'spring_2026';
                 const maxDays = isSpring ? 7 : 11;
 
                 for (let d = 1; d <= maxDays; d++) {
@@ -1278,7 +1277,7 @@ export const dataService = {
                         }
 
                         if (predictedWinnerId === m.winnerId) {
-                            const isSpring = this._getCurrentSplitId() === 'spring_2026';
+                            const isSpring = targetSplitId === 'spring_2026';
                             dayPoints += isSpring ? 1.5 : 1;
                         }
                     });
@@ -1314,7 +1313,7 @@ export const dataService = {
                         }
 
                         if (predictedWinnerId === m.winnerId) {
-                            dayPoints += this.getPlayoffMatchPoints(m, playoffMatches);
+                            dayPoints += this.getPlayoffMatchPoints(m, playoffMatches, targetSplitId);
                         }
                      });
 

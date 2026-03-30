@@ -47,21 +47,10 @@ export const extractStatsFromData = async (
   // --- FIX: DETECCION DE VARIABLES DE ENTORNO EN VITE/VERCEL ---
   // En Vite (producción), process.env suele estar vacío. Se debe usar import.meta.env.
   // Buscamos varias claves posibles para mayor compatibilidad.
-  let apiKey = '';
-  
-  // 1. Intentar VITE env vars (Estándar para React+Vite)
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-      apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY || '';
-  }
-
-  // 2. Fallback a process.env (Si se define en build time o un polyfill)
-  if (!apiKey && typeof process !== 'undefined' && process.env) {
-      apiKey = process.env.API_KEY || '';
-  }
+  let apiKey = process.env.GEMINI_API_KEY || '';
 
   if (!apiKey) {
     console.error("❌ ERROR CRÍTICO: No se encontró la API Key de Gemini.");
-    console.error("Asegúrate de configurar la variable de entorno 'VITE_GEMINI_API_KEY' en Vercel/Netlify.");
     throw new Error("API Key de Gemini no configurada");
   }
 
