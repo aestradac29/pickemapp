@@ -139,7 +139,7 @@ const App: React.FC = () => {
         const fetchLeaderboard = async () => {
             setIsLoadingLeaderboard(true);
             try {
-                const users = await dataService.getAllUsers();
+                const users = await dataService.getAllUsers(selectedSplit || undefined);
                 setLeaderboardUsers(users);
             } catch (e) {
                 console.error("Error loading leaderboard", e);
@@ -149,7 +149,7 @@ const App: React.FC = () => {
         }
         fetchLeaderboard();
     }
-  }, [view]);
+  }, [view, selectedSplit]);
 
   const handleUserAuthenticated = (user: any) => {
       // Si ya tenemos un usuario seteado manualmente (por el registro), intentamos no sobrescribirlo con 'Invocador' si es posible

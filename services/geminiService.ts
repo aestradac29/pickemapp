@@ -24,6 +24,8 @@ const statsSchema: Schema = {
           totalDamage: { type: Type.NUMBER, description: "Daño total a campeones" },
           damagePerMinute: { type: Type.NUMBER, description: "Daño por minuto (DPM)" },
           teamTotalDamage: { type: Type.NUMBER, description: "Daño total del equipo de este jugador (para calcular porcentaje)" },
+          turretDamage: { type: Type.NUMBER, description: "Daño infligido a torretas (Damage dealt to turrets)" },
+          minionsPerMinute: { type: Type.NUMBER, description: "Súbditos por minuto (CSM o Minions/Min)" },
           gold: { type: Type.NUMBER },
           visionScore: { type: Type.NUMBER },
           // Stats de equipo inferidas para el jugador
@@ -77,6 +79,8 @@ export const extractStatsFromData = async (
     2. Si encuentras datos de daño (Total Damage), extrae el daño del jugador Y el daño total de su equipo para poder calcular porcentajes.
     3. Busca explícitamente el valor 'DPM' o 'Damage Per Minute' y asígnalo al campo damagePerMinute.
     4. Para roles específicos:
+       - Top: Busca el daño a torretas (Damage dealt to turrets) y el CSM (Minions/Min).
+       - Mid: Busca el daño a torretas (Damage dealt to turrets).
        - Jungle: Busca cuántos Dragones y Barones mató SU equipo.
        - Support: Busca el Vision Score.
     5. Detecta Multikills (Double, Triple, Quadra, Penta).
@@ -88,7 +92,7 @@ export const extractStatsFromData = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -131,6 +135,8 @@ export const extractStatsFromData = async (
             quadraKills: extracted.quadraKills || 0,
             pentaKills: extracted.pentaKills || 0,
             teamDamagePercentage: dmgPercent,
+            turretDamage: extracted.turretDamage || 0,
+            minionsPerMinute: extracted.minionsPerMinute || 0,
             damagePerMinute: extracted.damagePerMinute || 0, // Ahora extraído directamente por Gemini
             visionScore: extracted.visionScore || 0,
             dragonsKilled: extracted.dragonsKilled || 0,

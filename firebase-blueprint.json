@@ -1,0 +1,37 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and scores",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "score": { "type": "number" },
+        "scoreBreakdown": { "type": "object" }
+      },
+      "required": ["username", "email"]
+    },
+    "DebugLog": {
+      "title": "Debug Log",
+      "description": "System debug logs",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "log": { "type": "string" },
+        "splitId": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User documents"
+    },
+    "/debug_logs/{logId}": {
+      "schema": "DebugLog",
+      "description": "System logs"
+    }
+  }
+}
