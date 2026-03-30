@@ -275,7 +275,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
             
             // 1. Max Matchday: Count all matches in GROUPS stage
             const matchdayCount = allMatches.filter(m => m.stage === Stage.GROUPS).length;
-            const matchdayMax = matchdayCount * 1.5;
+            const matchdayMax = isSpring ? matchdayCount * 1.5 : matchdayCount;
 
             // 2. Max Ranking: Teams Count * 6 or 6.75 (Perfect Hit)
             const teamsCount = Object.keys(teamsMap).length;
@@ -709,7 +709,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
             {/* Stats Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 relative z-0">
                 <StatCard icon={Trophy} label="Puntos Totales" value={user.score} type="gold" />
-                <StatCard icon={Swords} label="Aciertos Fase Regular" value={user.scoreBreakdown.matchdayCount} type="blue" />
+                <StatCard icon={Swords} label="Fase Regular" value={user.scoreBreakdown.matchday} type="blue" />
                 <StatCard icon={UserIcon} label="Fantasy" value={user.scoreBreakdown.fantasy} type="cyan" />
             </div>
 
@@ -970,7 +970,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                 
                 {/* Matchday: Count matches in GROUPS stage */}
                 <BreakdownBar 
-                    label={`Predicciones Jornada (${user.scoreBreakdown.matchdayCount} aciertos)`} 
+                    label="Predicciones Jornada (Matchday)" 
                     value={user.scoreBreakdown.matchday} 
                     max={maxScores.matchday} 
                     color="bg-blue-500" 

@@ -3,7 +3,7 @@ import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamSta
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, getFantasySchedule } from '../constants';
 import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where } from "firebase/firestore";
 
 // Helper CRÍTICO: Elimina recursivamente cualquier campo 'undefined' del objeto.
 const cleanPayload = (data: any): any => {
@@ -873,11 +873,10 @@ export const dataService = {
     },
 
     // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
-    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[], splitId?: string) {
+    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[]) {
         // 1. Get Match & Players
-        const targetSplitId = splitId || this._getCurrentSplitId();
         const [docSnap, players] = await Promise.all([
-            getDoc(doc(db, "admin_data", this._getDocName("matches", targetSplitId))),
+            getDoc(doc(db, "admin_data", this._getDocName("matches"))),
             this.getPlayers()
         ]);
         if (!docSnap.exists()) return;
@@ -995,10 +994,10 @@ export const dataService = {
         };
         allMatches[index] = updatedMatch;
         
-        await setDoc(doc(db, "admin_data", this._getDocName("matches", targetSplitId)), { allMatches: cleanPayload(allMatches) }, { merge: true });
+        await setDoc(doc(db, "admin_data", this._getDocName("matches")), { allMatches: cleanPayload(allMatches) }, { merge: true });
 
         // 4. Trigger Recalculation
-        await this.recalculateAllFantasyScores(allMatches, targetSplitId);
+        await this.recalculateAllFantasyScores(allMatches, this._getCurrentSplitId());
     },
 
     async recalculateAllFantasyScores(allMatches: Match[], splitId?: string) {
@@ -1161,7 +1160,6 @@ export const dataService = {
                 const userRanking = rankingSnap.exists() ? rankingSnap.data().order || [] : [];
 
                 let matchdayScore = 0;
-                let matchdayCount = 0;
                 const regularMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.winnerId);
                 
                 regularMatches.forEach(m => {
@@ -1186,8 +1184,8 @@ export const dataService = {
                     }
 
                     if (predictedWinnerId === m.winnerId) {
-                        matchdayCount++;
-                        matchdayScore += 1.5;
+                        const isSpring = targetSplitId === 'spring_2026';
+                        matchdayScore += isSpring ? 1.5 : 1;
                     }
                 });
 
@@ -1279,7 +1277,8 @@ export const dataService = {
                         }
 
                         if (predictedWinnerId === m.winnerId) {
-                            dayPoints += 1.5;
+                            const isSpring = targetSplitId === 'spring_2026';
+                            dayPoints += isSpring ? 1.5 : 1;
                         }
                     });
                     currentCumulative += dayPoints;
@@ -1324,7 +1323,6 @@ export const dataService = {
 
                 const breakdown = {
                     matchday: matchdayScore,
-                    matchdayCount: matchdayCount,
                     ranking: rankingScore,
                     playoffs: playoffsScore,
                     fantasy: parseFloat(fantasyTotal.toFixed(2))
@@ -1473,11 +1471,10 @@ export const dataService = {
             return docSnap.exists() ? docSnap.data().list || [] : [];
         } catch (e) { return []; }
     },
-    async savePredictions(predictions: any[], splitId?: string) {
+    async savePredictions(predictions: any[]) {
         if (!predictions.length) return;
         const userId = predictions[0].user_id;
-        const targetSplitId = splitId || this._getCurrentSplitId();
-        const docRef = doc(db, "users", userId, "picks", targetSplitId);
+        const docRef = doc(db, "users", userId, "picks", this._getCurrentSplitId());
         const docSnap = await getDoc(docRef);
         let currentPreds = docSnap.exists() ? docSnap.data().list || [] : [];
         predictions.forEach(newP => {
@@ -1486,10 +1483,6 @@ export const dataService = {
             else currentPreds.push({ matchId: newP.match_id, predictedWinnerId: newP.predicted_winner_id });
         });
         await setDoc(docRef, { list: cleanPayload(currentPreds) }, { merge: true });
-        
-        // Trigger recalculation to update scores
-        const matches = await this.getMatches(undefined, targetSplitId);
-        await this.recalculateAllFantasyScores(matches, targetSplitId);
     },
     async getUserRanking(userId: string, splitId?: string) {
         try {
@@ -1866,13 +1859,6 @@ export const dataService = {
             console.error("Error responding to trade:", e);
             throw e;
         }
-    },
-
-    subscribeToUsers(callback: () => void) {
-        const q = query(collection(db, 'users'));
-        return onSnapshot(q, () => {
-            callback();
-        });
     },
 
     async transferCard(fromUserId: string, toUserId: string, cardId: string, splitId: string) {

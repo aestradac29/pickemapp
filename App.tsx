@@ -34,7 +34,6 @@ const App: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null); // New state for live avatar update
   const [userRole, setUserRole] = useState<string>('user'); // Nuevo estado para el rol
-  const [emailVerified, setEmailVerified] = useState<boolean>(false); // Nuevo estado para verificación de email
   
   // Navigation State
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null); // ID of the profile being viewed
@@ -163,7 +162,6 @@ const App: React.FC = () => {
       setCurrentUserId(user.id);
       setCurrentUserAvatar(user.profile?.avatar_url);
       setUserRole(user.role || 'user'); // Set Role from DB
-      setEmailVerified(user.emailVerified || false);
       loadUserData(user.id);
 
       // Smart Redirect
@@ -239,7 +237,7 @@ const App: React.FC = () => {
       case ViewState.RANKING:
         return <RankingCombinedView currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit} />;
       case ViewState.FANTASY:
-        return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} emailVerified={emailVerified} selectedSplit={selectedSplit || 'winter_2026'} />;
+        return <FantasyView currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit || 'winter_2026'} />;
       case ViewState.OFFICIAL_STANDINGS:
         return <OfficialStandings selectedSplit={selectedSplit} />;
       case ViewState.PROFILE:
