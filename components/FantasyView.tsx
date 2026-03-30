@@ -525,7 +525,12 @@ const RankingRow: React.FC<RankingRowProps> = ({ user, rank, score, isMe, isView
     </div>
 );
 
-export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: boolean; selectedSplit: string }> = ({ currentUserId, isAdmin, selectedSplit }) => {
+export const FantasyView: React.FC<{ 
+    currentUserId?: string | null; 
+    isAdmin?: boolean; 
+    emailVerified?: boolean;
+    selectedSplit: string 
+}> = ({ currentUserId, isAdmin, emailVerified, selectedSplit }) => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Record<string, Team>>({});
   const [allMatches, setAllMatches] = useState<Match[]>([]);
@@ -867,7 +872,7 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
        } catch (e: any) {
            console.error("Error fetching debug logs:", e);
            if (e.message?.includes("permission")) {
-               setAdminMessage("Error de permisos: Asegúrate de desplegar firestore.rules y que tu rol sea 'admin' en la BBDD.");
+               setAdminMessage("Error de permisos: Asegúrate de desplegar firestore.rules (manualmente en tu consola Firebase) y que tu rol sea 'admin' en la BBDD. Tu email debe ser alvaroestradacabello@gmail.com y estar verificado.");
                setTimeout(() => setAdminMessage(""), 5000);
            }
        }
@@ -1092,13 +1097,20 @@ export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: bo
                     </button>
 
                     {!isAdmin && currentUserId && (
-                        <button 
-                            onClick={handleMakeMeAdmin}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold uppercase border bg-red-900/50 border-red-500 text-red-300 hover:bg-red-900/80 transition-colors"
-                            title="Hacerse Admin (Solo para el dueño)"
-                        >
-                            Hacerse Admin
-                        </button>
+                        <div className="flex flex-col gap-1">
+                            <button 
+                                onClick={handleMakeMeAdmin}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold uppercase border bg-red-900/50 border-red-500 text-red-300 hover:bg-red-900/80 transition-colors"
+                                title="Hacerse Admin (Solo para el dueño)"
+                            >
+                                Hacerse Admin
+                            </button>
+                            {!emailVerified && (
+                                <span className="text-[9px] text-yellow-500 font-bold uppercase text-center">
+                                    Verifica tu email para activar permisos
+                                </span>
+                            )}
+                        </div>
                     )}
                 </div>
             )}

@@ -3,7 +3,7 @@ import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamSta
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, getFantasySchedule } from '../constants';
 import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where, onSnapshot } from "firebase/firestore";
 
 // Helper CRÍTICO: Elimina recursivamente cualquier campo 'undefined' del objeto.
 const cleanPayload = (data: any): any => {
@@ -873,11 +873,11 @@ export const dataService = {
     },
 
     // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
-    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[]) {
+    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[], splitId?: string) {
         // 1. Get Match & Players
         const [docSnap, players] = await Promise.all([
-            getDoc(doc(db, "admin_data", this._getDocName("matches"))),
-            this.getPlayers()
+            getDoc(doc(db, "admin_data", this._getDocName("matches", splitId))),
+            this.getPlayers(false, splitId)
         ]);
         if (!docSnap.exists()) return;
 
@@ -1471,10 +1471,11 @@ export const dataService = {
             return docSnap.exists() ? docSnap.data().list || [] : [];
         } catch (e) { return []; }
     },
-    async savePredictions(predictions: any[]) {
+    async savePredictions(predictions: any[], splitId?: string) {
         if (!predictions.length) return;
         const userId = predictions[0].user_id;
-        const docRef = doc(db, "users", userId, "picks", this._getCurrentSplitId());
+        const targetSplitId = this._normalizeSplitId(splitId);
+        const docRef = doc(db, "users", userId, "picks", targetSplitId);
         const docSnap = await getDoc(docRef);
         let currentPreds = docSnap.exists() ? docSnap.data().list || [] : [];
         predictions.forEach(newP => {
@@ -1495,6 +1496,14 @@ export const dataService = {
         const targetSplitId = this._normalizeSplitId(splitId);
         await setDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`), { order: cleanPayload(teamIds) }, { merge: true });
     },
+
+    subscribeToUsers(callback: () => void) {
+        const q = query(collection(db, "users"));
+        return onSnapshot(q, () => {
+            callback();
+        });
+    },
+
     async getAdminRanking(splitId?: string) {
         try {
             const targetSplitId = this._normalizeSplitId(splitId);
