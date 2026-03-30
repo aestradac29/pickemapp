@@ -427,9 +427,9 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       if (!statsMatch) return;
       setIsSavingStats(true);
       try {
-          await dataService.saveMatchStatsAndCalculate(statsMatch.id, stats, selectedSplit);
+          await dataService.saveMatchStatsAndCalculate(statsMatch.id, stats);
           setStatsMatch(null); 
-          const updated = await dataService.getMatches(undefined, selectedSplit);
+          const updated = await dataService.getMatches();
           setAllMatches(updated);
       } catch (e) {
           console.error(e);
@@ -478,7 +478,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       }, 60000);
 
       try {
-          await dataService.savePredictions(predsToSave, selectedSplit);
+          await dataService.savePredictions(predsToSave);
           if (onPredictionsSaved) await onPredictionsSaved();
           setSaveStatus('success');
           setTimeout(() => setSaveStatus('idle'), 3000);

@@ -38,16 +38,6 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  app.post("/api/debug/log", (req, res) => {
-    const { log } = req.body;
-    console.log("--- DEBUG LOG RECEIVED ---");
-    const fs = require('fs');
-    const path = require('path');
-    const logPath = path.join(process.cwd(), 'debug_fantasy.log');
-    fs.appendFileSync(logPath, log + "\n");
-    res.json({ status: "logged" });
-  });
-
   // Endpoint to send push notifications
   app.post("/api/notifications/send", async (req, res) => {
     if (!isFirebaseAdminInitialized) {
