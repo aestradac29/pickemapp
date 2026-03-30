@@ -994,10 +994,10 @@ export const dataService = {
         };
         allMatches[index] = updatedMatch;
         
-        await setDoc(doc(db, "admin_data", this._getDocName("matches")), { allMatches: cleanPayload(allMatches) }, { merge: true });
+        await setDoc(doc(db, "admin_data", this._getDocName("matches", splitId)), { allMatches: cleanPayload(allMatches) }, { merge: true });
 
         // 4. Trigger Recalculation
-        await this.recalculateAllFantasyScores(allMatches, this._getCurrentSplitId());
+        await this.recalculateAllFantasyScores(allMatches, splitId);
     },
 
     async recalculateAllFantasyScores(allMatches: Match[], splitId?: string) {
@@ -1134,6 +1134,13 @@ export const dataService = {
         }
     },
 
+    subscribeToUsers(callback: () => void) {
+        const q = query(collection(db, "users"));
+        return onSnapshot(q, () => {
+            callback();
+        });
+    },
+
     async getAllUsers(splitId?: string): Promise<User[]> {
         try {
             const targetSplitId = this._normalizeSplitId(splitId);
@@ -1160,6 +1167,7 @@ export const dataService = {
                 const userRanking = rankingSnap.exists() ? rankingSnap.data().order || [] : [];
 
                 let matchdayScore = 0;
+                let matchdayHits = 0;
                 const regularMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.winnerId);
                 
                 regularMatches.forEach(m => {
@@ -1186,6 +1194,7 @@ export const dataService = {
                     if (predictedWinnerId === m.winnerId) {
                         const isSpring = targetSplitId === 'spring_2026';
                         matchdayScore += isSpring ? 1.5 : 1;
+                        matchdayHits += 1;
                     }
                 });
 
@@ -1325,7 +1334,8 @@ export const dataService = {
                     matchday: matchdayScore,
                     ranking: rankingScore,
                     playoffs: playoffsScore,
-                    fantasy: parseFloat(fantasyTotal.toFixed(2))
+                    fantasy: parseFloat(fantasyTotal.toFixed(2)),
+                    matchdayHits: matchdayHits
                 };
 
                 const globalScore = breakdown.matchday + breakdown.ranking + breakdown.playoffs;
@@ -1496,14 +1506,6 @@ export const dataService = {
         const targetSplitId = this._normalizeSplitId(splitId);
         await setDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`), { order: cleanPayload(teamIds) }, { merge: true });
     },
-
-    subscribeToUsers(callback: () => void) {
-        const q = query(collection(db, "users"));
-        return onSnapshot(q, () => {
-            callback();
-        });
-    },
-
     async getAdminRanking(splitId?: string) {
         try {
             const targetSplitId = this._normalizeSplitId(splitId);

@@ -188,6 +188,7 @@ export interface User {
     ranking: number;
     playoffs: number;
     fantasy: number;
+    matchdayHits?: number;
   };
   rank: number;
   pointsHistory: { day: string; points: number }[]; // Global History
