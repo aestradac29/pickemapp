@@ -417,9 +417,9 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       if (!statsMatch) return;
       setIsSavingStats(true);
       try {
-          await dataService.saveMatchStatsAndCalculate(statsMatch.id, games, selectedSplit);
+          await dataService.saveMatchStatsAndCalculate(statsMatch.id, games);
           setStatsMatch(null); 
-          const updated = await dataService.getMatches(undefined, selectedSplit);
+          const updated = await dataService.getMatches();
           setAllMatches(updated);
       } catch (e) {
           console.error(e);
@@ -461,7 +461,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       }, 60000);
 
       try {
-          await dataService.savePredictions(dayPredictions, selectedSplit);
+          await dataService.savePredictions(dayPredictions);
           if (onPredictionsSaved) await onPredictionsSaved();
           setSaveStatus('success');
           setTimeout(() => setSaveStatus('idle'), 3000);
@@ -647,7 +647,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     <div className="flex justify-center -mt-2 mb-2 animate-in fade-in">
                         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-widest shadow-sm">
                             <Trophy className="w-3 h-3" />
-                            <span>Acierto: +1.5 Puntos</span>
+                            <span>Acierto: +{selectedSplit.toLowerCase().includes('spring') ? '1.5' : '1'} Punto</span>
                         </div>
                     </div>
                 )}

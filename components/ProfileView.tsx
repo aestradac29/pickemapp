@@ -459,13 +459,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
         );
     };
 
-    const BreakdownBar = ({ label, value, max, color, subtitle }: any) => (
+    const BreakdownBar = ({ label, value, max, color }: any) => (
         <div className="mb-4">
             <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1.5">
-                <div className="flex flex-col">
-                    <span className="text-gray-400">{label}</span>
-                    {subtitle && <span className="text-[9px] text-gray-500 font-medium lowercase first-letter:uppercase">{subtitle}</span>}
-                </div>
+                <span className="text-gray-400">{label}</span>
                 <span className="text-white">
                     {value} <span className="text-gray-500">/ {max}</span> Pts
                 </span>
@@ -977,7 +974,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                     value={user.scoreBreakdown.matchday} 
                     max={maxScores.matchday} 
                     color="bg-blue-500" 
-                    subtitle={`${user.scoreBreakdown.matchdayCount} jornadas acertadas`}
                 />
                 
                 {/* Ranking: Count teams * 6 */}

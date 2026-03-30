@@ -5,8 +5,6 @@ import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User, 
 import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, TrendingDown, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole, Skull, Crosshair, Droplet } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { dataService } from '../services/dataService';
-import { db } from '../lib/firebase';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 
 // Budget Constants
 const MAX_BUDGET = 1500;
@@ -525,12 +523,7 @@ const RankingRow: React.FC<RankingRowProps> = ({ user, rank, score, isMe, isView
     </div>
 );
 
-export const FantasyView: React.FC<{ 
-    currentUserId?: string | null; 
-    isAdmin?: boolean; 
-    emailVerified?: boolean;
-    selectedSplit: string 
-}> = ({ currentUserId, isAdmin, emailVerified, selectedSplit }) => {
+export const FantasyView: React.FC<{ currentUserId?: string | null; isAdmin?: boolean; selectedSplit: string }> = ({ currentUserId, isAdmin, selectedSplit }) => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Record<string, Team>>({});
   const [allMatches, setAllMatches] = useState<Match[]>([]);
@@ -545,8 +538,6 @@ export const FantasyView: React.FC<{
   const [activeTab, setActiveTab] = useState<'lineup' | 'history'>('lineup');
   const [viewingUserId, setViewingUserId] = useState<string | null>(currentUserId || null);
   const [isAdminSaving, setIsAdminSaving] = useState(false);
-  const [debugLogs, setDebugLogs] = useState<any[]>([]);
-  const [showDebugLogs, setShowDebugLogs] = useState(false);
   const [pendingRoundChange, setPendingRoundChange] = useState<number | null>(null);
   const [showRules, setShowRules] = useState(false);
 
@@ -569,20 +560,6 @@ export const FantasyView: React.FC<{
   useEffect(() => {
     loadData();
   }, [currentUserId, selectedSplit]);
-
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    const unsubscribe = dataService.subscribeToUsers(() => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-            loadData();
-        }, 1000);
-    });
-    return () => {
-        unsubscribe();
-        clearTimeout(timeoutId);
-    };
-  }, []);
 
   useEffect(() => {
       if (currentUserId && !viewingUserId) {
@@ -674,7 +651,7 @@ export const FantasyView: React.FC<{
             dataService.getTeams(false, selectedSplit),
             dataService.getMatches(undefined, selectedSplit),
             dataService.getDaysConfig(selectedSplit),
-            dataService.getAllUsers(selectedSplit)
+            dataService.getAllUsers()
         ]);
         
         setPlayers(fetchedPlayers);
@@ -833,8 +810,6 @@ export const FantasyView: React.FC<{
     }
   };
 
-  const [adminMessage, setAdminMessage] = useState<string | null>(null);
-
   const handleToggleLock = async () => {
       if (!isAdmin) return;
       const newStatus = !roundLocked;
@@ -842,63 +817,21 @@ export const FantasyView: React.FC<{
       await dataService.updateGlobalConfig({ fantasyLocked: newStatus }, selectedSplit);
   };
 
-   const handleForceRecalculate = async () => {
-       if (!isAdmin) return;
-       console.log("handleForceRecalculate clicked");
-       
-       setAdminMessage("Recalculando puntos... por favor espera.");
+  const handleForceRecalculate = async () => {
+      if (!isAdmin) return;
+      if (!window.confirm("CONFIRMACIÓN: Esto escaneará TODOS los equipos de usuarios y recalculará sus puntos.")) return;
+      
       setIsAdminSaving(true);
       try {
           await dataService.forceRecalculateAll(selectedSplit);
-          setAdminMessage("Puntos recalculados correctamente.");
+          alert("Puntos recalculados correctamente.");
           await loadData();
-          fetchDebugLogs();
-          setTimeout(() => setAdminMessage(null), 5000);
       } catch(e) {
-          setAdminMessage("Error al recalcular.");
-          setTimeout(() => setAdminMessage(null), 5000);
+          alert("Error al recalcular.");
       } finally {
           setIsAdminSaving(false);
       }
   };
-
-   const fetchDebugLogs = async () => {
-       console.log("Fetching debug logs...");
-       try {
-           const q = query(collection(db, "debug_logs"), orderBy("timestamp", "desc"), limit(5));
-           const snap = await getDocs(q);
-           console.log("Fetched logs:", snap.docs.length);
-           setDebugLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-       } catch (e: any) {
-           console.error("Error fetching debug logs:", e);
-           if (e.message?.includes("permission")) {
-               setAdminMessage("Error de permisos: Asegúrate de desplegar firestore.rules (manualmente en tu consola Firebase) y que tu rol sea 'admin' en la BBDD. Tu email debe ser alvaroestradacabello@gmail.com y estar verificado.");
-               setTimeout(() => setAdminMessage(""), 5000);
-           }
-       }
-   };
-
-    const handleMakeMeAdmin = async () => {
-        if (!currentUserId) return;
-        setIsAdminSaving(true);
-        setAdminMessage("Otorgando permisos de admin...");
-        try {
-            const { doc, setDoc } = await import("firebase/firestore");
-            await setDoc(doc(db, "users", currentUserId), { role: 'admin' }, { merge: true });
-            setAdminMessage("¡Ahora eres Admin! Recarga la página.");
-            setTimeout(() => setAdminMessage(""), 5000);
-        } catch (e: any) {
-            console.error("Error setting admin role:", e);
-            setAdminMessage("Error al otorgar permisos: " + e.message);
-            setTimeout(() => setAdminMessage(""), 5000);
-        } finally {
-            setIsAdminSaving(false);
-        }
-    };
-
-  useEffect(() => {
-      if (isAdmin) fetchDebugLogs();
-  }, [isAdmin]);
 
   const handleChangeActiveRound = (newRound: number) => {
       if (!isAdmin) return;
@@ -1075,63 +1008,14 @@ export const FantasyView: React.FC<{
 
                     <button 
                         onClick={handleForceRecalculate}
-                        disabled={isAdminSaving}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold uppercase border bg-purple-900/50 border-purple-500 text-purple-300 hover:bg-purple-900/80 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold uppercase border bg-purple-900/50 border-purple-500 text-purple-300 hover:bg-purple-900/80 transition-colors"
                         title="Recalcular puntuaciones"
                     >
-                        <RefreshCcw className={`w-3 h-3 ${isAdminSaving ? 'animate-spin' : ''}`} /> Recalcular
+                        <RefreshCcw className="w-3 h-3" /> Recalcular
                     </button>
-
-                    {adminMessage && (
-                        <div className="absolute top-full right-0 mt-2 p-2 bg-gray-900 border border-hextech-500 rounded text-[10px] text-hextech-400 z-50 whitespace-nowrap animate-in fade-in slide-in-from-top-1">
-                            {adminMessage}
-                        </div>
-                    )}
-
-                    <button 
-                        onClick={() => setShowDebugLogs(!showDebugLogs)}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold uppercase border bg-gray-900/50 border-gray-500 text-gray-300 hover:bg-gray-900/80 transition-colors"
-                        title="Ver Logs de Depuración"
-                    >
-                        {showDebugLogs ? 'Ocultar Logs' : 'Ver Logs'}
-                    </button>
-
-                    {!isAdmin && currentUserId && (
-                        <div className="flex flex-col gap-1">
-                            <button 
-                                onClick={handleMakeMeAdmin}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold uppercase border bg-red-900/50 border-red-500 text-red-300 hover:bg-red-900/80 transition-colors"
-                                title="Hacerse Admin (Solo para el dueño)"
-                            >
-                                Hacerse Admin
-                            </button>
-                            {!emailVerified && (
-                                <span className="text-[9px] text-yellow-500 font-bold uppercase text-center">
-                                    Verifica tu email para activar permisos
-                                </span>
-                            )}
-                        </div>
-                    )}
                 </div>
             )}
           </div>
-
-          {/* DEBUG LOGS VIEWER */}
-          {isAdmin && showDebugLogs && (
-              <div className="mb-6 p-4 bg-black border border-red-500 rounded-lg overflow-auto max-h-[400px] font-mono text-[10px]">
-                  <div className="flex justify-between items-center mb-2">
-                      <h3 className="text-red-500 font-bold uppercase">Debug Logs (Admin Only)</h3>
-                      <button onClick={fetchDebugLogs} className="text-[#0ac8b9] hover:underline">Refrescar</button>
-                  </div>
-                  {debugLogs.length === 0 && <p className="text-gray-500">No hay logs recientes.</p>}
-                  {debugLogs.map(log => (
-                      <div key={log.id} className="mb-4 border-b border-gray-800 pb-2">
-                          <p className="text-gray-400">{log.timestamp} - Split: {log.splitId}</p>
-                          <pre className="text-green-400 whitespace-pre-wrap mt-1">{log.log}</pre>
-                      </div>
-                  ))}
-              </div>
-          )}
 
           {/* VIEW CONTROLS & TABS */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-gray-700 pb-2">

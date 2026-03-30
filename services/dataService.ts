@@ -3,7 +3,7 @@ import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamSta
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, getFantasySchedule } from '../constants';
 import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where, onSnapshot, writeBatch } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where } from "firebase/firestore";
 
 // Helper CRÍTICO: Elimina recursivamente cualquier campo 'undefined' del objeto.
 const cleanPayload = (data: any): any => {
@@ -138,8 +138,8 @@ export const dataService = {
     },
 
     // Helper to get points for a playoff match based on its position
-    getPlayoffMatchPoints(match: Match, allPlayoffMatches: Match[], splitId?: string): number {
-        const isSpring = this._normalizeSplitId(splitId) === 'spring_2026';
+    getPlayoffMatchPoints(match: Match, allPlayoffMatches: Match[]): number {
+        const isSpring = this._getCurrentSplitId() === 'spring_2026';
         const sorted = [...allPlayoffMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         const winners = sorted.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
         const losers = sorted.filter(m => m.bracketStage === 'losers');
@@ -259,22 +259,22 @@ export const dataService = {
 
         // 3.5. CARRY OVER TEAMS (Rollover Lineups)
         // This ensures every user starts the new round with their previous team physically saved.
-        await this.carryOverFantasyTeams(newRound, splitId);
+        await this.carryOverFantasyTeams(newRound);
 
         // 4. Update Config to new round & UNLOCK explicitly (admin triggers next round, so it starts open)
         await this.updateGlobalConfig({ 
             fantasyRound: newRound,
             fantasyLocked: false // Reset manual lock if it was set
-        }, splitId);
+        });
     },
 
     // Explicitly copy previous teams to the new round for all users
-    async carryOverFantasyTeams(newRound: number, splitId?: string) {
+    async carryOverFantasyTeams(newRound: number) {
         if (newRound <= 1) return; // No rollover for first round
 
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
-        const currentSplitId = this._normalizeSplitId(splitId);
+        const currentSplitId = this._getCurrentSplitId();
         
         const updates = userSnapshot.docs.map(async (userDoc) => {
             const userId = userDoc.id;
@@ -869,14 +869,14 @@ export const dataService = {
     // MANUAL FORCE RECALCULATION WRAPPER
     async forceRecalculateAll(splitId?: string) {
         const matches = await this.getMatches(undefined, splitId);
-        await this.recalculateAllFantasyScores(matches, splitId);
+        await this.recalculateAllFantasyScores(matches);
     },
 
     // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
-    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[], splitId?: string) {
+    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[]) {
         // 1. Get Match & Players
         const [docSnap, players] = await Promise.all([
-            getDoc(doc(db, "admin_data", this._getDocName("matches", splitId))),
+            getDoc(doc(db, "admin_data", this._getDocName("matches"))),
             this.getPlayers()
         ]);
         if (!docSnap.exists()) return;
@@ -997,14 +997,14 @@ export const dataService = {
         await setDoc(doc(db, "admin_data", this._getDocName("matches")), { allMatches: cleanPayload(allMatches) }, { merge: true });
 
         // 4. Trigger Recalculation
-        await this.recalculateAllFantasyScores(allMatches, this._getCurrentSplitId());
+        await this.recalculateAllFantasyScores(allMatches);
     },
 
-    async recalculateAllFantasyScores(allMatches: Match[], splitId?: string) {
+    async recalculateAllFantasyScores(allMatches: Match[]) {
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
         const users = userSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        const currentSplitId = this._normalizeSplitId(splitId);
+        const currentSplitId = this._getCurrentSplitId();
 
         // Map stats by Match ID -> Player ID
         const matchStatsMap: Record<string, Record<string, number>> = {};
@@ -1160,7 +1160,6 @@ export const dataService = {
                 const userRanking = rankingSnap.exists() ? rankingSnap.data().order || [] : [];
 
                 let matchdayScore = 0;
-                let matchdayCount = 0;
                 const regularMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.winnerId);
                 
                 regularMatches.forEach(m => {
@@ -1185,9 +1184,8 @@ export const dataService = {
                     }
 
                     if (predictedWinnerId === m.winnerId) {
-                        const isSpring = targetSplitId === 'spring_2026';
+                        const isSpring = this._getCurrentSplitId() === 'spring_2026';
                         matchdayScore += isSpring ? 1.5 : 1;
-                        matchdayCount += 1;
                     }
                 });
 
@@ -1217,13 +1215,13 @@ export const dataService = {
                     }
 
                     if (predictedWinnerId === m.winnerId) {
-                        playoffsScore += this.getPlayoffMatchPoints(m, playoffMatches, targetSplitId);
+                        playoffsScore += this.getPlayoffMatchPoints(m, playoffMatches);
                     }
                 });
 
                 let rankingScore = 0;
                 if (adminRanking && adminRanking.length > 0 && userRanking.length > 0) {
-                    const isSpring = targetSplitId === 'spring_2026';
+                    const isSpring = this._getCurrentSplitId() === 'spring_2026';
                     userRanking.forEach((teamId: string, index: number) => {
                         const actualIndex = adminRanking.indexOf(teamId);
                         if (actualIndex !== -1) {
@@ -1237,10 +1235,11 @@ export const dataService = {
 
                 let fantasyTotal = 0;
                 const fantasyHistory = [];
-                const schedule = getFantasySchedule(targetSplitId);
+                const currentSplitId = this._getCurrentSplitId();
+                const schedule = getFantasySchedule(currentSplitId);
                 for(const roundConfig of schedule) {
                     const r = roundConfig.id;
-                    const roundDocName = this._getFantasyRoundDocName(r, targetSplitId);
+                    const roundDocName = this._getFantasyRoundDocName(r, currentSplitId);
                     const roundRef = doc(db, "users", userId, "fantasy_rounds", roundDocName);
                     const roundSnap = await getDoc(roundRef);
                     const points = roundSnap.exists() ? (roundSnap.data().score || 0) : 0;
@@ -1252,7 +1251,7 @@ export const dataService = {
 
                 const pointsHistory: { day: string; points: number }[] = [];
                 let currentCumulative = 0;
-                const isSpring = targetSplitId === 'spring_2026';
+                const isSpring = currentSplitId === 'spring_2026';
                 const maxDays = isSpring ? 7 : 11;
 
                 for (let d = 1; d <= maxDays; d++) {
@@ -1279,7 +1278,7 @@ export const dataService = {
                         }
 
                         if (predictedWinnerId === m.winnerId) {
-                            const isSpring = targetSplitId === 'spring_2026';
+                            const isSpring = this._getCurrentSplitId() === 'spring_2026';
                             dayPoints += isSpring ? 1.5 : 1;
                         }
                     });
@@ -1315,7 +1314,7 @@ export const dataService = {
                         }
 
                         if (predictedWinnerId === m.winnerId) {
-                            dayPoints += this.getPlayoffMatchPoints(m, playoffMatches, targetSplitId);
+                            dayPoints += this.getPlayoffMatchPoints(m, playoffMatches);
                         }
                      });
 
@@ -1325,7 +1324,6 @@ export const dataService = {
 
                 const breakdown = {
                     matchday: matchdayScore,
-                    matchdayCount: matchdayCount,
                     ranking: rankingScore,
                     playoffs: playoffsScore,
                     fantasy: parseFloat(fantasyTotal.toFixed(2))
@@ -1434,7 +1432,7 @@ export const dataService = {
                 if (b.score !== a.score) {
                     return b.score - a.score;
                 }
-                return b.scoreBreakdown.matchdayCount - a.scoreBreakdown.matchdayCount;
+                return b.scoreBreakdown.matchday - a.scoreBreakdown.matchday;
             });
 
             // ASSIGN RANKS (Dense Ranking: 1, 2, 2, 4...)
@@ -1444,7 +1442,7 @@ export const dataService = {
                     const curr = users[i];
                     
                     // Check if scores are identical including tie-breaker
-                    if (prev.score === curr.score && prev.scoreBreakdown.matchdayCount === curr.scoreBreakdown.matchdayCount) {
+                    if (prev.score === curr.score && prev.scoreBreakdown.matchday === curr.scoreBreakdown.matchday) {
                         curr.rank = prev.rank;
                     } else {
                         curr.rank = i + 1;
@@ -1474,25 +1472,17 @@ export const dataService = {
             return docSnap.exists() ? docSnap.data().list || [] : [];
         } catch (e) { return []; }
     },
-    async savePredictions(predictions: any[], splitId?: string) {
+    async savePredictions(predictions: any[]) {
         if (!predictions.length) return;
         const userId = predictions[0].user_id;
-        const targetSplitId = this._normalizeSplitId(splitId);
-        const docRef = doc(db, "users", userId, "picks", targetSplitId);
+        const docRef = doc(db, "users", userId, "picks", this._getCurrentSplitId());
         const docSnap = await getDoc(docRef);
         let currentPreds = docSnap.exists() ? docSnap.data().list || [] : [];
         predictions.forEach(newP => {
             const index = currentPreds.findIndex((p: any) => p.matchId === newP.match_id);
-            if (index !== -1) {
-                currentPreds[index].predictedWinnerId = newP.predicted_winner_id;
-            } else {
-                currentPreds.push({ 
-                    matchId: newP.match_id, 
-                    predictedWinnerId: newP.predicted_winner_id 
-                });
-            }
+            if (index !== -1) currentPreds[index].predictedWinnerId = newP.predicted_winner_id;
+            else currentPreds.push({ matchId: newP.match_id, predictedWinnerId: newP.predicted_winner_id });
         });
-        // @ts-ignore
         await setDoc(docRef, { list: cleanPayload(currentPreds) }, { merge: true });
     },
     async getUserRanking(userId: string, splitId?: string) {
@@ -1895,12 +1885,5 @@ export const dataService = {
         } else {
             await addDoc(toInvRef, { userId: toUserId, cardId: cardId, quantity: 1, obtainedAt: new Date().toISOString() });
         }
-    },
-
-    subscribeToUsers(callback: () => void) {
-        const usersRef = collection(db, "users");
-        return onSnapshot(usersRef, () => {
-            callback();
-        });
     }
 };
