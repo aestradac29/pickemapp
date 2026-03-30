@@ -3,7 +3,7 @@ import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamSta
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, getFantasySchedule } from '../constants';
 import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where } from "firebase/firestore";
 
 // Helper CRÍTICO: Elimina recursivamente cualquier campo 'undefined' del objeto.
 const cleanPayload = (data: any): any => {
@@ -873,11 +873,11 @@ export const dataService = {
     },
 
     // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
-    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[], splitId?: string) {
+    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[]) {
         // 1. Get Match & Players
         const [docSnap, players] = await Promise.all([
-            getDoc(doc(db, "admin_data", this._getDocName("matches", splitId))),
-            this.getPlayers(false, splitId)
+            getDoc(doc(db, "admin_data", this._getDocName("matches"))),
+            this.getPlayers()
         ]);
         if (!docSnap.exists()) return;
 
@@ -994,10 +994,10 @@ export const dataService = {
         };
         allMatches[index] = updatedMatch;
         
-        await setDoc(doc(db, "admin_data", this._getDocName("matches", splitId)), { allMatches: cleanPayload(allMatches) }, { merge: true });
+        await setDoc(doc(db, "admin_data", this._getDocName("matches")), { allMatches: cleanPayload(allMatches) }, { merge: true });
 
         // 4. Trigger Recalculation
-        await this.recalculateAllFantasyScores(allMatches, splitId);
+        await this.recalculateAllFantasyScores(allMatches, this._getCurrentSplitId());
     },
 
     async recalculateAllFantasyScores(allMatches: Match[], splitId?: string) {
@@ -1134,13 +1134,6 @@ export const dataService = {
         }
     },
 
-    subscribeToUsers(callback: () => void) {
-        const q = query(collection(db, "users"));
-        return onSnapshot(q, () => {
-            callback();
-        });
-    },
-
     async getAllUsers(splitId?: string): Promise<User[]> {
         try {
             const targetSplitId = this._normalizeSplitId(splitId);
@@ -1167,7 +1160,6 @@ export const dataService = {
                 const userRanking = rankingSnap.exists() ? rankingSnap.data().order || [] : [];
 
                 let matchdayScore = 0;
-                let matchdayHits = 0;
                 const regularMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.winnerId);
                 
                 regularMatches.forEach(m => {
@@ -1194,7 +1186,6 @@ export const dataService = {
                     if (predictedWinnerId === m.winnerId) {
                         const isSpring = targetSplitId === 'spring_2026';
                         matchdayScore += isSpring ? 1.5 : 1;
-                        matchdayHits += 1;
                     }
                 });
 
@@ -1334,8 +1325,7 @@ export const dataService = {
                     matchday: matchdayScore,
                     ranking: rankingScore,
                     playoffs: playoffsScore,
-                    fantasy: parseFloat(fantasyTotal.toFixed(2)),
-                    matchdayHits: matchdayHits
+                    fantasy: parseFloat(fantasyTotal.toFixed(2))
                 };
 
                 const globalScore = breakdown.matchday + breakdown.ranking + breakdown.playoffs;
@@ -1481,11 +1471,10 @@ export const dataService = {
             return docSnap.exists() ? docSnap.data().list || [] : [];
         } catch (e) { return []; }
     },
-    async savePredictions(predictions: any[], splitId?: string) {
+    async savePredictions(predictions: any[]) {
         if (!predictions.length) return;
         const userId = predictions[0].user_id;
-        const targetSplitId = this._normalizeSplitId(splitId);
-        const docRef = doc(db, "users", userId, "picks", targetSplitId);
+        const docRef = doc(db, "users", userId, "picks", this._getCurrentSplitId());
         const docSnap = await getDoc(docRef);
         let currentPreds = docSnap.exists() ? docSnap.data().list || [] : [];
         predictions.forEach(newP => {

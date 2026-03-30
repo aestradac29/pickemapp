@@ -14,16 +14,15 @@ export const authService = {
                 // Obtener datos adicionales del perfil en Firestore
                 const userProfile = await this.getUserProfile(firebaseUser.uid);
                 
-                    const user = {
-                        id: firebaseUser.uid,
-                        email: firebaseUser.email,
-                        emailVerified: firebaseUser.emailVerified,
-                        role: userProfile?.role || 'user', // Recuperamos el rol de la BBDD
-                        profile: {
-                            username: userProfile?.username || firebaseUser.displayName || 'Invocador',
-                            avatar_url: userProfile?.avatar_url || firebaseUser.photoURL
-                        }
-                    };
+                const user = {
+                    id: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    role: userProfile?.role || 'user', // Recuperamos el rol de la BBDD
+                    profile: {
+                        username: userProfile?.username || firebaseUser.displayName || 'Invocador',
+                        avatar_url: userProfile?.avatar_url || firebaseUser.photoURL
+                    }
+                };
                 listener(user);
             } else {
                 listener(null);
@@ -98,7 +97,6 @@ export const authService = {
                     resolve({
                         id: firebaseUser.uid,
                         email: firebaseUser.email,
-                        emailVerified: firebaseUser.emailVerified,
                         role: userProfile?.role || 'user', // Recuperamos el rol de la BBDD
                         profile: {
                             username: userProfile?.username || firebaseUser.displayName,

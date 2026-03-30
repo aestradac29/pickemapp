@@ -28,7 +28,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
   // Helper to get score based on active category
   const getScore = (user: User) => {
     if (activeCategory === 'global') return user.score; 
-    if (activeCategory === 'matchday') return user.scoreBreakdown.matchdayHits || 0;
     return user.scoreBreakdown[activeCategory];
   };
 
@@ -44,9 +43,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
 
           // Global Tie-Breaker: Most correct matchday picks
           if (activeCategory === 'global') {
-              const hitsA = a.scoreBreakdown.matchdayHits || 0;
-              const hitsB = b.scoreBreakdown.matchdayHits || 0;
-              return hitsB - hitsA;
+              return b.scoreBreakdown.matchday - a.scoreBreakdown.matchday;
           }
 
           // Other categories: No secondary sort (shared position)
@@ -346,7 +343,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
                         {/* Show Matchday hits in Global tab to explain tie-breaker */}
                         {activeCategory === 'global' && (
                             <p className="text-[9px] text-gray-400/80 uppercase tracking-tight">
-                                Jornadas acertadas: {user.scoreBreakdown.matchdayHits || 0}
+                                Jornadas acertadas: {user.scoreBreakdown.matchday}
                             </p>
                         )}
                     </div>
@@ -356,9 +353,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
                     <p className={`text-2xl font-bold leading-none drop-shadow-md ${scoreColor}`}>
                         {getScore(user)}
                     </p>
-                    <p className={`text-[10px] uppercase font-bold tracking-wider mt-1 ${hasCustomBanner ? 'text-gray-300' : 'text-gray-500'}`}>
-                        {activeCategory === 'matchday' ? 'Aciertos' : 'Puntos'}
-                    </p>
+                    <p className={`text-[10px] uppercase font-bold tracking-wider mt-1 ${hasCustomBanner ? 'text-gray-300' : 'text-gray-500'}`}>Puntos</p>
                 </div>
                 </div>
             );

@@ -441,7 +441,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
         );
     }
 
-    const StatCard = ({ icon: Icon, label, value, type, subValue, subLabel }: { icon: any, label: string, value: number | string, type: 'gold' | 'blue' | 'purple' | 'cyan', subValue?: number | string, subLabel?: string }) => {
+    const StatCard = ({ icon: Icon, label, value, type }: { icon: any, label: string, value: number, type: 'gold' | 'blue' | 'purple' | 'cyan' }) => {
         const theme = {
             gold: { bg: 'bg-yellow-900/10', border: 'border-yellow-500/30', text: 'text-yellow-400', icon: 'text-yellow-500', glow: 'shadow-[0_0_15px_rgba(234,179,8,0.1)]' },
             blue: { bg: 'bg-blue-900/10', border: 'border-blue-500/30', text: 'text-blue-400', icon: 'text-blue-500', glow: 'shadow-[0_0_15px_rgba(59,130,246,0.1)]' },
@@ -454,20 +454,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                 <div className={`absolute -right-6 -bottom-6 opacity-10 ${theme.text}`}><Icon className="w-24 h-24 -rotate-12" /></div>
                 <div className={`absolute top-2 right-2 opacity-60 ${theme.icon}`}><Icon className="w-5 h-5" /></div>
                 <span className="text-3xl font-bold text-white mb-1 relative z-10 drop-shadow-sm">{value}</span>
-                {subValue !== undefined && (
-                    <span className="text-[10px] text-gray-400 font-bold mb-1 relative z-10">{subValue} {subLabel}</span>
-                )}
                 <span className={`text-[10px] uppercase font-bold tracking-widest relative z-10 ${theme.text} opacity-90`}>{label}</span>
             </div>
         );
     };
 
-    const BreakdownBar = ({ label, value, max, color, subValue, subLabel }: any) => (
+    const BreakdownBar = ({ label, value, max, color }: any) => (
         <div className="mb-4">
             <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1.5">
                 <span className="text-gray-400">{label}</span>
                 <span className="text-white">
-                    {value} {subValue !== undefined && <span className="text-gray-500">({subValue} {subLabel})</span>} <span className="text-gray-500">/ {max}</span> Pts
+                    {value} <span className="text-gray-500">/ {max}</span> Pts
                 </span>
             </div>
             <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden border border-gray-700/50">
@@ -712,14 +709,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
             {/* Stats Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 relative z-0">
                 <StatCard icon={Trophy} label="Puntos Totales" value={user.score} type="gold" />
-                <StatCard 
-                    icon={Swords} 
-                    label="Jornadas Acertadas" 
-                    value={user.scoreBreakdown.matchdayHits || 0} 
-                    subValue={user.scoreBreakdown.matchday} 
-                    subLabel="Pts"
-                    type="blue" 
-                />
+                <StatCard icon={Swords} label="Fase Regular" value={user.scoreBreakdown.matchday} type="blue" />
                 <StatCard icon={UserIcon} label="Fantasy" value={user.scoreBreakdown.fantasy} type="cyan" />
             </div>
 
@@ -982,8 +972,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                 <BreakdownBar 
                     label="Predicciones Jornada (Matchday)" 
                     value={user.scoreBreakdown.matchday} 
-                    subValue={user.scoreBreakdown.matchdayHits || 0}
-                    subLabel="Aciertos"
                     max={maxScores.matchday} 
                     color="bg-blue-500" 
                 />
