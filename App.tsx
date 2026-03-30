@@ -18,6 +18,7 @@ import { TeamsView } from './components/TeamsView';
 import { OfficialStandings } from './components/OfficialStandings';
 import { HallOfFame } from './components/HallOfFame'; // Import nuevo
 import { Album } from './components/Album'; // New Album Import
+import { AdminAssistant } from './src/components/AdminAssistant';
 import { ViewState, UserPrediction, User } from './types';
 import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, Download } from 'lucide-react';
 import { authService } from './services/authService';
@@ -530,6 +531,8 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* Admin Assistant */}
+      <AdminAssistant isAdmin={isAdmin} />
     </div>
   );
 };
