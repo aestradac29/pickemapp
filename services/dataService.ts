@@ -260,12 +260,14 @@ export const dataService = {
         });
 
         // 3. Save new player list
-        const playersDocRef = doc(db, "admin_data", "players");
+        const targetSplitId = this._normalizeSplitId(splitId);
+        const docName = targetSplitId === 'winter_2026' ? 'players' : `players_${targetSplitId}`;
+        const playersDocRef = doc(db, "admin_data", docName);
         await setDoc(playersDocRef, { list: cleanPayload(updatedPlayers) }, { merge: true });
 
         // 3.5. CARRY OVER TEAMS (Rollover Lineups)
         // This ensures every user starts the new round with their previous team physically saved.
-        await this.carryOverFantasyTeams(newRound);
+        await this.carryOverFantasyTeams(newRound, splitId);
 
         // 4. Update Config to new round & UNLOCK explicitly (admin triggers next round, so it starts open)
         await this.updateGlobalConfig({ 
@@ -275,12 +277,16 @@ export const dataService = {
     },
 
     // Explicitly copy previous teams to the new round for all users
-    async carryOverFantasyTeams(newRound: number) {
+    async carryOverFantasyTeams(newRound: number, splitId?: string) {
         if (newRound <= 1) return; // No rollover for first round
 
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
-        const currentSplitId = this._getCurrentSplitId();
+        const currentSplitId = this._normalizeSplitId(splitId || this._getCurrentSplitId());
+        
+        // Fetch players to infer legacy costs if missing
+        const players = await this.getPlayers(false, currentSplitId);
+        const playerMap = new Map<string, Player>(players.map(p => [p.id, p]));
         
         const updates = userSnapshot.docs.map(async (userDoc) => {
             const userId = userDoc.id;
@@ -329,19 +335,27 @@ export const dataService = {
                 const preservedTeam: Record<string, any> = {};
                 Object.keys(teamToCopy).forEach(key => {
                     const slot = teamToCopy[key];
-                    // Clean format
+                    let playerId = null;
+                    let purchaseCost = undefined;
+
                     if (slot && typeof slot === 'object') {
-                        preservedTeam[key] = {
-                            playerId: slot.playerId || null,
-                            purchaseCost: slot.purchaseCost // Preserve original cost
-                        };
+                        playerId = slot.playerId || null;
+                        purchaseCost = slot.purchaseCost;
                     } else if (typeof slot === 'string') {
-                        // Legacy string format
-                        preservedTeam[key] = { playerId: slot };
-                    } else {
-                        // Empty/Null
-                        preservedTeam[key] = { playerId: null };
+                        playerId = slot;
                     }
+
+                    if (playerId && purchaseCost === undefined) {
+                        const player = playerMap.get(playerId as string);
+                        if (player) {
+                            purchaseCost = player.cost - (player.priceChange || 0);
+                        }
+                    }
+
+                    preservedTeam[key] = {
+                        playerId,
+                        purchaseCost
+                    };
                 });
 
                 await setDoc(targetRef, {

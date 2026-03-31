@@ -215,7 +215,8 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   }, [role, players, teams]);
 
   // LOGICA DE PRECIOS
-  const storedCost = slot?.purchaseCost || player?.cost || 0;
+  const legacyPreviousPrice = (player?.cost || 0) - (player?.priceChange || 0);
+  const storedCost = slot?.purchaseCost || legacyPreviousPrice || player?.cost || 0;
   const currentMarketCost = player?.cost || 0;
   
   let effectiveCost = 0;
@@ -768,7 +769,8 @@ export const FantasyView: React.FC<{
       if (!player) return 0;
       
       const marketCost = player.cost;
-      const storedCost = slot.purchaseCost || marketCost;
+      const legacyPreviousPrice = marketCost - (player.priceChange || 0);
+      const storedCost = slot.purchaseCost || legacyPreviousPrice || marketCost;
       
       // If viewing past round, we return storedCost strictly
       if (viewRoundId < activeConfigRound) {
@@ -809,7 +811,8 @@ export const FantasyView: React.FC<{
             const player = players.find(p => p.id === slot.playerId);
             if (player) {
                 const marketCost = player.cost;
-                const storedCost = slot.purchaseCost || marketCost;
+                const legacyPreviousPrice = marketCost - (player.priceChange || 0);
+                const storedCost = slot.purchaseCost || legacyPreviousPrice || marketCost;
                 
                 teamToSave[role] = {
                     ...slot,
