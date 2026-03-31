@@ -238,12 +238,18 @@ export const dataService = {
 
             // Only change price if they have played at least 1 game
             if ((p.totalPoints || 0) > 0) {
-                if (targetPrice > currentCost) {
-                    // Should increase: Move 5% of the gap towards target, no hard cap
+                // Performance Ratio: How did they perform this round vs their average?
+                const performanceRatio = avg > 0 ? (p.lastMatchPoints || 0) / avg : 1;
+
+                if (performanceRatio >= 0.9) {
+                    // Good performance: Increase
                     change = Math.ceil((targetPrice - currentCost) * 0.05);
-                } else if (targetPrice < currentCost) {
-                    // Should decrease: Move 2.5% of the gap towards target (prices stickier downwards)
-                    change = Math.floor((targetPrice - currentCost) * 0.025);
+                } else if (performanceRatio < 0.7) {
+                    // Bad performance: Decrease
+                    change = Math.floor((targetPrice - currentCost) * 0.05);
+                } else {
+                    // Average performance: Minimal change
+                    change = Math.floor((targetPrice - currentCost) * 0.01);
                 }
             }
 
