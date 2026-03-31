@@ -231,19 +231,19 @@ export const dataService = {
         // 2. Calculate new prices based on performance (Last Round vs Average)
         const updatedPlayers = currentPlayers.map(p => {
             const avg = p.averagePoints || 0;
-            // Target price based on performance (Multiplier 18-20 is standard for Fantasy LoL budgets ~1500)
-            const targetPrice = avg * 18; 
+            // Target price based on performance (Multiplier 15 is more sustainable)
+            const targetPrice = avg * 15; 
             let change = 0;
             const currentCost = p.cost || 250; // Fallback cost if missing
 
             // Only change price if they have played at least 1 game
             if ((p.totalPoints || 0) > 0) {
                 if (targetPrice > currentCost) {
-                    // Should increase
-                    change = Math.min(50, Math.ceil((targetPrice - currentCost) * 0.2)); // Move 20% towards target
+                    // Should increase: Move 5% of the gap towards target, no hard cap
+                    change = Math.ceil((targetPrice - currentCost) * 0.05);
                 } else if (targetPrice < currentCost) {
-                    // Should decrease
-                    change = Math.max(-50, Math.floor((targetPrice - currentCost) * 0.1)); // Move 10% towards target (prices stickier downwards)
+                    // Should decrease: Move 2.5% of the gap towards target (prices stickier downwards)
+                    change = Math.floor((targetPrice - currentCost) * 0.025);
                 }
             }
 
