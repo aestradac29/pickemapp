@@ -3,7 +3,7 @@ import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamSta
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, getFantasySchedule } from '../constants';
 import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, orderBy, limit, addDoc, updateDoc, where, onSnapshot } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 // Helper CRÍTICO: Elimina recursivamente cualquier campo 'undefined' del objeto.
@@ -884,11 +884,11 @@ export const dataService = {
     },
 
     // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
-    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[]) {
+    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[], splitId?: string) {
         // 1. Get Match & Players
         const [docSnap, players] = await Promise.all([
-            getDoc(doc(db, "admin_data", this._getDocName("matches"))),
-            this.getPlayers()
+            getDoc(doc(db, "admin_data", this._getDocName("matches", splitId))),
+            this.getPlayers(undefined, splitId)
         ]);
         if (!docSnap.exists()) return;
 
@@ -1171,6 +1171,7 @@ export const dataService = {
                 const userRanking = rankingSnap.exists() ? rankingSnap.data().order || [] : [];
 
                 let matchdayScore = 0;
+                let matchdayCount = 0;
                 const regularMatches = allMatches.filter(m => m.stage === Stage.GROUPS && m.winnerId);
                 
                 regularMatches.forEach(m => {
@@ -1197,6 +1198,7 @@ export const dataService = {
                     if (predictedWinnerId === m.winnerId) {
                         const isSpring = this._getCurrentSplitId() === 'spring_2026';
                         matchdayScore += isSpring ? 1.5 : 1;
+                        matchdayCount++;
                     }
                 });
 
@@ -1335,6 +1337,7 @@ export const dataService = {
 
                 const breakdown = {
                     matchday: matchdayScore,
+                    matchdayCount: matchdayCount,
                     ranking: rankingScore,
                     playoffs: playoffsScore,
                     fantasy: parseFloat(fantasyTotal.toFixed(2))
@@ -1471,6 +1474,15 @@ export const dataService = {
         }
     },
 
+    subscribeToUsers(callback: () => void) {
+        const usersRef = collection(db, "users");
+        return onSnapshot(usersRef, () => {
+            callback();
+        }, (error) => {
+            console.warn("Firestore Subscription Error (users):", error);
+        });
+    },
+
     async updateUserProfile(userId: string, updates: any) {
         const docRef = doc(db, "users", userId);
         await setDoc(docRef, cleanPayload(updates), { merge: true });
@@ -1483,10 +1495,10 @@ export const dataService = {
             return docSnap.exists() ? docSnap.data().list || [] : [];
         } catch (e) { return []; }
     },
-    async savePredictions(predictions: any[]) {
+    async savePredictions(predictions: any[], splitId?: string) {
         if (!predictions.length) return;
         const userId = predictions[0].user_id;
-        const docRef = doc(db, "users", userId, "picks", this._getCurrentSplitId());
+        const docRef = doc(db, "users", userId, "picks", this._normalizeSplitId(splitId));
         const docSnap = await getDoc(docRef);
         let currentPreds = docSnap.exists() ? docSnap.data().list || [] : [];
         predictions.forEach(newP => {

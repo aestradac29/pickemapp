@@ -5,7 +5,7 @@ import { doc, updateDoc, arrayUnion } from "firebase/firestore";
 // You need a VAPID key from Firebase Console -> Project Settings -> Cloud Messaging -> Web Push certificates
 // Since we don't have it, we'll leave it empty, but getToken might fail without it.
 // If it fails, we'll catch the error.
-const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || "";
+const VAPID_KEY = (import.meta as any).env.VITE_FIREBASE_VAPID_KEY || "";
 
 export const notificationService = {
   async requestPermissionAndGetToken(userId: string) {

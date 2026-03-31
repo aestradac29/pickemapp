@@ -48,7 +48,7 @@ export const extractStatsFromData = async (
   // En Vite (producción), process.env suele estar vacío. Se debe usar import.meta.env.
   // Buscamos varias claves posibles para mayor compatibilidad.
   const isBrowser = typeof window !== 'undefined';
-  let apiKey = isBrowser ? import.meta.env.VITE_GEMINI_API_KEY : process.env.VITE_GEMINI_API_KEY;
+  let apiKey = isBrowser ? (import.meta as any).env.VITE_GEMINI_API_KEY : process.env.VITE_GEMINI_API_KEY;
 
   if (!apiKey) {
     // Fallback por si la clave no tiene el prefijo VITE_ en el servidor
