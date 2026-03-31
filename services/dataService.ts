@@ -790,8 +790,12 @@ export const dataService = {
     },
 
     _getFantasyRoundDocName(round: number, splitId: string): string {
-        if (splitId === 'winter_2026' || splitId === 'Winter 2026') {
+        const normalized = this._normalizeSplitId(splitId);
+        if (normalized === 'winter_2026') {
             return `round_${round}`;
+        }
+        if (normalized === 'spring_2026') {
+            return `Spring 2026_round_${round}`;
         }
         return `${splitId}_round_${round}`;
     },
@@ -803,7 +807,8 @@ export const dataService = {
         const roundDocRef = doc(db, "users", userId, "fantasy_rounds", roundDocName);
         await setDoc(roundDocRef, { team: cleanPayload(team), captain, roundId: round, updatedAt: new Date().toISOString() }, { merge: true });
         
-        const currentRef = doc(db, "users", userId, "fantasy", splitId);
+        const normalizedSplitId = this._normalizeSplitId(splitId);
+        const currentRef = doc(db, "users", userId, "fantasy", normalizedSplitId);
         await setDoc(currentRef, { team: cleanPayload(team), captain }, { merge: true });
     },
 
@@ -1196,7 +1201,7 @@ export const dataService = {
                     }
 
                     if (predictedWinnerId === m.winnerId) {
-                        const isSpring = this._getCurrentSplitId() === 'spring_2026';
+                        const isSpring = targetSplitId === 'spring_2026';
                         matchdayScore += isSpring ? 1.5 : 1;
                         matchdayCount++;
                     }
@@ -1234,7 +1239,7 @@ export const dataService = {
 
                 let rankingScore = 0;
                 if (adminRanking && adminRanking.length > 0 && userRanking.length > 0) {
-                    const isSpring = this._getCurrentSplitId() === 'spring_2026';
+                    const isSpring = targetSplitId === 'spring_2026';
                     userRanking.forEach((teamId: string, index: number) => {
                         const actualIndex = adminRanking.indexOf(teamId);
                         if (actualIndex !== -1) {
@@ -1248,11 +1253,10 @@ export const dataService = {
 
                 let fantasyTotal = 0;
                 const fantasyHistory = [];
-                const currentSplitId = this._getCurrentSplitId();
-                const schedule = getFantasySchedule(currentSplitId);
+                const schedule = getFantasySchedule(targetSplitId);
                 for(const roundConfig of schedule) {
                     const r = roundConfig.id;
-                    const roundDocName = this._getFantasyRoundDocName(r, currentSplitId);
+                    const roundDocName = this._getFantasyRoundDocName(r, targetSplitId);
                     const roundRef = doc(db, "users", userId, "fantasy_rounds", roundDocName);
                     const roundSnap = await getDoc(roundRef);
                     const points = roundSnap.exists() ? (roundSnap.data().score || 0) : 0;
@@ -1264,7 +1268,7 @@ export const dataService = {
 
                 const pointsHistory: { day: string; points: number }[] = [];
                 let currentCumulative = 0;
-                const isSpring = currentSplitId === 'spring_2026';
+                const isSpring = targetSplitId === 'spring_2026';
                 const maxDays = isSpring ? 7 : 11;
 
                 for (let d = 1; d <= maxDays; d++) {

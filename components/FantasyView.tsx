@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { ROLE_ICONS, getFantasySchedule, COUNTRIES, normalizeSplitId } from '../constants';
 import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User, PlayerGameStats } from '../types';
 import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, TrendingDown, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole, Skull, Crosshair, Droplet } from 'lucide-react';
@@ -566,29 +566,92 @@ export const FantasyView: React.FC<{
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const loadHistory = useCallback(async (userId: string) => {
+      const history = [];
+      const schedule = getFantasySchedule(selectedSplit);
+      for (const roundConfig of schedule) {
+          const i = roundConfig.id;
+          const rData = await dataService.getFantasyTeam(userId, i, selectedSplit);
+          if (rData) history.push({ round: i, score: rData.score || 0, team: rData.team });
+          else history.push({ round: i, score: 0, team: null });
+      }
+      setHistoryScores(history);
+  }, [selectedSplit]);
+
+  const loadFantasyTeam = useCallback(async (round: number, userId: string) => {
+      console.log("Loading fantasy team for:", userId, round, selectedSplit);
+      const savedData = await dataService.getFantasyTeam(userId, round, selectedSplit);
+      console.log("Saved data:", savedData);
+      if (savedData) {
+          setMyTeam(savedData.team);
+          setOriginalTeam(savedData.team); // Save snapshot for price restoration logic
+          setMyCaptain(savedData.captain || null);
+      } else {
+          setMyTeam({[Role.TOP]: {playerId:null}, [Role.JUNGLE]: {playerId:null}, [Role.MID]: {playerId:null}, [Role.ADC]: {playerId:null}, [Role.SUPPORT]: {playerId:null}});
+          setOriginalTeam(null);
+          setMyCaptain(null);
+      }
+    }, [selectedSplit]);
+
+  const loadData = useCallback(async () => {
+    setIsLoadingData(true);
+    try {
+        const [fetchedPlayers, fetchedTeams, fetchedMatches, config, fetchedUsers] = await Promise.all([
+            dataService.getPlayers(false, selectedSplit),
+            dataService.getTeams(false, selectedSplit),
+            dataService.getMatches(undefined, selectedSplit),
+            dataService.getDaysConfig(selectedSplit),
+            dataService.getAllUsers(selectedSplit)
+        ]);
+        
+        setPlayers(fetchedPlayers);
+        setTeams(fetchedTeams);
+        setAllMatches(fetchedMatches);
+        setAllUsers(fetchedUsers);
+        
+        const currentRound = config.fantasyRound || 1;
+        setActiveConfigRound(currentRound);
+        setViewRoundId(currentRound);
+        setRoundLocked(config.fantasyLocked || false);
+
+        if (currentUserId && !viewingUserId) {
+            setViewingUserId(currentUserId);
+        }
+        
+        const targetUserId = viewingUserId || currentUserId;
+        if (targetUserId) {
+            await loadHistory(targetUserId);
+        }
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setIsLoadingData(false);
+    }
+  }, [currentUserId, selectedSplit, viewingUserId, loadHistory]);
+
   useEffect(() => {
     loadData();
   }, [currentUserId, selectedSplit]);
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: any;
     const unsubscribe = dataService.subscribeToUsers(() => {
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
             loadData();
         }, 1000);
     });
     return () => {
-        unsubscribe();
-        clearTimeout(timeoutId);
+        if (unsubscribe) unsubscribe();
+        if (timeoutId) clearTimeout(timeoutId);
     };
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
       if (currentUserId && !viewingUserId) {
           setViewingUserId(currentUserId);
       }
-  }, [currentUserId]);
+  }, [currentUserId, viewingUserId]);
 
   useEffect(() => {
       if (viewingUserId && !isLoadingData) {
@@ -616,7 +679,7 @@ export const FantasyView: React.FC<{
           }
           fetchTeam();
       }
-  }, [viewRoundId, viewingUserId, isLoadingData]);
+  }, [viewRoundId, viewingUserId, isLoadingData, loadFantasyTeam]);
 
   // NEW: Calculate Points for Specific Selected Round
   const roundPointsMap = useMemo(() => {
@@ -651,70 +714,12 @@ export const FantasyView: React.FC<{
       return map;
   }, [allMatches, viewRoundId]);
 
-  const loadFantasyTeam = async (round: number, userId: string) => {
-      console.log("Loading fantasy team for:", userId, round, selectedSplit);
-      const savedData = await dataService.getFantasyTeam(userId, round, selectedSplit);
-      console.log("Saved data:", savedData);
-      if (savedData) {
-          setMyTeam(savedData.team);
-          setOriginalTeam(savedData.team); // Save snapshot for price restoration logic
-          setMyCaptain(savedData.captain || null);
-      } else {
-          setMyTeam({[Role.TOP]: {playerId:null}, [Role.JUNGLE]: {playerId:null}, [Role.MID]: {playerId:null}, [Role.ADC]: {playerId:null}, [Role.SUPPORT]: {playerId:null}});
-          setOriginalTeam(null);
-          setMyCaptain(null);
-      }
-    };
-
-  const loadData = async () => {
-    setIsLoadingData(true);
-    try {
-        const [fetchedPlayers, fetchedTeams, fetchedMatches, config, fetchedUsers] = await Promise.all([
-            dataService.getPlayers(false, selectedSplit),
-            dataService.getTeams(false, selectedSplit),
-            dataService.getMatches(undefined, selectedSplit),
-            dataService.getDaysConfig(selectedSplit),
-            dataService.getAllUsers(selectedSplit)
-        ]);
-        
-        setPlayers(fetchedPlayers);
-        setTeams(fetchedTeams);
-        setAllMatches(fetchedMatches);
-        setAllUsers(fetchedUsers);
-        
-        const currentRound = config.fantasyRound || 1;
-        setActiveConfigRound(currentRound);
-        setViewRoundId(currentRound);
-        setRoundLocked(config.fantasyLocked || false);
-
-        if (currentUserId) {
-            setViewingUserId(currentUserId);
-            await loadHistory(currentUserId);
-        }
-    } catch (err) {
-        console.error(err);
-    } finally {
-        setIsLoadingData(false);
-    }
-  };
-
-  const loadHistory = async (userId: string) => {
-      const history = [];
-      const schedule = getFantasySchedule(selectedSplit);
-      for (const roundConfig of schedule) {
-          const i = roundConfig.id;
-          const rData = await dataService.getFantasyTeam(userId, i, selectedSplit);
-          if (rData) history.push({ round: i, score: rData.score || 0, team: rData.team });
-          else history.push({ round: i, score: 0, team: null });
-      }
-      setHistoryScores(history);
-  };
 
   useEffect(() => {
       if(viewingUserId && activeTab === 'history') {
           loadHistory(viewingUserId);
       }
-  }, [viewingUserId, activeTab]);
+  }, [viewingUserId, activeTab, loadHistory]);
 
   const handleSelect = (role: Role, playerId: string | null) => {
     if (viewingUserId !== currentUserId || roundLocked || viewRoundId !== activeConfigRound) return;
