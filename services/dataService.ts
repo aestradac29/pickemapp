@@ -268,21 +268,18 @@ export const dataService = {
                 const stats = teamStats[p.teamId];
                 const winRate = stats ? stats.wins / stats.total : 0.5; // 0.0 to 1.0
                 
-                // Base change based on target price gap
-                const baseChange = (targetPrice - currentCost) * 0.05;
+                // Base change based on target price gap (Reduced from 0.05 to 0.02)
+                const baseChange = (targetPrice - currentCost) * 0.02;
                 
                 // Apply Win Rate Modifier: 
-                // WinRate 1.0 (2-0) -> Full boost
-                // WinRate 0.5 (1-1) -> Neutral/Small adjustment
-                // WinRate 0.0 (0-2) -> Full penalty
-                // Increased sensitivity (x4) to make 1-1 teams feel the "gravity"
-                const winRateModifier = (winRate - 0.5) * 4; 
+                // Increased sensitivity (x2) to keep it balanced but less volatile than x4
+                const winRateModifier = (winRate - 0.5) * 2; 
                 
                 // Price Dampener: Harder to increase if already expensive (>400)
                 const priceDampener = currentCost > 400 ? 0.5 : 1.0;
                 
-                // Price Correction: If already above target, force a small downward pressure
-                const priceCorrection = currentCost > targetPrice ? -0.05 : 0; 
+                // Price Correction: If already above target, force a small downward pressure (Reduced from 0.05 to 0.02)
+                const priceCorrection = currentCost > targetPrice ? -0.02 : 0; 
                 
                 change = Math.round((baseChange * (1 + winRateModifier) * priceDampener) + (priceCorrection * currentCost));
             }
