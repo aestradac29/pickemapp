@@ -2,6 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 // --- REDIRECTION LOGIC ---
 // Si el usuario accede desde el dominio antiguo de Google Cloud, redirigir a Vercel
@@ -21,7 +22,9 @@ if (window.location.hostname === OLD_DOMAIN) {
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <React.StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </React.StrictMode>
   );
 }

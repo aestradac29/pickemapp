@@ -1,10 +1,8 @@
 {
-  "projectId": "pickem-des",
-  "appId": "1:515907119194:web:5bceb2b212e2c472fd9063",
-  "apiKey": "AIzaSyDJIyLofv-NXbSGBosy2tj3lSOIZ986lf8",
+  "apiKey": "AIzaSyAVFP9bRb8GZ-PzLI1BqCaPVfiS1P2l38c",
   "authDomain": "pickem-des.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-6e3ba274-78ba-42f9-83f6-8c7f41792855",
+  "projectId": "pickem-des",
   "storageBucket": "pickem-des.firebasestorage.app",
   "messagingSenderId": "515907119194",
-  "measurementId": ""
+  "appId": "1:515907119194:web:ef5f55d5ee2900b7fd9063"
 }

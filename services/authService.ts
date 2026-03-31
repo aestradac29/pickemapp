@@ -2,6 +2,7 @@
 import { auth, db } from '../lib/firebase';
 import * as Auth from "firebase/auth";
 import { doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 // Helper para notificar cambios de auth
 type AuthListener = (user: any | null) => void;
@@ -14,16 +15,15 @@ export const authService = {
                 // Obtener datos adicionales del perfil en Firestore
                 const userProfile = await this.getUserProfile(firebaseUser.uid);
                 
-                    const user = {
-                        id: firebaseUser.uid,
-                        email: firebaseUser.email,
-                        emailVerified: firebaseUser.emailVerified,
-                        role: userProfile?.role || 'user', // Recuperamos el rol de la BBDD
-                        profile: {
-                            username: userProfile?.username || firebaseUser.displayName || 'Invocador',
-                            avatar_url: userProfile?.avatar_url || firebaseUser.photoURL
-                        }
-                    };
+                const user = {
+                    id: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    role: userProfile?.role || 'user', // Recuperamos el rol de la BBDD
+                    profile: {
+                        username: userProfile?.username || firebaseUser.displayName || 'Invocador',
+                        avatar_url: userProfile?.avatar_url || firebaseUser.photoURL
+                    }
+                };
                 listener(user);
             } else {
                 listener(null);
@@ -61,8 +61,8 @@ export const authService = {
 
         // Si el identificador no tiene @, asumimos que es username y buscamos su email
         if (!identifier.includes('@')) {
+             const usersRef = collection(db, "users");
              try {
-                 const usersRef = collection(db, "users");
                  const q = query(usersRef, where("username", "==", identifier));
                  const querySnapshot = await getDocs(q);
                  
@@ -76,6 +76,9 @@ export const authService = {
                      email = userData.email;
                  }
              } catch (e: any) {
+                 if (e.message?.includes('permission') || e.code === 'permission-denied') {
+                     handleFirestoreError(e, OperationType.LIST, "users");
+                 }
                  throw new Error(e.message || "Error al buscar el usuario.");
              }
         }
@@ -98,7 +101,6 @@ export const authService = {
                     resolve({
                         id: firebaseUser.uid,
                         email: firebaseUser.email,
-                        emailVerified: firebaseUser.emailVerified,
                         role: userProfile?.role || 'user', // Recuperamos el rol de la BBDD
                         profile: {
                             username: userProfile?.username || firebaseUser.displayName,
@@ -114,6 +116,7 @@ export const authService = {
 
     // Obtener datos de Firestore
     async getUserProfile(uid: string) {
+        const path = `users/${uid}`;
         try {
             const docRef = doc(db, "users", uid);
             const docSnap = await getDoc(docRef);
@@ -121,7 +124,10 @@ export const authService = {
                 return docSnap.data();
             }
             return null;
-        } catch (e) {
+        } catch (e: any) {
+            if (e.message?.includes('permission') || e.code === 'permission-denied') {
+                handleFirestoreError(e, OperationType.GET, path);
+            }
             console.error("Error fetching profile", e);
             return null;
         }

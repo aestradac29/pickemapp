@@ -1,72 +1,71 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ===============================================================
     // Helper Functions
+    // ===============================================================
+
     function isAuthenticated() {
       return request.auth != null;
-    }
-    
-    function isAdmin() {
-      return isAuthenticated() &&
-        (
-          (request.auth.token.email == "alvaroestradacabello@gmail.com" && request.auth.token.email_verified == true) ||
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
-        );
     }
 
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Rules for debug_logs
-    match /debug_logs/{logId} {
-      allow read, write: if isAdmin();
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "alvaroestradacabello@gmail.com" && request.auth.token.email_verified == true));
     }
 
-    // Rules for users
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == userId && request.resource.data.role == 'user';
-      allow update: if isAdmin() || (isOwner(userId) && (
-        request.resource.data.role == resource.data.role || 
-        request.auth.token.email == "alvaroestradacabello@gmail.com"
-      ));
-      
-      match /fantasy_rounds/{roundId} {
-        allow read: if isAuthenticated();
-        allow write: if isOwner(userId) || isAdmin();
-      }
-      
-      match /{collectionName=**} {
-        // collection_splitId, inventory_splitId, etc.
-        allow read: if isAuthenticated();
-        allow write: if isOwner(userId) || isAdmin();
-      }
-    }
-    
-    // Rules for admin_data
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // 1. Admin Data (Matches, Teams, Players, Config)
     match /admin_data/{docId} {
-      allow read: if isAuthenticated();
+      // Everyone can read these configs
+      allow read: if true;
+      // Only admins can write
       allow write: if isAdmin();
     }
 
-    // Rules for notifications
+    // 2. Notifications
     match /notifications/{notifId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Rules for trade_offers
-    match /trade_offers/{offerId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid || isAdmin());
+    // 3. Users Collection
+    match /users/{userId} {
+      // Allow unauthenticated users to query by username for login
+      // This is necessary for username-to-email lookup in authService.ts
+      allow list: if true; 
+      
+      // Allow users to read their own profile
+      allow get: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      
+      // Allow users to create and update their own profile
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+
+      // Subcollections for users
+      match /{allSubcollections=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
     }
-    
-    // Default deny
-    match /{document=**} {
-      allow read, write: if isAdmin();
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['username', 'email', 'role']) &&
+             data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.role in ['user', 'admin'];
     }
   }
 }

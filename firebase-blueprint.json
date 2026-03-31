@@ -1,37 +1,44 @@
 {
   "entities": {
     "User": {
-      "title": "User",
-      "description": "User profile and scores",
+      "title": "User Profile",
+      "description": "Extended user profile data stored in Firestore.",
       "type": "object",
       "properties": {
-        "username": { "type": "string" },
-        "email": { "type": "string" },
-        "role": { "type": "string", "enum": ["user", "admin"] },
-        "score": { "type": "number" },
-        "scoreBreakdown": { "type": "object" }
+        "username": { "type": "string", "description": "Unique username for the app." },
+        "email": { "type": "string", "format": "email", "description": "User email address." },
+        "avatar_url": { "type": "string", "description": "URL to the user's avatar image." },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "User role for permissions." },
+        "created_at": { "type": "string", "format": "date-time", "description": "Timestamp of account creation." },
+        "total_score": { "type": "number", "description": "Total points accumulated in the split." }
       },
-      "required": ["username", "email"]
+      "required": ["username", "email", "role"]
     },
-    "DebugLog": {
-      "title": "Debug Log",
-      "description": "System debug logs",
+    "AdminConfig": {
+      "title": "Global Configuration",
+      "description": "Global settings for the application managed by admins.",
       "type": "object",
       "properties": {
-        "timestamp": { "type": "string", "format": "date-time" },
-        "log": { "type": "string" },
-        "splitId": { "type": "string" }
+        "visibleDays": { "type": "array", "items": { "type": "integer" } },
+        "closedDays": { "type": "array", "items": { "type": "integer" } },
+        "fantasyRound": { "type": "integer" },
+        "fantasyLocked": { "type": "boolean" },
+        "albumEnabled": { "type": "boolean" }
       }
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
-      "description": "User documents"
+      "description": "User profile documents."
     },
-    "/debug_logs/{logId}": {
-      "schema": "DebugLog",
-      "description": "System logs"
+    "/admin_data/{docId}": {
+      "schema": "AdminConfig",
+      "description": "Global application configuration and data."
+    },
+    "/notifications/{notifId}": {
+      "schema": "object",
+      "description": "Global notifications for users."
     }
   }
 }
