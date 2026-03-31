@@ -227,6 +227,33 @@ export const dataService = {
     async processRoundTransition(newRound: number, splitId?: string) {
         // 1. Get current state (Using fresh stats)
         const currentPlayers = await this.getPlayers(false, splitId);
+        const matches = await this.getMatches(undefined, splitId);
+        const schedule = getFantasySchedule(this._normalizeSplitId(splitId));
+        const previousRound = newRound - 1;
+        const roundConfig = schedule.find(r => r.id === previousRound);
+        
+        const teamStats: Record<string, { wins: number, total: number }> = {};
+        if (roundConfig) {
+            const roundMatches = matches.filter(m => {
+                if (roundConfig.stage === Stage.GROUPS) {
+                    return m.stage === Stage.GROUPS && roundConfig.matchdays.includes(m.day || 0);
+                }
+                return m.stage !== Stage.GROUPS && roundConfig.matchdays.includes(m.day || 0);
+            });
+            
+            roundMatches.forEach(m => {
+                if (m.isCompleted && m.winnerId) {
+                    const teamAId = (m.teamA && typeof m.teamA === 'object' && 'id' in m.teamA) ? m.teamA.id : (m.teamA as any);
+                    const teamBId = (m.teamB && typeof m.teamB === 'object' && 'id' in m.teamB) ? m.teamB.id : (m.teamB as any);
+                    
+                    [teamAId, teamBId].forEach(tId => {
+                        if (!teamStats[tId]) teamStats[tId] = { wins: 0, total: 0 };
+                        teamStats[tId].total++;
+                        if (tId === m.winnerId) teamStats[tId].wins++;
+                    });
+                }
+            });
+        }
         
         // 2. Calculate new prices based on performance (Last Round vs Average)
         const updatedPlayers = currentPlayers.map(p => {
@@ -238,19 +265,22 @@ export const dataService = {
 
             // Only change price if they have played at least 1 game
             if ((p.totalPoints || 0) > 0) {
-                // Performance Ratio: How did they perform this round vs their average?
-                const performanceRatio = avg > 0 ? (p.lastMatchPoints || 0) / avg : 1;
-
-                if (performanceRatio >= 0.9) {
-                    // Good performance: Increase
-                    change = Math.ceil((targetPrice - currentCost) * 0.05);
-                } else if (performanceRatio < 0.7) {
-                    // Bad performance: Decrease
-                    change = Math.floor((targetPrice - currentCost) * 0.05);
-                } else {
-                    // Average performance: Minimal change
-                    change = Math.floor((targetPrice - currentCost) * 0.01);
-                }
+                const stats = teamStats[p.teamId];
+                const winRate = stats ? stats.wins / stats.total : 0.5; // 0.0 to 1.0
+                
+                // Base change based on target price gap
+                const baseChange = (targetPrice - currentCost) * 0.05;
+                
+                // Apply Win Rate Modifier: 
+                // WinRate 1.0 (2-0) -> Full boost
+                // WinRate 0.5 (1-1) -> Neutral/Small adjustment
+                // WinRate 0.0 (0-2) -> Full penalty
+                const winRateModifier = (winRate - 0.5) * 2; // Maps 0.0-1.0 to -1.0 to 1.0
+                
+                // Price Dampener: Harder to increase if already expensive (>400)
+                const priceDampener = currentCost > 400 ? 0.5 : 1.0;
+                
+                change = Math.round(baseChange * (1 + winRateModifier) * priceDampener);
             }
 
             // Apply Change & Integers only
