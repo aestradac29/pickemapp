@@ -268,20 +268,21 @@ export const dataService = {
                 const stats = teamStats[p.teamId];
                 const winRate = stats ? stats.wins / stats.total : 0.5; // 0.0 to 1.0
                 
-                // Base change based on target price gap (Reduced from 0.05 to 0.02)
-                const baseChange = (targetPrice - currentCost) * 0.02;
+                // Asymmetric Logic:
+                // If winRate < 0.5 (more losses): Strong penalty
+                // If winRate > 0.5 (more wins): Moderate boost
+                // If winRate == 0.5 (1-1): Slight decrease to combat inflation
                 
-                // Apply Win Rate Modifier: 
-                // Increased sensitivity (x2) to keep it balanced but less volatile than x4
-                const winRateModifier = (winRate - 0.5) * 2; 
-                
-                // Price Dampener: Harder to increase if already expensive (>400)
-                const priceDampener = currentCost > 400 ? 0.5 : 1.0;
-                
-                // Price Correction: If already above target, force a small downward pressure (Reduced from 0.05 to 0.02)
-                const priceCorrection = currentCost > targetPrice ? -0.02 : 0; 
-                
-                change = Math.round((baseChange * (1 + winRateModifier) * priceDampener) + (priceCorrection * currentCost));
+                if (winRate < 0.5) {
+                    // Penalización directa: Bajada fuerte (-4% a -8% del precio)
+                    change = Math.floor((currentCost * -0.06) * (1 + (0.5 - winRate) * 2));
+                } else if (winRate > 0.5) {
+                    // Subida moderada: (+2% a +4% del precio)
+                    change = Math.ceil((currentCost * 0.03) * (1 + (winRate - 0.5) * 2));
+                } else {
+                    // Empate (1-1): Bajada ligera para corregir inflación (-1%)
+                    change = Math.floor(currentCost * -0.01);
+                }
             }
 
             // Apply Change & Integers only
