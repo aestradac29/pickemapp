@@ -268,21 +268,26 @@ export const dataService = {
                 const stats = teamStats[p.teamId];
                 const winRate = stats ? stats.wins / stats.total : 0.5; // 0.0 to 1.0
                 
-                // Asymmetric Logic:
-                // If winRate < 0.5 (more losses): Strong penalty
-                // If winRate > 0.5 (more wins): Moderate boost
-                // If winRate == 0.5 (1-1): Slight decrease to combat inflation
-                
+                // 1. Result Component: Asymmetric Penalty/Boost
+                let resultChange = 0;
                 if (winRate < 0.5) {
                     // Penalización directa: Bajada fuerte (-4% a -8% del precio)
-                    change = Math.floor((currentCost * -0.06) * (1 + (0.5 - winRate) * 2));
+                    resultChange = (currentCost * -0.04) * (1 + (0.5 - winRate) * 2);
                 } else if (winRate > 0.5) {
                     // Subida moderada: (+2% a +4% del precio)
-                    change = Math.ceil((currentCost * 0.03) * (1 + (winRate - 0.5) * 2));
+                    resultChange = (currentCost * 0.02) * (1 + (winRate - 0.5) * 2);
                 } else {
-                    // Empate (1-1): Bajada ligera para corregir inflación (-1%)
-                    change = Math.floor(currentCost * -0.01);
+                    // Empate (1-1): Bajada ligera para corregir inflación (-0.5%)
+                    resultChange = (currentCost * -0.005);
                 }
+
+                // 2. Value Component: Price vs Target Correction
+                // Target price based on performance (Multiplier 15)
+                const targetPrice = avg * 15;
+                const valueGap = (targetPrice - currentCost) * 0.01; // Small weight for long-term stabilization
+
+                // 3. Combine
+                change = Math.round(resultChange + valueGap);
             }
 
             // Apply Change & Integers only
