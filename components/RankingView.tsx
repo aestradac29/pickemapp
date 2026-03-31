@@ -62,7 +62,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
 
       try {
           // Check start time of Day 1 matches
-          const matches = await dataService.getMatches(1);
+          const matches = await dataService.getMatches(1, selectedSplit);
           if (matches.length > 0) {
               const sortedMatches = matches.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
               const firstMatchStart = new Date(sortedMatches[0].startTime);
@@ -85,7 +85,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
     try {
         // 1. Cargar equipos y Ranking Oficial SIEMPRE para comparar
         const [teamsMap, adminRankingIds] = await Promise.all([
-            dataService.getTeams(),
+            dataService.getTeams(false, selectedSplit),
             dataService.getAdminRanking(selectedSplit)
         ]);
         
