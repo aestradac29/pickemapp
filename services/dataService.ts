@@ -275,12 +275,16 @@ export const dataService = {
                 // WinRate 1.0 (2-0) -> Full boost
                 // WinRate 0.5 (1-1) -> Neutral/Small adjustment
                 // WinRate 0.0 (0-2) -> Full penalty
-                const winRateModifier = (winRate - 0.5) * 2; // Maps 0.0-1.0 to -1.0 to 1.0
+                // Increased sensitivity (x4) to make 1-1 teams feel the "gravity"
+                const winRateModifier = (winRate - 0.5) * 4; 
                 
                 // Price Dampener: Harder to increase if already expensive (>400)
                 const priceDampener = currentCost > 400 ? 0.5 : 1.0;
                 
-                change = Math.round(baseChange * (1 + winRateModifier) * priceDampener);
+                // Price Correction: If already above target, force a small downward pressure
+                const priceCorrection = currentCost > targetPrice ? -0.05 : 0; 
+                
+                change = Math.round((baseChange * (1 + winRateModifier) * priceDampener) + (priceCorrection * currentCost));
             }
 
             // Apply Change & Integers only
