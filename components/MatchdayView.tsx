@@ -26,7 +26,9 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
     selectedSplit: propSelectedSplit
 }) => {
   const selectedSplit = propSelectedSplit || normalizeSplitId(localStorage.getItem('selectedSplit'));
+  const daysCount = selectedSplit.toLowerCase().includes('spring') ? 7 : 11;
   const [currentDay, setCurrentDay] = useState(1);
+  const [hasInitializedDay, setHasInitializedDay] = useState(false);
   const [visibleDays, setVisibleDays] = useState<number[]>([]); 
   const [closedDays, setClosedDays] = useState<number[]>([]); 
   const [openedDays, setOpenedDays] = useState<number[]>([]); 
@@ -37,6 +39,24 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   const [allPlayers, setAllPlayers] = useState<Player[]>([]); // Need players for stats
   const [allUsers, setAllUsers] = useState<User[]>([]); // For User Selector
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
+
+  // Auto-initialize to first incomplete day
+  useEffect(() => {
+      if (!isLoadingMatches && allMatches.length > 0 && !hasInitializedDay) {
+          let dayToSelect = 1;
+          for (let d = 1; d <= daysCount; d++) {
+              const dayMatches = allMatches.filter(m => m.day === d && m.stage === Stage.GROUPS);
+              if (dayMatches.length > 0 && dayMatches.every(m => m.isCompleted)) {
+                  dayToSelect = d + 1;
+              } else {
+                  break;
+              }
+          }
+          if (dayToSelect > daysCount) dayToSelect = daysCount;
+          setCurrentDay(dayToSelect);
+          setHasInitializedDay(true);
+      }
+  }, [isLoadingMatches, allMatches, hasInitializedDay, daysCount]);
 
   // Viewing State
   const [viewingUserId, setViewingUserId] = useState<string | null>(currentUserId);
@@ -476,7 +496,6 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       }
   };
 
-  const daysCount = selectedSplit.toLowerCase().includes('spring') ? 7 : 11;
   const days = Array.from({ length: daysCount }, (_, i) => i + 1);
   const validMatches = matches.filter(m => !m.id.startsWith('temp-'));
   const validMatchIds = validMatches.map(m => m.id);
