@@ -162,7 +162,7 @@ const App: React.FC = () => {
       setCurrentUserId(user.id);
       setCurrentUserAvatar(user.profile?.avatar_url);
       setUserRole(user.role || 'user'); // Set Role from DB
-      loadUserData(user.id);
+      loadUserData(user.id, selectedSplit);
 
       // Smart Redirect
       if (view === ViewState.LOGIN) {
@@ -170,18 +170,25 @@ const App: React.FC = () => {
       }
   };
 
-  const loadUserData = async (userId: string) => {
+  const loadUserData = async (userId: string, splitId: string | null) => {
       try {
-        const preds = await dataService.getUserPredictions(userId);
+        const preds = await dataService.getUserPredictions(userId, splitId || undefined);
         setPredictions(preds);
       } catch (e) {
           console.error("Error loading predictions", e);
       }
   };
 
+  // Reload predictions when split changes
+  useEffect(() => {
+    if (currentUserId) {
+        loadUserData(currentUserId, selectedSplit);
+    }
+  }, [selectedSplit, currentUserId]);
+
   const refreshPredictions = async () => {
     if (currentUserId) {
-        const preds = await dataService.getUserPredictions(currentUserId);
+        const preds = await dataService.getUserPredictions(currentUserId, selectedSplit || undefined);
         setPredictions(preds);
     }
   };
