@@ -696,6 +696,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                         // Visibility Logic for Spectating
                         // If spectating, you can ONLY see the pick if the match has started OR the day is closed
                         const matchStarted = new Date() >= new Date(match.startTime);
+                        const isMatchLocked = (isManuallyClosed || (matchStarted && !isExplicitlyOpened)) && !isSpectating;
                         const canSeePick = !isSpectating || isLockedForUser || matchStarted || isAdmin;
                         const userPick = predictions.find(p => p.matchId === match.id)?.predictedWinnerId;
 
@@ -709,8 +710,8 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                                 onSelectWinner={handleSelectWinner}
                                 isEditing={isEditMode}
                                 isAdmin={isAdmin}
-                                // If spectating, treat as locked (read-only)
-                                isDayLocked={isLockedForUser || isSpectating}
+                                // Per-match locking
+                                isLocked={isMatchLocked || isSpectating}
                                 isExplicitlyOpened={isExplicitlyOpened}
                                 teamARecord={strRecA}
                                 teamBRecord={strRecB}
@@ -756,7 +757,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       </div>
 
       {/* Footer Action (Save Button) - Only show if current user */}
-      {!isEditMode && matches.length > 0 && isDayVisible && !isLockedForUser && !isSpectating && (
+      {!isEditMode && matches.length > 0 && isDayVisible && !isManuallyClosed && matches.some(match => !(new Date() >= new Date(match.startTime) && !isExplicitlyOpened)) && !isSpectating && (
           <div className="fixed bottom-8 left-0 right-0 px-4 flex flex-col items-center pointer-events-none z-40 gap-2">
             
             {saveStatus === 'error' && errorMessage && (

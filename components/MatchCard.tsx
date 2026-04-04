@@ -7,7 +7,7 @@ interface MatchCardProps {
   match: Match;
   selectedWinnerId?: string;
   onSelectWinner: (matchId: string, teamId: string) => void;
-  isDayLocked?: boolean; // Prop para bloqueo global de jornada
+  isLocked?: boolean; // Prop para bloqueo de partido
   isExplicitlyOpened?: boolean; // Nuevo: Override para ignorar bloqueo por tiempo
   isAdmin?: boolean; // Nuevo: Para permitir acciones de admin
   customTitle?: string; // Nuevo prop para mostrar "R1 1", "L-SEMI", etc.
@@ -126,7 +126,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     match, 
     selectedWinnerId, 
     onSelectWinner,
-    isDayLocked = false,
+    isLocked = false,
     isExplicitlyOpened = false,
     isAdmin = false,
     customTitle,
@@ -159,11 +159,9 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   // Local delete confirmation state (to avoid window.confirm blocking)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Effective Lock: Global Day Lock OR Individual Time Lock
+  // Effective Lock: Prop-based lock (now per-match)
   const isTbd = match.teamA?.id === 'tbd' || match.teamB?.id === 'tbd';
-  const isTimeLocked = new Date() > new Date(match.startTime) && !match.isCompleted;
-  // If isExplicitlyOpened is true, we ignore the time lock
-  const isLocked = (isDayLocked || (isTimeLocked && !isExplicitlyOpened) || isTbd) && !isAdmin;
+  const effectiveLocked = (isLocked || isTbd) && !isAdmin;
 
   // Has Stats Data?
   const hasStats = ((match.games && match.games.length > 0) || (match.stats && Object.keys(match.stats).length > 0)) && !isTbd;
@@ -463,7 +461,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 
   // --- NORMAL RENDER ---
   return (
-    <div className={`w-full bg-gray-900/50 backdrop-blur-sm rounded-xl border overflow-hidden mb-4 shadow-xl transition-all ${match.isCompleted ? 'border-gray-800 opacity-90' : isLocked ? 'border-gray-800 opacity-95' : 'border-gray-700'}`}>
+    <div className={`w-full bg-gray-900/50 backdrop-blur-sm rounded-xl border overflow-hidden mb-4 shadow-xl transition-all ${match.isCompleted ? 'border-gray-800 opacity-90' : effectiveLocked ? 'border-gray-800 opacity-95' : 'border-gray-700'}`}>
       {/* Header */}
       <div className="bg-black/30 px-4 py-2 flex justify-between items-center text-xs text-gray-400">
         <div className="flex items-center gap-2">
@@ -504,15 +502,15 @@ export const MatchCard: React.FC<MatchCardProps> = ({
         {/* RIGHT SIDE HEADER ACTIONS */}
         <div className="flex items-center gap-2">
             {match.isCompleted && <span className="text-green-400 font-bold uppercase flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Finalizado</span>}
-            {isLocked && !match.isCompleted && (
+            {effectiveLocked && !match.isCompleted && (
                 <span 
                     className="text-red-400 font-bold uppercase flex items-center gap-1 cursor-help"
-                    title={`Debug: DayLocked=${isDayLocked}, TimeLocked=${isTimeLocked}, ExplicitOpen=${isExplicitlyOpened}, TBD=${isTbd}`}
+                    title={`Debug: Locked=${isLocked}, TBD=${isTbd}`}
                 >
                     <Lock className="w-3 h-3"/> Cerrado
                 </span>
             )}
-            <span className={isLocked || match.isCompleted ? 'opacity-50' : ''}>
+            <span className={effectiveLocked || match.isCompleted ? 'opacity-50' : ''}>
                 {new Date(match.startTime).toLocaleDateString([], {day: '2-digit', month: '2-digit'})} - {new Date(match.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
             </span>
         </div>
@@ -526,7 +524,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             isSelected={selectedWinnerId === match.teamA.id} 
             match={match}
             isEditing={isEditing}
-            isLocked={isLocked}
+            isLocked={effectiveLocked}
             onSelect={onSelectWinner}
             record={teamARecord}
           />
@@ -562,7 +560,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
             isSelected={selectedWinnerId === match.teamB.id} 
             match={match}
             isEditing={isEditing}
-            isLocked={isLocked}
+            isLocked={effectiveLocked}
             onSelect={onSelectWinner}
             record={teamBRecord}
           />
