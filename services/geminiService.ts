@@ -43,24 +43,27 @@ export const extractStatsFromData = async (
   rawData: string, 
   availablePlayers: Player[]
 ): Promise<Record<string, Partial<PlayerGameStats>>> => {
-  
-  // --- FIX: DETECCION DE VARIABLES DE ENTORNO EN VITE/VERCEL ---
-  // En Vite (producción), process.env suele estar vacío. Se debe usar import.meta.env.
-  // Buscamos varias claves posibles para mayor compatibilidad.
-  const isBrowser = typeof window !== 'undefined';
-  let apiKey = isBrowser ? (import.meta as any).env.VITE_GEMINI_API_KEY : process.env.VITE_GEMINI_API_KEY;
+
+  // La API key se lee siempre desde import.meta.env (Vite la inyecta en
+  // desarrollo y en el build de producción). Nunca se usa process.env aquí
+  // porque este servicio se ejecuta en el navegador, no en el servidor.
+  // En local: VITE_GEMINI_API_KEY en .env.local
+  // En Vercel: VITE_GEMINI_API_KEY en Environment Variables
+  const apiKey: string =
+    (import.meta as any).env.VITE_GEMINI_API_KEY ||
+    (import.meta as any).env.GEMINI_API_KEY ||
+    "";
 
   if (!apiKey) {
-    // Fallback por si la clave no tiene el prefijo VITE_ en el servidor
-    apiKey = process.env.GEMINI_API_KEY || '';
-  }
-
-  if (!apiKey) {
-    console.error("❌ ERROR CRÍTICO: No se encontró la API Key de Gemini.");
+    console.error(
+      "❌ Gemini: API Key no encontrada.\n" +
+      "   → En local: añade VITE_GEMINI_API_KEY=... a tu .env.local\n" +
+      "   → En Vercel: configura VITE_GEMINI_API_KEY en Environment Variables."
+    );
     throw new Error("API Key de Gemini no configurada");
   }
 
-  const ai = new GoogleGenAI({ apiKey: apiKey });
+  const ai = new GoogleGenAI({ apiKey });
 
   // Lista de nombres para ayudar a la IA a mapear
   const playerNamesList = availablePlayers.map(p => p.name).join(", ");

@@ -3,50 +3,54 @@ import { initializeApp } from "firebase/app";
 import * as Auth from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getMessaging, isSupported } from "firebase/messaging";
-import devConfig from "../firebase-applet-config.json";
 
-// 1. Detectar Entorno y Claves de Producción
-const isBrowser = typeof window !== 'undefined';
+// ──────────────────────────────────────────────────────────────────────────────
+// Configuración Firebase
+//
+// DESARROLLO (Google AI Studio / local):
+//   Las variables VITE_FIREBASE_* deben estar en un archivo .env.local
+//   (que está en .gitignore y nunca se sube a Git).
+//
+// PRODUCCIÓN (Vercel):
+//   Las mismas variables se configuran en el panel de Vercel → Settings →
+//   Environment Variables.
+//
+// El archivo firebase-applet-config.json ya NO se usa; está en .gitignore.
+// ──────────────────────────────────────────────────────────────────────────────
 
-// Intentar obtener claves de producción (Vercel o Servidor)
-// Nota: En Vite, debemos acceder a import.meta.env de forma estática para que el build las reemplace.
-const prodApiKey = isBrowser ? (import.meta as any).env.VITE_FIREBASE_API_KEY : process.env.VITE_FIREBASE_API_KEY;
-const prodAuthDomain = isBrowser ? (import.meta as any).env.VITE_FIREBASE_AUTH_DOMAIN : process.env.VITE_FIREBASE_AUTH_DOMAIN;
-const prodProjectId = isBrowser ? (import.meta as any).env.VITE_FIREBASE_PROJECT_ID : process.env.VITE_FIREBASE_PROJECT_ID;
-const prodStorageBucket = isBrowser ? (import.meta as any).env.VITE_FIREBASE_STORAGE_BUCKET : process.env.VITE_FIREBASE_STORAGE_BUCKET;
-const prodMessagingSenderId = isBrowser ? (import.meta as any).env.VITE_FIREBASE_MESSAGING_SENDER_ID : process.env.VITE_FIREBASE_MESSAGING_SENDER_ID;
-const prodAppId = isBrowser ? (import.meta as any).env.VITE_FIREBASE_APP_ID : process.env.VITE_FIREBASE_APP_ID;
+const firebaseConfig = {
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+};
 
-let firebaseConfig;
+// Comprobación en tiempo de arranque para detectar variables sin configurar
+if (!firebaseConfig.apiKey) {
+  console.error(
+    "❌ Firebase: VITE_FIREBASE_API_KEY no está definida.\n" +
+    "   → En local: crea un archivo .env.local con tus credenciales.\n" +
+    "   → En Vercel: configura las variables de entorno en el panel."
+  );
+}
 
-if (prodApiKey) {
-  // --- PRODUCCIÓN (VERCEL / SERVER PROD) ---
-  if (isBrowser) console.log("🔥 Firebase: Usando configuración de Producción (Client)");
-  else console.log("🔥 Firebase: Usando configuración de Producción (Server)");
-  
-  firebaseConfig = {
-    apiKey: prodApiKey,
-    authDomain: prodAuthDomain,
-    projectId: prodProjectId,
-    storageBucket: prodStorageBucket,
-    messagingSenderId: prodMessagingSenderId,
-    appId: prodAppId,
-  };
+if (import.meta.env.DEV) {
+  console.log("🔧 Firebase: usando proyecto →", firebaseConfig.projectId);
 } else {
-  // --- DESARROLLO (LOCAL) ---
-  if (isBrowser) console.log("🔧 Firebase: Usando configuración de Desarrollo (Pick'em Des)");
-  firebaseConfig = devConfig;
+  console.log("🔥 Firebase: modo producción →", firebaseConfig.projectId);
 }
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = Auth.getAuth(app);
 
-// Usar el databaseId si está presente en la configuración
+// Soporte para Firestore con databaseId personalizado (opcional)
 const dbId = (firebaseConfig as any).firestoreDatabaseId;
 export const db = getFirestore(app, dbId);
 
-// Initialize Messaging only if supported by the browser
+// Firebase Messaging — sólo si el navegador lo soporta
 export let messaging: any = null;
 isSupported().then((supported) => {
   if (supported) {
