@@ -5,6 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 dotenv.config();
 
@@ -109,6 +110,26 @@ async function startServer() {
     res.json({ status: "ok", env: IS_PRODUCTION ? "production" : "development" });
   });
 
+  // ── Configuración pública para el cliente ─────────────────────────────────
+  // En AI Studio las variables de entorno llegan al servidor (process.env) pero
+  // no a import.meta.env del cliente. Este endpoint las expone de forma segura:
+  // solo se devuelven claves públicas (Firebase client SDK + Gemini), nunca
+  // secretos de servidor como FIREBASE_SERVICE_ACCOUNT_JSON o INTERNAL_API_TOKEN.
+  app.get("/api/config", (_req, res) => {
+    res.json({
+      firebase: {
+        apiKey:            process.env.VITE_FIREBASE_API_KEY            || process.env.FIREBASE_API_KEY            || "",
+        authDomain:        process.env.VITE_FIREBASE_AUTH_DOMAIN        || process.env.FIREBASE_AUTH_DOMAIN        || "",
+        projectId:         process.env.VITE_FIREBASE_PROJECT_ID         || process.env.FIREBASE_PROJECT_ID         || "",
+        storageBucket:     process.env.VITE_FIREBASE_STORAGE_BUCKET     || process.env.FIREBASE_STORAGE_BUCKET     || "",
+        messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || "",
+        appId:             process.env.VITE_FIREBASE_APP_ID             || process.env.FIREBASE_APP_ID             || "",
+        vapidKey:          process.env.VITE_FIREBASE_VAPID_KEY          || process.env.FIREBASE_VAPID_KEY          || "",
+      },
+      geminiApiKey: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "",
+    });
+  });
+
   // Envío de push notifications (requiere Firebase Admin + token interno)
   app.post("/api/notifications/send", requireInternalToken, async (req, res) => {
     if (!isFirebaseAdminInitialized) {
@@ -150,22 +171,64 @@ async function startServer() {
 
   // ── Frontend ──────────────────────────────────────────────────────────────
 
+  // ── Helper: genera el script de configuración para inyectar en el HTML ──────
+  // Lee las variables de process.env (donde AI Studio y Vercel las inyectan)
+  // y las convierte en window.__APP_CONFIG__ para que el cliente las lea
+  // sincrónicamente, sin ningún fetch ni race condition.
+  function buildConfigScript(): string {
+    const config = {
+      firebase: {
+        apiKey:            process.env.VITE_FIREBASE_API_KEY            || process.env.FIREBASE_API_KEY            || "",
+        authDomain:        process.env.VITE_FIREBASE_AUTH_DOMAIN        || process.env.FIREBASE_AUTH_DOMAIN        || "",
+        projectId:         process.env.VITE_FIREBASE_PROJECT_ID         || process.env.FIREBASE_PROJECT_ID         || "",
+        storageBucket:     process.env.VITE_FIREBASE_STORAGE_BUCKET     || process.env.FIREBASE_STORAGE_BUCKET     || "",
+        messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || "",
+        appId:             process.env.VITE_FIREBASE_APP_ID             || process.env.FIREBASE_APP_ID             || "",
+        vapidKey:          process.env.VITE_FIREBASE_VAPID_KEY          || process.env.FIREBASE_VAPID_KEY          || "",
+      },
+      geminiApiKey: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "",
+    };
+    return `<script>window.__APP_CONFIG__ = ${JSON.stringify(config)};</script>`;
+  }
+
+  // ── Helper: sirve index.html con la config inyectada ─────────────────────
+  function serveIndexWithConfig(htmlPath: string, res: express.Response) {
+    try {
+      let html = fs.readFileSync(htmlPath, "utf-8");
+      html = html.replace("<!-- __APP_CONFIG_PLACEHOLDER__ -->", buildConfigScript());
+      res.setHeader("Content-Type", "text/html");
+      res.send(html);
+    } catch {
+      res.status(500).send("Error al cargar la aplicación.");
+    }
+  }
+
   if (!IS_PRODUCTION) {
     // Desarrollo: Vite en modo middleware (HMR, etc.)
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
+
+    // Interceptar index.html para inyectar la config antes de que Vite lo sirva
+    app.get("/", (_req, res, next) => {
+      const indexPath = path.resolve(__dirname, "index.html");
+      if (fs.existsSync(indexPath)) {
+        serveIndexWithConfig(indexPath, res);
+      } else {
+        next();
+      }
+    });
+
     app.use(vite.middlewares);
   } else {
     // Producción: servir el build estático de Vite
     const distPath = path.resolve(__dirname, "dist");
     app.use(express.static(distPath));
 
-    // SPA catch-all: todas las rutas desconocidas devuelven index.html
-    // Esto permite que React Router maneje la navegación correctamente.
+    // SPA catch-all: inyectar config en index.html para todas las rutas
     app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      serveIndexWithConfig(path.join(distPath, "index.html"), res);
     });
   }
 

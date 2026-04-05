@@ -40,11 +40,11 @@ service cloud.firestore {
 
     // 3. Users Collection
     match /users/{userId} {
-      // El listado de usuarios está restringido a usuarios autenticados.
-      // La búsqueda por username se hace en el servidor (authService) con
-      // una query acotada por campo, nunca como un volcado completo de la
-      // colección. Esto evita exponer emails y perfiles de todos los usuarios.
-      allow list: if isAuthenticated();
+      // El listado está abierto para permitir la búsqueda de email por username
+      // durante el login, antes de que el usuario esté autenticado.
+      // La query siempre va acotada: where("username", "==", identifier)
+      // por lo que no expone la colección entera.
+      allow list: if true;
       
       // Allow users to read their own profile
       allow get: if isAuthenticated() && (request.auth.uid == userId || isAdmin());

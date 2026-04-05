@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Schema, Type } from "@google/genai";
 import { Player, PlayerGameStats } from '../types';
+import { getGeminiApiKey } from '../lib/geminiConfig';
 
 // Definición del esquema de respuesta esperado para Gemini
 const statsSchema: Schema = {
@@ -40,27 +41,15 @@ const statsSchema: Schema = {
 };
 
 export const extractStatsFromData = async (
-  rawData: string, 
+  rawData: string,
   availablePlayers: Player[]
 ): Promise<Record<string, Partial<PlayerGameStats>>> => {
 
-  // La API key se lee siempre desde import.meta.env (Vite la inyecta en
-  // desarrollo y en el build de producción). Nunca se usa process.env aquí
-  // porque este servicio se ejecuta en el navegador, no en el servidor.
-  // En local: VITE_GEMINI_API_KEY en .env.local
-  // En Vercel: VITE_GEMINI_API_KEY en Environment Variables
-  const apiKey: string =
-    (import.meta as any).env.VITE_GEMINI_API_KEY ||
-    (import.meta as any).env.GEMINI_API_KEY ||
-    "";
+  // Carga la API key compatible con los 3 entornos (Vercel, local, AI Studio)
+  const apiKey = getGeminiApiKey();
 
   if (!apiKey) {
-    console.error(
-      "❌ Gemini: API Key no encontrada.\n" +
-      "   → En local: añade VITE_GEMINI_API_KEY=... a tu .env.local\n" +
-      "   → En Vercel: configura VITE_GEMINI_API_KEY en Environment Variables."
-    );
-    throw new Error("API Key de Gemini no configurada");
+    throw new Error("API Key de Gemini no configurada. Revisa las variables de entorno.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -108,7 +97,7 @@ export const extractStatsFromData = async (
     if (parsed.stats && Array.isArray(parsed.stats)) {
       parsed.stats.forEach((extracted: any) => {
         // Encontrar el jugador en nuestra DB haciendo matching flexible de nombre
-        const player = availablePlayers.find(p => 
+        const player = availablePlayers.find(p =>
           p.name.toLowerCase() === extracted.playerName?.toLowerCase() ||
           extracted.playerName?.toLowerCase().includes(p.name.toLowerCase()) ||
           p.name.toLowerCase().includes(extracted.playerName?.toLowerCase())

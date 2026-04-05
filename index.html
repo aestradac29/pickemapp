@@ -114,9 +114,17 @@
 }
 </script>
 <link rel="stylesheet" href="/index.css">
+  <!-- __APP_CONFIG_PLACEHOLDER__ -->
 </head>
   <body>
     <div id="root"></div>
+    <script type="module">
+      import RefreshRuntime from '/@react-refresh'
+      RefreshRuntime.injectIntoGlobalHook(window)
+      window.$RefreshReg$ = () => {}
+      window.$RefreshSig$ = () => (type) => type
+      window.__vite_plugin_react_preamble_installed__ = true
+    </script>
     <script type="module" src="/index.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {

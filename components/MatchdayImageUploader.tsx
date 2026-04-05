@@ -4,6 +4,7 @@ import { Upload, Loader2, Sparkles } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { Stage } from '../types';
 import { MatchConfirmationModal } from './MatchConfirmationModal';
+import { getGeminiApiKey } from '../lib/geminiConfig';
 
 interface MatchdayImageUploaderProps {
     currentDay: number;
@@ -29,7 +30,7 @@ export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ cu
             reader.onloadend = async () => {
                 const base64Image = (reader.result as string).split(',')[1];
                 
-                const apiKey: string = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.GEMINI_API_KEY || "";
+                const apiKey = getGeminiApiKey();
                 const ai = new GoogleGenAI({ apiKey });
 
                 const response = await ai.models.generateContent({
