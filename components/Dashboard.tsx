@@ -13,7 +13,6 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser, isAdmin = false, selectedSplit }) => {
   const [playoffsAccessible, setPlayoffsAccessible] = useState(false);
-  const [albumEnabled, setAlbumEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   const isAccessibleSplit = (selectedSplit?.toLowerCase().includes('winter') || selectedSplit?.toLowerCase().includes('spring')) ?? true;
@@ -24,7 +23,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
         try {
             const config = await dataService.getDaysConfig();
             setPlayoffsAccessible(config.playoffsAccessible || false);
-            setAlbumEnabled(config.albumEnabled !== false);
         } catch (e) {
             console.error("Failed to load dashboard config", e);
         } finally {
@@ -39,13 +37,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
       const newValue = !playoffsAccessible;
       setPlayoffsAccessible(newValue);
       await dataService.updateGlobalConfig({ playoffsAccessible: newValue });
-  };
-
-  const handleToggleAlbum = async () => {
-      if (!isAdmin) return;
-      const newValue = !albumEnabled;
-      setAlbumEnabled(newValue);
-      await dataService.updateGlobalConfig({ albumEnabled: newValue });
   };
 
   const isSpring = selectedSplit?.toLowerCase().includes('spring');
@@ -145,20 +136,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView, currentUser,
                   >
                       {playoffsAccessible ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                       {playoffsAccessible ? 'Bloquear Acceso Playoffs' : 'Abrir Acceso Playoffs'}
-                  </button>
-
-                  <button 
-                      onClick={handleToggleAlbum}
-                      className={`
-                          flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all shadow-lg
-                          ${albumEnabled 
-                              ? 'bg-red-900/30 border-red-500 text-red-300 hover:bg-red-900/50' 
-                              : 'bg-green-900/30 border-green-500 text-green-300 hover:bg-green-900/50'
-                          }
-                      `}
-                  >
-                      {albumEnabled ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                      {albumEnabled ? 'Deshabilitar Álbum' : 'Habilitar Álbum'}
                   </button>
 
                   <button 

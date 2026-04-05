@@ -25,8 +25,7 @@ export enum ViewState {
   RESULTS = 'RESULTS', // Resultados jornada
   PROFILE = 'PROFILE', // New Profile View
   TEAMS = 'TEAMS', // New Teams View
-  HALL_OF_FAME = 'HALL_OF_FAME', // New Hall of Fame View
-  ALBUM = 'ALBUM' // New Album View
+  HALL_OF_FAME = 'HALL_OF_FAME' // New Hall of Fame View
 }
 
 export enum CardType {

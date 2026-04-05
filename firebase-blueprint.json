@@ -22,8 +22,7 @@
         "visibleDays": { "type": "array", "items": { "type": "integer" } },
         "closedDays": { "type": "array", "items": { "type": "integer" } },
         "fantasyRound": { "type": "integer" },
-        "fantasyLocked": { "type": "boolean" },
-        "albumEnabled": { "type": "boolean" }
+        "fantasyLocked": { "type": "boolean" }
       }
     }
   },

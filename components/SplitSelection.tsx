@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Snowflake, Sun, Flower2, ArrowRight, Lock, Loader2, BookImage } from 'lucide-react';
+import { Snowflake, Sun, Flower2, ArrowRight, Lock, Loader2 } from 'lucide-react';
 import { dataService } from '../services/dataService';
 
 interface SplitSelectionProps {
   onSelect: (splitName: string) => void;
-  onSelectAlbum: () => void;
   isAdmin: boolean;
 }
 
@@ -33,20 +32,15 @@ const VISUAL_METADATA: Record<string, any> = {
     }
 };
 
-export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect, onSelectAlbum, isAdmin }) => {
+export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect, isAdmin }) => {
   const [splits, setSplits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [albumEnabled, setAlbumEnabled] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
         try {
-            const [dbSplits, config] = await Promise.all([
-                dataService.getSplits(),
-                dataService.getDaysConfig()
-            ]);
+            const dbSplits = await dataService.getSplits();
             setSplits(dbSplits);
-            setAlbumEnabled(config.albumEnabled !== false);
         } catch (error) {
             console.error(error);
         } finally {
@@ -74,7 +68,7 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect, onSele
         <p className="text-gray-400">Elige el Split de la LEC en el que quieres competir</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-[1400px]">
+      <div className="flex flex-wrap justify-center gap-8 w-full max-w-[1400px]">
         {splits.map((split) => {
           // Determinar qué estilo visual usar basado en el ID o nombre
           let styleKey = 'winter';
@@ -92,7 +86,7 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect, onSele
               onClick={() => !isLocked && onSelect(split.name)}
               disabled={isLocked}
               className={`
-                group relative h-[400px] rounded-2xl overflow-hidden border-2 transition-all duration-500
+                group relative h-[400px] w-full sm:w-[300px] rounded-2xl overflow-hidden border-2 transition-all duration-500
                 ${isLocked 
                   ? 'border-gray-800 opacity-60 cursor-not-allowed' 
                   : `${visual.borderColor} ${visual.shadow} shadow-2xl hover:scale-105 cursor-pointer`
@@ -154,69 +148,6 @@ export const SplitSelection: React.FC<SplitSelectionProps> = ({ onSelect, onSele
             </button>
           );
         })}
-
-        {/* Album Card */}
-        {(albumEnabled || isAdmin) && (
-            <button
-              onClick={() => onSelectAlbum()}
-              disabled={!albumEnabled && isAdmin}
-              className={`
-                group relative h-[400px] rounded-2xl overflow-hidden border-2 transition-all duration-500
-                ${(!albumEnabled && isAdmin)
-                  ? 'border-gray-800 opacity-60 cursor-not-allowed' 
-                  : `border-pink-400 shadow-pink-500/20 shadow-2xl hover:scale-105 cursor-pointer`
-                }
-              `}
-            >
-              <div className="absolute inset-0">
-                <img 
-                  src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_1.jpg" 
-                  alt="Álbum" 
-                  className={`
-                    w-full h-full object-cover transition-transform duration-700 object-center
-                    ${(!albumEnabled && isAdmin) ? 'grayscale' : 'grayscale group-hover:grayscale-0 group-hover:scale-110'} 
-                  `} 
-                />
-                <div className={`absolute inset-0 transition-colors duration-500 ${(!albumEnabled && isAdmin) ? 'bg-black/80' : 'bg-black/70 group-hover:bg-black/40'}`}></div>
-              </div>
-
-              <div className="relative z-10 h-full flex flex-col items-center justify-center p-6 text-center">
-                <div className={`
-                  w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-lg transition-transform duration-500
-                  ${(!albumEnabled && isAdmin)
-                    ? 'bg-gray-800 border border-gray-700' 
-                    : `bg-gradient-to-br from-pink-400 to-purple-400 transform group-hover:-translate-y-2`
-                  }
-                `}>
-                  {(!albumEnabled && isAdmin) ? <Lock className="w-8 h-8 text-gray-500" /> : <BookImage className="w-10 h-10 text-black/70" />}
-                </div>
-
-                <h3 className={`text-2xl font-bold mb-2 uppercase tracking-wide transition-transform ${(!albumEnabled && isAdmin) ? 'text-gray-500' : 'text-white group-hover:scale-110'}`}>
-                  Álbum
-                </h3>
-
-                <span className={`
-                  text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border mb-8
-                  ${(!albumEnabled && isAdmin)
-                    ? 'bg-gray-800/50 border-gray-600 text-gray-400'
-                    : 'bg-pink-500/20 border-pink-500 text-pink-300' 
-                  }
-                `}>
-                  {(!albumEnabled && isAdmin) ? 'Deshabilitado' : 'Colección'}
-                </span>
-
-                {albumEnabled && (
-                  <div className={`
-                    flex items-center gap-2 text-sm font-bold uppercase tracking-widest opacity-0 transform translate-y-4
-                    group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300
-                    bg-white/10 backdrop-blur px-4 py-2 rounded-lg border border-white/20 hover:bg-white/20
-                  `}>
-                    Entrar <ArrowRight className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
-            </button>
-        )}
 
         {splits.length === 0 && !loading && (
              <div className="col-span-full text-center text-gray-500">

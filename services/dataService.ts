@@ -66,8 +66,7 @@ export const dataService = {
         playoffRounds?: number, 
         playoffsAccessible?: boolean,
         fantasyRound?: number, // Current active fantasy round
-        fantasyLocked?: boolean, // Is current fantasy round locked?
-        albumEnabled?: boolean // Is the album feature enabled?
+        fantasyLocked?: boolean // Is current fantasy round locked?
     }> {
         const docName = this._getDocName("config", splitId);
         const path = `admin_data/${docName}`;
@@ -80,8 +79,7 @@ export const dataService = {
                 visibleDays: [1], closedDays: [], openedDays: [],
                 playoffVisibleDays: [1], playoffClosedDays: [],
                 playoffRounds: 3, playoffsAccessible: false,
-                fantasyRound: 1, fantasyLocked: false,
-                albumEnabled: true
+                fantasyRound: 1, fantasyLocked: false
             };
 
             if (docSnap.exists()) {
@@ -95,8 +93,7 @@ export const dataService = {
                     playoffRounds: data.playoffRounds || 3, 
                     playoffsAccessible: data.playoffsAccessible || false,
                     fantasyRound: data.fantasyRound || 1,
-                    fantasyLocked: data.fantasyLocked || false, // Manual Override
-                    albumEnabled: data.albumEnabled !== undefined ? data.albumEnabled : true
+                    fantasyLocked: data.fantasyLocked || false // Manual Override
                 };
             }
 
@@ -136,8 +133,7 @@ export const dataService = {
                 visibleDays: [1], closedDays: [], 
                 playoffVisibleDays: [1], playoffClosedDays: [],
                 playoffRounds: 3, playoffsAccessible: false,
-                fantasyRound: 1, fantasyLocked: false,
-                albumEnabled: true
+                fantasyRound: 1, fantasyLocked: false
             };
         }
     },
@@ -1606,21 +1602,4 @@ export const dataService = {
     },
 
     // --- CARD COLLECTION SYSTEM ---
-
-    // ── Álbum, cartas e intercambios ──────────────────────────────────────────
-    // Estos métodos han sido movidos a services/albumService.ts
-    // Se mantienen aquí como delegaciones para no romper imports existentes.
-    async getCardsForSplit(splitId: string) { const { albumService } = await import('./albumService'); return albumService.getCardsForSplit(splitId); },
-    async saveCardsForSplit(splitId: string, cards: any[]) { const { albumService } = await import('./albumService'); return albumService.saveCardsForSplit(splitId, cards); },
-    async getUserCollection(userId: string, splitId: string) { const { albumService } = await import('./albumService'); return albumService.getUserCollection(userId, splitId); },
-    async getUserPackState(userId: string, splitId: string) { const { albumService } = await import('./albumService'); return albumService.getUserPackState(userId, splitId); },
-    async getUserInventory(userId: string, splitId: string) { const { albumService } = await import('./albumService'); return albumService.getUserInventory(userId, splitId); },
-    async moveCardToCollection(userId: string, splitId: string, inventoryItemId: string, cardId: string) { const { albumService } = await import('./albumService'); return albumService.moveCardToCollection(userId, splitId, inventoryItemId, cardId); },
-    async deleteUserCollection(userId: string, splitId: string) { const { albumService } = await import('./albumService'); return albumService.deleteUserCollection(userId, splitId); },
-    async openDailyPack(userId: string, splitId: string) { const { albumService } = await import('./albumService'); return albumService.openDailyPack(userId, splitId); },
-    async getAllDuplicateCards(splitId: string) { const { albumService } = await import('./albumService'); return albumService.getAllDuplicateCards(splitId); },
-    async createTradeOffer(offer: any) { const { albumService } = await import('./albumService'); return albumService.createTradeOffer(offer); },
-    async getUserTradeOffers(userId: string) { const { albumService } = await import('./albumService'); return albumService.getUserTradeOffers(userId); },
-    async respondToTradeOffer(offerId: string, status: 'ACCEPTED' | 'REJECTED', splitId: string) { const { albumService } = await import('./albumService'); return albumService.respondToTradeOffer(offerId, status, splitId); },
-    async transferCard(fromUserId: string, toUserId: string, cardId: string, splitId: string) { const { albumService } = await import('./albumService'); return albumService.transferCard(fromUserId, toUserId, cardId, splitId); },
 };

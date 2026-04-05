@@ -14,7 +14,6 @@ import { ProfileView } from './components/ProfileView';
 import { TeamsView } from './components/TeamsView';
 import { OfficialStandings } from './components/OfficialStandings';
 import { HallOfFame } from './components/HallOfFame'; // Import nuevo
-import { Album } from './components/Album'; // New Album Import
 import { ViewState, UserPrediction, User } from './types';
 import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, Download } from 'lucide-react';
 import { authService } from './services/authService';
@@ -217,7 +216,7 @@ const App: React.FC = () => {
       case ViewState.LOGIN:
         return <Login onLogin={handleLogin} />;
       case ViewState.SPLIT_SELECTION:
-        return <SplitSelection onSelect={handleSplitSelect} onSelectAlbum={() => setView(ViewState.ALBUM)} isAdmin={isAdmin} />;
+        return <SplitSelection onSelect={handleSplitSelect} isAdmin={isAdmin} />;
       case ViewState.DASHBOARD:
         return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
       case ViewState.RANKING:
@@ -237,8 +236,6 @@ const App: React.FC = () => {
         return <TeamsView />;
       case ViewState.HALL_OF_FAME: // Nuevo caso
         return <HallOfFame />;
-      case ViewState.ALBUM: // New case
-        return <Album currentUserId={currentUserId} isAdmin={isAdmin} selectedSplit={selectedSplit || 'winter_2026'} setSelectedSplit={setSelectedSplit} />;
       case ViewState.DB_MANAGER:
          // Protect route
          if (!isAdmin) return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
@@ -318,7 +315,7 @@ const App: React.FC = () => {
                 {view !== ViewState.DASHBOARD && view !== ViewState.SPLIT_SELECTION && (
                     <button 
                         onClick={() => {
-                            if (view === ViewState.ALBUM) {
+                            if (view === ViewState.DASHBOARD) {
                                 setView(ViewState.SPLIT_SELECTION);
                             } else {
                                 setView(selectedSplit ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION);
@@ -428,7 +425,7 @@ const App: React.FC = () => {
                     </button>
                     {selectedSplit ? (
                         <>
-                            <button onClick={() => { setView(view === ViewState.ALBUM ? ViewState.SPLIT_SELECTION : ViewState.DASHBOARD); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium">Inicio</button>
+                            <button onClick={() => { setView(ViewState.DASHBOARD); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium">Inicio</button>
                             <button onClick={() => { setView(ViewState.SPLIT_SELECTION); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium flex items-center gap-2">
                                 <ArrowRightLeft className="w-4 h-4" /> Cambiar Split
                             </button>
