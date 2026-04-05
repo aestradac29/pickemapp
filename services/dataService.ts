@@ -11,6 +11,10 @@ const cleanPayload = (data: any): any => {
     return JSON.parse(JSON.stringify(data));
 };
 
+// Fecha de corte para picks aleatorios: antes de esta fecha los picks
+// generados deterministicamente no suman puntos (regla de negocio del juego).
+const RANDOM_PICKS_CUTOFF = new Date('2026-02-21T00:00:00').getTime();
+
 export const dataService = {
     _getCurrentSplitId(): string {
         const split = localStorage.getItem('selectedSplit');
@@ -465,7 +469,7 @@ export const dataService = {
                 
                 return dbTeams;
             } else {
-                console.log("Seeding Teams to Database...");
+                if ((import.meta as any).env?.DEV) console.log("Seeding Teams to Database...");
                 try {
                     await setDoc(docRef, { data: cleanPayload(TEAMS) });
                 } catch (e) {
@@ -786,7 +790,7 @@ export const dataService = {
 
 
             } else {
-                console.log("Seeding Matches...");
+                if ((import.meta as any).env?.DEV) console.log("Seeding Matches...");
                 const seedMatches = [...MATCHES];
                 let generatedMatches: Match[] = [];
                 for (let i = 1; i <= 11; i++) {
@@ -1074,12 +1078,14 @@ export const dataService = {
     },
 
     async recalculateAllFantasyScores(allMatches: Match[]) {
+        // ── Paso 1: datos base ────────────────────────────────────────────────
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
         const users = userSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         const currentSplitId = this._getCurrentSplitId();
+        const schedule = getFantasySchedule(currentSplitId);
 
-        // Map stats by Match ID -> Player ID
+        // Mapa precomputado: matchId → playerId → puntos (sin Firestore)
         const matchStatsMap: Record<string, Record<string, number>> = {};
         allMatches.forEach(m => {
             if (m.stats) {
@@ -1090,86 +1096,93 @@ export const dataService = {
             }
         });
 
-        const updates = users.map(async (user: any) => {
+        // ── Paso 2: por usuario, leer TODAS sus rondas de golpe ──────────────
+        // Antes: N_usuarios × N_rondas lecturas secuenciales = hasta 200+ round trips.
+        // Ahora: 1 getDocs por usuario (lee toda la subcolección) = N_usuarios round trips.
+        await Promise.all(users.map(async (user: any) => {
+            // Leer toda la subcolección fantasy_rounds del usuario de una vez
+            const roundsRef = collection(db, "users", user.id, "fantasy_rounds");
+            const roundsSnap = await getDocs(roundsRef);
+
+            // Indexar por nombre de documento para acceso O(1)
+            const roundsMap: Record<string, any> = {};
+            roundsSnap.docs.forEach(d => { roundsMap[d.id] = d.data(); });
+
             let totalFantasyScore = 0;
-            
-            for (const roundConfig of getFantasySchedule(currentSplitId)) {
+            const writeOps: Promise<any>[] = [];
+
+            for (const roundConfig of schedule) {
                 const roundId = roundConfig.id;
                 const roundDocName = this._getFantasyRoundDocName(roundId, currentSplitId);
                 const roundRef = doc(db, "users", user.id, "fantasy_rounds", roundDocName);
-                const roundSnap = await getDoc(roundRef);
-                
-                // FIND TEAM: Current or Inherited
-                let teamToScore = null;
-                let captainToScore = null;
 
-                if (roundSnap.exists()) {
-                    const data = roundSnap.data();
-                    teamToScore = data.team;
-                    captainToScore = data.captain;
+                // Buscar el equipo: ronda actual o heredado hacia atrás (sin Firestore)
+                let teamToScore: any = null;
+                let captainToScore: string | null = null;
+                let isInherited = false;
+
+                if (roundsMap[roundDocName]) {
+                    teamToScore   = roundsMap[roundDocName].team;
+                    captainToScore = roundsMap[roundDocName].captain;
                 } else {
-                    // Try backwards inheritance (WITHIN SAME SPLIT)
+                    // Herencia hacia atrás dentro del mismo split (solo en memoria)
                     for (let r = roundId - 1; r >= 1; r--) {
                         const prevDocName = this._getFantasyRoundDocName(r, currentSplitId);
-                        const prevRef = doc(db, "users", user.id, "fantasy_rounds", prevDocName);
-                        const prevSnap = await getDoc(prevRef);
-                        if (prevSnap.exists()) {
-                            teamToScore = prevSnap.data().team;
-                            captainToScore = prevSnap.data().captain;
-                            break; // Found most recent
+                        if (roundsMap[prevDocName]) {
+                            teamToScore    = roundsMap[prevDocName].team;
+                            captainToScore = roundsMap[prevDocName].captain;
+                            isInherited    = true;
+                            break;
                         }
                     }
                 }
 
-                if (teamToScore) {
-                    let roundScore = 0;
-                    const relevantMatches = allMatches.filter(m => {
-                        if (roundConfig.stage === Stage.GROUPS) {
-                            return m.stage === Stage.GROUPS && roundConfig.matchdays.includes(m.day || 0);
-                        } else {
-                            return m.stage !== Stage.GROUPS && roundConfig.matchdays.includes(m.day || 0);
-                        }
-                    });
+                if (!teamToScore) continue;
 
-                    Object.values(teamToScore).forEach((slot: any) => {
-                        const pid = slot?.playerId || (typeof slot === 'string' ? slot : null);
-                        if (pid) {
-                            let playerRoundPoints = 0;
-                            relevantMatches.forEach(m => {
-                                const points = matchStatsMap[m.id]?.[pid] || 0;
-                                playerRoundPoints += points;
-                            });
-                            
-                            if (pid === captainToScore) playerRoundPoints *= 1.5;
-                            roundScore += playerRoundPoints;
-                        }
-                    });
+                // Calcular puntuación de la ronda (todo en memoria)
+                const relevantMatches = allMatches.filter(m => {
+                    if (roundConfig.stage === Stage.GROUPS) {
+                        return m.stage === Stage.GROUPS && roundConfig.matchdays.includes(m.day || 0);
+                    }
+                    return m.stage !== Stage.GROUPS && roundConfig.matchdays.includes(m.day || 0);
+                });
 
-                    // SAVE THE SCORE (And populate the round doc if it was missing)
-                    await setDoc(roundRef, { 
+                let roundScore = 0;
+                Object.values(teamToScore).forEach((slot: any) => {
+                    const pid = slot?.playerId || (typeof slot === 'string' ? slot : null);
+                    if (!pid) return;
+                    let pts = relevantMatches.reduce(
+                        (acc, m) => acc + (matchStatsMap[m.id]?.[pid] || 0), 0
+                    );
+                    if (pid === captainToScore) pts *= 1.5;
+                    roundScore += pts;
+                });
+
+                totalFantasyScore += roundScore;
+
+                // Acumular escrituras — se dispararán todas en paralelo al final
+                writeOps.push(
+                    setDoc(roundRef, {
                         team: cleanPayload(teamToScore),
                         captain: captainToScore,
                         score: parseFloat(roundScore.toFixed(2)),
-                        inherited: !roundSnap.exists() // Flag to know it was auto-filled
-                    }, { merge: true });
-                    
-                    totalFantasyScore += roundScore;
-                }
+                        inherited: isInherited,
+                    }, { merge: true })
+                );
             }
 
+            // Actualizar scoreBreakdown del usuario
             const userDocRef = doc(db, "users", user.id);
-            const userDocSnap = await getDoc(userDocRef);
-            if(userDocSnap.exists()) {
-                const userData = userDocSnap.data();
-                const breakdown = userData.scoreBreakdown || {};
-                breakdown.fantasy = parseFloat(totalFantasyScore.toFixed(2));
-                await setDoc(userDocRef, { scoreBreakdown: breakdown }, { merge: true });
-            }
-        });
+            writeOps.push(
+                setDoc(userDocRef, {
+                    scoreBreakdown: { fantasy: parseFloat(totalFantasyScore.toFixed(2)) }
+                }, { merge: true })
+            );
 
-        await Promise.all(updates);
+            // Disparar todas las escrituras de este usuario en paralelo
+            await Promise.all(writeOps);
+        }));
     },
-
     // ... (rest of methods)
     async createMatch(matchData: any) {
         const docRef = doc(db, "admin_data", this._getDocName("matches"));
@@ -1251,7 +1264,7 @@ export const dataService = {
                     // Random picks only count if match is on/after Feb 21, 2026
                     if (isRandom) {
                         const matchTime = new Date(m.startTime).getTime();
-                        const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                        const cutoff = RANDOM_PICKS_CUTOFF;
                         if (matchTime < cutoff) {
                             predictedWinnerId = null;
                         }
@@ -1283,7 +1296,7 @@ export const dataService = {
                     // Random picks only count if match is on/after Feb 21, 2026
                     if (isRandom) {
                         const matchTime = new Date(m.startTime).getTime();
-                        const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                        const cutoff = RANDOM_PICKS_CUTOFF;
                         if (matchTime < cutoff) {
                             predictedWinnerId = null;
                         }
@@ -1345,7 +1358,7 @@ export const dataService = {
 
                         if (isRandom) {
                             const matchTime = new Date(m.startTime).getTime();
-                            const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                            const cutoff = RANDOM_PICKS_CUTOFF;
                             if (matchTime < cutoff) {
                                 predictedWinnerId = null;
                             }
@@ -1381,7 +1394,7 @@ export const dataService = {
 
                         if (isRandom) {
                             const matchTime = new Date(m.startTime).getTime();
-                            const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                            const cutoff = RANDOM_PICKS_CUTOFF;
                             if (matchTime < cutoff) {
                                 predictedWinnerId = null;
                             }
@@ -1443,7 +1456,7 @@ export const dataService = {
 
                             if (isRandom) {
                                 const matchTime = new Date(m.startTime).getTime();
-                                const cutoff = new Date('2026-02-21T00:00:00').getTime();
+                                const cutoff = RANDOM_PICKS_CUTOFF;
                                 if (matchTime < cutoff) {
                                     predictedWinnerId = null;
                                 }

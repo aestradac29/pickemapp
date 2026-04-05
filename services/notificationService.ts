@@ -17,13 +17,13 @@ export const notificationService = {
     try {
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
-        console.log("Notification permission granted.");
+        if ((import.meta as any).env?.DEV) console.log("Notification permission granted.");
         
         // Get FCM token
         const token = await getToken(messaging, { vapidKey: VAPID_KEY });
         
         if (token) {
-          console.log("FCM Token obtained:", token);
+          if ((import.meta as any).env?.DEV) console.log("FCM Token obtained:", token);
           // Save token to user profile
           await this.saveTokenToUser(userId, token);
           return token;
@@ -32,7 +32,7 @@ export const notificationService = {
           return null;
         }
       } else {
-        console.log("Notification permission not granted.");
+        if ((import.meta as any).env?.DEV) console.log("Notification permission not granted.");
         return null;
       }
     } catch (error) {
@@ -47,7 +47,7 @@ export const notificationService = {
       await updateDoc(userRef, {
         fcmTokens: arrayUnion(token)
       });
-      console.log("Token saved to user profile.");
+      if ((import.meta as any).env?.DEV) console.log("Token saved to user profile.");
     } catch (error) {
       console.error("Error saving token to user:", error);
     }

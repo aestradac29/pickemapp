@@ -1,17 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 
-import { MatchCard } from './components/MatchCard';
 import { Leaderboard } from './components/Leaderboard';
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { RankingCombinedView } from './components/RankingCombinedView';
-import { RankingView } from './components/RankingView';
 import { FantasyView } from './components/FantasyView';
 import { MatchdayView } from './components/MatchdayView';
 import { PlayoffsView } from './components/PlayoffsView';
 import { SplitSelection } from './components/SplitSelection';
-import { PasswordResetModal } from './components/PasswordResetModal';
 import { DatabaseManager } from './components/DatabaseManager'; 
 import { ProfileView } from './components/ProfileView'; 
 import { TeamsView } from './components/TeamsView';
@@ -22,7 +19,6 @@ import { ViewState, UserPrediction, User } from './types';
 import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, Download } from 'lucide-react';
 import { authService } from './services/authService';
 import { dataService } from './services/dataService';
-import { notificationService } from './services/notificationService';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.LOGIN);
@@ -41,9 +37,6 @@ const App: React.FC = () => {
   const [selectedSplit, setSelectedSplit] = useState<string | null>(() => {
     return localStorage.getItem('selectedSplit');
   });
-
-  // Recovery State
-  const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
 
   // Sync selectedSplit with localStorage changes
   useEffect(() => {
@@ -214,23 +207,9 @@ const App: React.FC = () => {
     setIsMenuOpen(false);
   };
 
-  const handlePasswordSuccess = () => {
-      setShowPasswordResetModal(false);
-  };
-
   const handleViewProfile = (userId: string) => {
       setViewingProfileId(userId);
       setView(ViewState.PROFILE);
-  };
-
-  const handleSelectWinner = async (matchId: string, teamId: string) => {
-    setPredictions(prev => {
-      const existing = prev.find(p => p.matchId === matchId);
-      if (existing) {
-        return prev.map(p => p.matchId === matchId ? { ...p, predictedWinnerId: teamId } : p);
-      }
-      return [...prev, { matchId, predictedWinnerId: teamId }];
-    });
   };
 
   const renderContent = () => {
@@ -309,7 +288,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#0a1428] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1a2c4e] via-[#0a1428] to-[#0a1428] text-[#f0e6d2] font-sans flex flex-col">
       
       {/* Navbar */}
-      {currentUser && !showPasswordResetModal && view !== ViewState.LOGIN && (
+      {currentUser && view !== ViewState.LOGIN && (
         <nav className="sticky top-0 z-50 bg-[#091428]/90 backdrop-blur-md border-b border-hextech-500/30 shadow-lg">
           <div className="max-w-6xl mx-auto px-4">
             <div className="flex items-center justify-between h-16">
@@ -482,14 +461,6 @@ const App: React.FC = () => {
             </p>
         </div>
       </footer>
-
-      {/* Password Reset Modal */}
-      {showPasswordResetModal && (
-          <PasswordResetModal 
-            onClose={() => setShowPasswordResetModal(false)}
-            onSuccess={handlePasswordSuccess}
-          />
-      )}
 
       {/* Install Guide Modal */}
       {showInstallGuide && (
