@@ -25,7 +25,6 @@ interface PlayerRowProps {
 
 const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-  const { toast, ToastContainer } = useToast();
     
     const s = stats[player.id] || { 
         playerId: player.id,
@@ -532,7 +531,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
             setShowImportModal(false);
         } catch (error) {
             console.error("AI Import Failed:", error);
-            toast.error("Falló la importación. Revisa los datos e inténtalo de nuevo.");
+            alert("Falló la importación. Inténtalo de nuevo o revisa la consola.");
         } finally {
             setIsImporting(false);
         }

@@ -5,7 +5,6 @@ import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User, 
 import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, TrendingDown, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole, Skull, Crosshair, Droplet } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { dataService } from '../services/dataService';
-import { useToast } from './ui/Toast';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 
@@ -199,7 +198,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   const teamInfo = player ? teams[player.teamId] : null;
   const teamColor = teamInfo?.color || '#0ac8b9';
   const [imgError, setImgError] = useState(false);
-  const { toast } = useToast();
   
   React.useEffect(() => { setImgError(false); }, [playerId]);
 
@@ -929,7 +927,7 @@ export const FantasyView: React.FC<{
         await loadData();
       } catch (error) {
         console.error("Error updating active round", error);
-        toast.error("Error al cambiar de jornada.");
+        alert("Error al cambiar de jornada.");
       } finally {
         setIsAdminSaving(false);
       }

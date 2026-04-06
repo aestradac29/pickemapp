@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, Team, Stage } from '../types';
 import { dataService } from '../services/dataService';
-import { useToast } from './ui/Toast';
 import { getChampions } from '../services/riotService';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { PenLine, Save, Loader2, CheckCircle2, User as UserIcon, Trophy, Sparkles, Swords, Medal, AlertCircle, Link, Image as ImageIcon, Gift, Lock, Star, Crown, CircleDashed, LayoutTemplate, Share2, Copy, Download, Camera, Zap, Eye } from 'lucide-react';
@@ -133,7 +132,7 @@ const ShareModal = ({ user, teams, onClose }: { user: User, teams: Team[], onClo
             document.body.removeChild(link);
         } catch (err) {
             console.error("Error generating image", err);
-            toast.error("No se pudo generar la imagen.");
+            alert("No se pudo generar la imagen. Intenta copiando el texto.");
         } finally {
             setIsGenerating(false);
         }
@@ -230,7 +229,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
     const [user, setUser] = useState<User | null>(null);
     const [teams, setTeams] = useState<Team[]>([]); // Store loaded teams
     const [isLoading, setIsLoading] = useState(true);
-  const { toast, ToastContainer } = useToast();
     const [isEditing, setIsEditing] = useState(false);
     const [championOptions, setChampionOptions] = useState<Option[]>([]);
     const [showShareModal, setShowShareModal] = useState(false);
@@ -377,7 +375,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
             newEquipped = newEquipped.filter(id => id !== badgeId);
         } else {
             if (newEquipped.length >= 3) {
-                toast.warning("Máximo 3 insignias equipadas.");
+                alert("Solo puedes equiparte 3 insignias a la vez.");
                 return;
             }
             newEquipped.push(badgeId);
