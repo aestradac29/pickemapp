@@ -6,6 +6,7 @@ import { DaySelector } from './DaySelector';
 import { UserPrediction, Match, Team, Stage, Player, User } from '../types';
 import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, Trash, CirclePlus, GitMerge, List, User as UserIcon, LogOut } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import { useToast } from './ui/Toast';
 import { TEAMS, normalizeSplitId } from '../constants';
 import { StatsEntryModal } from './StatsEntryModal';
 import { StatsViewerModal } from './StatsViewerModal';
@@ -67,6 +68,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
   const [isLoadingPicks, setIsLoadingPicks] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
+  const { toast, ToastContainer } = useToast();
   const isSavingRef = useRef(false);
   
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -360,7 +362,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           setAllMatches(updatedMatches);
       } catch (error) {
           console.error("Failed to update/create match:", error);
-          alert("Error actualizando o creando el partido.");
+          toast.error("Error actualizando el partido.");
       }
   };
 
@@ -378,7 +380,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           setAllMatches(updatedMatches);
       } catch (error: any) {
           console.error("Error deleting match", error);
-          alert("Error al borrar el partido.");
+          toast.error("Error al borrar el partido.");
           setAllMatches(originalMatches);
       }
   };
@@ -433,7 +435,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           setAllMatches(updated);
       } catch (e) {
           console.error(e);
-          alert("Error guardando estadísticas");
+          toast.error("Error guardando estadísticas.");
       } finally {
           setIsSavingStats(false);
       }
@@ -441,7 +443,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
   const handleBatchSave = async () => {
       if (!currentUserId) {
-          alert("Debes iniciar sesión para guardar.");
+          toast.warning("Debes iniciar sesión para guardar.");
           return;
       }
       if (isEditMode || isSpectating) return;
@@ -818,7 +820,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
       {/* Footer Action (Save Button) */}
       {!isEditMode && !isLockedForUser && !isSpectating && (
-          <div className="fixed bottom-8 left-0 right-0 px-4 flex flex-col items-center pointer-events-none z-40 gap-2">
+          <div className="fixed bottom-20 md:bottom-8 left-0 right-0 px-4 flex flex-col items-center pointer-events-none z-40 gap-2">
             
             {saveStatus === 'error' && errorMessage && (
                  <div className="bg-red-900/90 border border-red-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-2 animate-in slide-in-from-bottom-5">
@@ -883,6 +885,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
               onClose={() => setViewStatsMatch(null)}
           />
       )}
+      <ToastContainer />
     </div>
   );
 };
