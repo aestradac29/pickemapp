@@ -15,14 +15,13 @@ import { TeamsView } from './components/TeamsView';
 import { OfficialStandings } from './components/OfficialStandings';
 import { HallOfFame } from './components/HallOfFame'; // Import nuevo
 import { ViewState, UserPrediction, User } from './types';
-import { Menu, X, Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, Download } from 'lucide-react';
+import { Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, Download, Home, Swords, Trophy, UserCircle2, X } from 'lucide-react';
 import { authService } from './services/authService';
 import { dataService } from './services/dataService';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.LOGIN);
   const [predictions, setPredictions] = useState<UserPrediction[]>([]);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // Auth State
   const [currentUser, setCurrentUser] = useState<string | null>(null);
@@ -82,7 +81,6 @@ const App: React.FC = () => {
       
       // Wait for the user to respond to the prompt
       const { outcome } = await deferredPrompt.userChoice;
-      console.log(`User response to the install prompt: ${outcome}`);
       
       // We've used the prompt, and can't use it again, throw it away
       setDeferredPrompt(null);
@@ -378,67 +376,30 @@ const App: React.FC = () => {
                 </button>
               </div>
 
-              {/* Mobile Menu Button */}
-              <div className="md:hidden flex items-center gap-3">
-                 <button 
-                      onClick={handleInstallClick}
-                      className="p-1.5 text-[#c8aa6e] bg-[#c8aa6e]/10 border border-[#c8aa6e]/30 rounded-lg hover:bg-[#c8aa6e]/20 transition-colors flex items-center gap-1"
-                      title="Instalar App"
-                 >
-                      <Download className="w-4 h-4" />
-                      <span className="text-[10px] font-bold uppercase">App</span>
-                 </button>
-
-                 {/* Quick Change Split for Mobile (Icon Only) */}
+              {/* Mobile: solo avatar + cambiar split (el resto va en bottom nav) */}
+              <div className="md:hidden flex items-center gap-2">
                  {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
-                    <button 
+                    <button
                         onClick={() => setView(ViewState.SPLIT_SELECTION)}
-                        className="p-2 text-gray-400 hover:text-[#c8aa6e]"
+                        className="p-2 text-gray-500 hover:text-[#c8aa6e] transition-colors"
                         title="Cambiar Split"
                     >
-                        <ArrowRightLeft className="w-5 h-5" />
+                        <ArrowRightLeft className="w-4 h-4" />
                     </button>
                  )}
-                 <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-hextech-400 p-2 hover:bg-gray-800 rounded-lg transition-colors">
-                   {isMenuOpen ? <X /> : <Menu />}
+                 <button
+                    onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); }}
+                    className="flex items-center"
+                 >
+                    <img
+                        src={currentUserAvatar || `https://ui-avatars.com/api/?name=${currentUser}&background=random`}
+                        alt="Avatar"
+                        className={`w-8 h-8 rounded-full border-2 transition-colors ${isAdmin ? 'border-red-500' : 'border-gray-600'}`}
+                    />
                  </button>
               </div>
             </div>
           </div>
-
-          {/* Mobile Menu Dropdown */}
-          {isMenuOpen && (
-             <div className="md:hidden bg-[#091428] border-b border-gray-800 animate-in slide-in-from-top-2">
-                <div className="px-4 py-2 space-y-1">
-                    <button 
-                        onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); setIsMenuOpen(false); }}
-                        className="w-full px-3 py-3 text-sm font-bold border-b border-gray-800 mb-2 flex items-center gap-3 hover:bg-gray-800 rounded transition-colors"
-                    >
-                        <img 
-                            src={currentUserAvatar || `https://ui-avatars.com/api/?name=${currentUser}&background=random`} 
-                            className="w-8 h-8 rounded-full border border-gray-600"
-                        />
-                        <div className="flex flex-col items-start">
-                            <span className="text-hextech-300">{currentUser}</span>
-                            {isAdmin && <span className="text-[10px] bg-red-900/50 text-red-300 px-1.5 rounded border border-red-500/50 uppercase">Admin</span>}
-                        </div>
-                    </button>
-                    {selectedSplit ? (
-                        <>
-                            <button onClick={() => { setView(ViewState.DASHBOARD); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium">Inicio</button>
-                            <button onClick={() => { setView(ViewState.SPLIT_SELECTION); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium flex items-center gap-2">
-                                <ArrowRightLeft className="w-4 h-4" /> Cambiar Split
-                            </button>
-                        </>
-                    ) : (
-                        <button onClick={() => { setView(ViewState.SPLIT_SELECTION); setIsMenuOpen(false); }} className="block w-full text-left py-3 px-3 text-gray-300 hover:bg-gray-800 rounded font-medium">Inicio</button>
-                    )}
-                    <button onClick={handleLogout} className="block w-full text-left py-3 px-3 text-red-400 hover:bg-red-900/20 rounded font-medium flex items-center gap-2 mt-2 border-t border-gray-800">
-                        <LogOut className="w-4 h-4" /> Cerrar Sesión
-                    </button>
-                </div>
-             </div>
-          )}
         </nav>
       )}
 
@@ -446,6 +407,97 @@ const App: React.FC = () => {
       <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
         {renderContent()}
       </main>
+
+      {/* ── Bottom Navigation Bar (mobile only) ── */}
+      {currentUser && view !== ViewState.LOGIN && (
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-[#060f1e]/95 backdrop-blur-md border-t border-gray-800/60">
+          <div className="flex items-center justify-around h-16 px-2 max-w-md mx-auto">
+
+            {/* Inicio / Dashboard */}
+            <button
+              onClick={() => setView(selectedSplit ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION)}
+              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+                view === ViewState.DASHBOARD || view === ViewState.SPLIT_SELECTION
+                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              <Home className="w-5 h-5" />
+              <span className="text-[9px] font-bold uppercase tracking-wider">Inicio</span>
+            </button>
+
+            {/* Jornadas */}
+            <button
+              onClick={() => setView(ViewState.MATCHDAY)}
+              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+                view === ViewState.MATCHDAY
+                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              <Swords className="w-5 h-5" />
+              <span className="text-[9px] font-bold uppercase tracking-wider">Jornada</span>
+            </button>
+
+            {/* Ranking — tab central destacado */}
+            <button
+              onClick={() => setView(ViewState.RESULTS)}
+              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all relative ${
+                view === ViewState.RESULTS
+                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {/* Indicador activo */}
+              {view === ViewState.RESULTS && (
+                <div className="absolute -top-px inset-x-2 h-0.5 rounded-full bg-[#c8aa6e]" />
+              )}
+              <div className={`p-1.5 rounded-lg transition-colors ${
+                view === ViewState.RESULTS ? 'bg-[#c8aa6e]/15' : ''
+              }`}>
+                <Trophy className="w-5 h-5" />
+              </div>
+              <span className="text-[9px] font-bold uppercase tracking-wider">Ranking</span>
+            </button>
+
+            {/* Playoffs */}
+            <button
+              onClick={() => setView(ViewState.PLAYOFFS)}
+              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+                view === ViewState.PLAYOFFS
+                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              <Trophy className="w-5 h-5" />
+              <span className="text-[9px] font-bold uppercase tracking-wider">Playoffs</span>
+            </button>
+
+            {/* Perfil */}
+            <button
+              onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); }}
+              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+                view === ViewState.PROFILE
+                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {currentUserAvatar ? (
+                <img
+                  src={currentUserAvatar}
+                  alt=""
+                  className={`w-5 h-5 rounded-full border transition-colors ${
+                    view === ViewState.PROFILE ? 'border-[#c8aa6e]' : 'border-gray-600'
+                  }`}
+                />
+              ) : (
+                <UserCircle2 className="w-5 h-5" />
+              )}
+              <span className="text-[9px] font-bold uppercase tracking-wider">Perfil</span>
+            </button>
+          </div>
+        </nav>
+      )}
+
+      {/* Spacer para que el contenido no quede bajo el bottom nav en móvil */}
+      {currentUser && view !== ViewState.LOGIN && (
+        <div className="md:hidden h-16" />
+      )}
 
       {/* Footer */}
       <footer className="w-full bg-[#050a14] border-t border-white/5 py-8 mt-auto backdrop-blur-sm">
