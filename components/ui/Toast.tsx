@@ -2,7 +2,7 @@
 // Toast — sistema de notificaciones no bloqueantes
 //
 // Uso:
-//   const { toast, ToastContainer } = useToast();
+//   const { toast } = useToast();
 //   toast.success('Guardado');
 //   toast.error('Algo falló');
 //   toast.info('Información');
@@ -11,7 +11,7 @@
 //   <ToastContainer />
 // ──────────────────────────────────────────────────────────────────────────────
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, createContext, useContext } from 'react';
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -37,7 +37,9 @@ const CONFIG: Record<ToastType, { icon: React.ElementType; border: string; bg: s
   info:    { icon: Info,         border: 'border-blue-500/40',   bg: 'bg-blue-900/20',   text: 'text-blue-200',   iconColor: 'text-blue-400'   },
 };
 
-export function useToast(): { toast: ToastAPI; ToastContainer: React.FC } {
+const ToastContext = createContext<{ toast: ToastAPI } | null>(null);
+
+export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<ToastItem[]>([]);
   const counter = useRef(0);
 
@@ -60,7 +62,21 @@ export function useToast(): { toast: ToastAPI; ToastContainer: React.FC } {
     info:    (msg) => add(msg, 'info'),
   };
 
-  const ToastContainer: React.FC = () => (
+  return (
+    <ToastContext.Provider value={{ toast }}>
+      {children}
+      <ToastContainer items={items} remove={remove} />
+    </ToastContext.Provider>
+  );
+};
+
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (!context) throw new Error('useToast must be used within a ToastProvider');
+  return context;
+}
+
+const ToastContainer: React.FC<{ items: ToastItem[], remove: (id: number) => void }> = ({ items, remove }) => (
     <div className="fixed top-20 right-4 z-[200] flex flex-col gap-2 pointer-events-none max-w-xs w-full">
       {items.map(item => {
         const cfg  = CONFIG[item.type];
@@ -87,7 +103,4 @@ export function useToast(): { toast: ToastAPI; ToastContainer: React.FC } {
         );
       })}
     </div>
-  );
-
-  return { toast, ToastContainer };
-}
+);

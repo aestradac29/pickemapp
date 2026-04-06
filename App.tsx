@@ -14,6 +14,7 @@ import { ProfileView } from './components/ProfileView';
 import { TeamsView } from './components/TeamsView';
 import { OfficialStandings } from './components/OfficialStandings';
 import { HallOfFame } from './components/HallOfFame'; // Import nuevo
+import { ToastProvider } from './components/ui/Toast';
 import { ViewState, UserPrediction, User } from './types';
 import { Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, Download, Home, Swords, Trophy, UserCircle2, X } from 'lucide-react';
 import { authService } from './services/authService';
@@ -280,283 +281,285 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a1428] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1a2c4e] via-[#0a1428] to-[#0a1428] text-[#f0e6d2] font-sans flex flex-col">
-      
-      {/* Navbar */}
-      {currentUser && view !== ViewState.LOGIN && (
-        <nav className="sticky top-0 z-50 bg-[#091428]/90 backdrop-blur-md border-b border-hextech-500/30 shadow-lg">
-          <div className="max-w-6xl mx-auto px-4">
-            <div className="flex items-center justify-between h-16">
-              
-              {/* Logo & Branding - Clickable to Home */}
-              <div 
-                className={`flex items-center gap-3 cursor-pointer group`} 
-                onClick={() => selectedSplit && setView(ViewState.DASHBOARD)}
-              >
-                <div className="w-9 h-9 bg-gradient-to-br from-hextech-500 to-hextech-900 rounded rotate-45 flex items-center justify-center border border-hextech-400 shadow-md group-hover:scale-105 transition-transform">
-                  <span className="text-white -rotate-45 font-bold text-sm">P</span>
-                </div>
-                <div className="flex flex-col">
-                    <h1 className="font-bold text-lg tracking-wide text-hextech-400 leading-none">
-                        PICK'EM <span className="text-hextech-500">PRO</span>
-                    </h1>
-                    {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
-                        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest group-hover:text-hextech-400 transition-colors">
-                            {selectedSplit}
-                        </span>
-                    )}
-                </div>
-              </div>
-
-              {/* Desktop Nav Actions */}
-              <div className="hidden md:flex items-center gap-4">
-                {view !== ViewState.DASHBOARD && view !== ViewState.SPLIT_SELECTION && (
-                    <button 
-                        onClick={() => {
-                            if (view === ViewState.DASHBOARD) {
-                                setView(ViewState.SPLIT_SELECTION);
-                            } else {
-                                setView(selectedSplit ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION);
-                            }
-                        }}
-                        className="text-gray-400 hover:text-[#c8aa6e] flex items-center gap-1 text-sm font-medium transition-colors"
-                    >
-                        <ChevronLeft className="w-4 h-4" /> Volver al Inicio
-                    </button>
-                )}
+    <ToastProvider>
+      <div className="min-h-screen bg-[#0a1428] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1a2c4e] via-[#0a1428] to-[#0a1428] text-[#f0e6d2] font-sans flex flex-col">
+        
+        {/* Navbar */}
+        {currentUser && view !== ViewState.LOGIN && (
+          <nav className="sticky top-0 z-50 bg-[#091428]/90 backdrop-blur-md border-b border-hextech-500/30 shadow-lg">
+            <div className="max-w-6xl mx-auto px-4">
+              <div className="flex items-center justify-between h-16">
                 
-                {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
-                   <button 
-                        onClick={() => setView(ViewState.SPLIT_SELECTION)}
-                        className="text-xs border border-gray-700 bg-gray-800/50 rounded-full px-3 py-1.5 text-gray-300 hover:text-white hover:border-[#c8aa6e] hover:bg-[#0a1428] transition-all flex items-center gap-1.5"
+                {/* Logo & Branding - Clickable to Home */}
+                <div 
+                  className={`flex items-center gap-3 cursor-pointer group`} 
+                  onClick={() => selectedSplit && setView(ViewState.DASHBOARD)}
+                >
+                  <div className="w-9 h-9 bg-gradient-to-br from-hextech-500 to-hextech-900 rounded rotate-45 flex items-center justify-center border border-hextech-400 shadow-md group-hover:scale-105 transition-transform">
+                    <span className="text-white -rotate-45 font-bold text-sm">P</span>
+                  </div>
+                  <div className="flex flex-col">
+                      <h1 className="font-bold text-lg tracking-wide text-hextech-400 leading-none">
+                          PICK'EM <span className="text-hextech-500">PRO</span>
+                      </h1>
+                      {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
+                          <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest group-hover:text-hextech-400 transition-colors">
+                              {selectedSplit}
+                          </span>
+                      )}
+                  </div>
+                </div>
+
+                {/* Desktop Nav Actions */}
+                <div className="hidden md:flex items-center gap-4">
+                  {view !== ViewState.DASHBOARD && view !== ViewState.SPLIT_SELECTION && (
+                      <button 
+                          onClick={() => {
+                              if (view === ViewState.DASHBOARD) {
+                                  setView(ViewState.SPLIT_SELECTION);
+                              } else {
+                                  setView(selectedSplit ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION);
+                              }
+                          }}
+                          className="text-gray-400 hover:text-[#c8aa6e] flex items-center gap-1 text-sm font-medium transition-colors"
+                      >
+                          <ChevronLeft className="w-4 h-4" /> Volver al Inicio
+                      </button>
+                  )}
+                  
+                  {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
+                     <button 
+                          onClick={() => setView(ViewState.SPLIT_SELECTION)}
+                          className="text-xs border border-gray-700 bg-gray-800/50 rounded-full px-3 py-1.5 text-gray-300 hover:text-white hover:border-[#c8aa6e] hover:bg-[#0a1428] transition-all flex items-center gap-1.5"
+                     >
+                          <ArrowRightLeft className="w-3 h-3" />
+                          Cambiar Split
+                     </button>
+                  )}
+
+                  <button 
+                      onClick={handleInstallClick}
+                      className="text-xs border border-[#c8aa6e] bg-[#c8aa6e]/10 rounded-full px-3 py-1.5 text-[#c8aa6e] hover:bg-[#c8aa6e]/20 transition-all font-bold flex items-center gap-1.5"
+                      title="Instalar App"
+                  >
+                      <Download className="w-3 h-3" />
+                      Instalar App
+                  </button>
+
+                  <div className="h-6 w-px bg-gray-700 mx-2"></div>
+                  
+                  {/* Profile Clickable Area */}
+                  <button 
+                      onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); }}
+                      className="flex items-center gap-3 hover:bg-gray-800/50 p-1 pr-3 rounded-full transition-colors group"
+                  >
+                      <img 
+                          src={currentUserAvatar || `https://ui-avatars.com/api/?name=${currentUser}&background=random`} 
+                          alt="Avatar" 
+                          className={`w-9 h-9 rounded-full border-2 group-hover:border-[#c8aa6e] transition-colors ${isAdmin ? 'border-red-500' : 'border-gray-600'}`}
+                      />
+                      <div className="flex flex-col items-start justify-center">
+                          <span className="text-sm font-bold text-hextech-300 leading-none group-hover:text-[#c8aa6e] transition-colors max-w-[100px] truncate">{currentUser}</span>
+                          {isAdmin && (
+                              <div className="flex items-center gap-1 mt-0.5 bg-red-900/30 px-1.5 py-0.5 rounded border border-red-500/30">
+                                  <ShieldAlert className="w-3 h-3 text-red-400" />
+                                  <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest leading-none">Admin</span>
+                              </div>
+                          )}
+                      </div>
+                  </button>
+
+                  <button 
+                      onClick={handleLogout}
+                      className="p-2 text-gray-400 hover:text-red-400 transition-colors ml-2 hover:bg-red-900/20 rounded-full"
+                      title="Cerrar Sesión"
+                  >
+                      <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Mobile: solo avatar + cambiar split (el resto va en bottom nav) */}
+                <div className="md:hidden flex items-center gap-2">
+                   {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
+                      <button
+                          onClick={() => setView(ViewState.SPLIT_SELECTION)}
+                          className="p-2 text-gray-500 hover:text-[#c8aa6e] transition-colors"
+                          title="Cambiar Split"
+                      >
+                          <ArrowRightLeft className="w-4 h-4" />
+                      </button>
+                   )}
+                   <button
+                      onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); }}
+                      className="flex items-center"
                    >
-                        <ArrowRightLeft className="w-3 h-3" />
-                        Cambiar Split
+                      <img
+                          src={currentUserAvatar || `https://ui-avatars.com/api/?name=${currentUser}&background=random`}
+                          alt="Avatar"
+                          className={`w-8 h-8 rounded-full border-2 transition-colors ${isAdmin ? 'border-red-500' : 'border-gray-600'}`}
+                      />
                    </button>
+                </div>
+              </div>
+            </div>
+          </nav>
+        )}
+
+        {/* Main Content Area */}
+        <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
+          {renderContent()}
+        </main>
+
+        {/* ── Bottom Navigation Bar (mobile only) ── */}
+        {currentUser && view !== ViewState.LOGIN && (
+          <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-[#060f1e]/95 backdrop-blur-md border-t border-gray-800/60">
+            <div className="flex items-center justify-around h-16 px-2 max-w-md mx-auto">
+
+              {/* Inicio / Dashboard */}
+              <button
+                onClick={() => setView(selectedSplit ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION)}
+                className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+                  view === ViewState.DASHBOARD || view === ViewState.SPLIT_SELECTION
+                    ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <Home className="w-5 h-5" />
+                <span className="text-[9px] font-bold uppercase tracking-wider">Inicio</span>
+              </button>
+
+              {/* Jornadas */}
+              <button
+                onClick={() => setView(ViewState.MATCHDAY)}
+                className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+                  view === ViewState.MATCHDAY
+                    ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <Swords className="w-5 h-5" />
+                <span className="text-[9px] font-bold uppercase tracking-wider">Jornada</span>
+              </button>
+
+              {/* Ranking — tab central destacado */}
+              <button
+                onClick={() => setView(ViewState.RESULTS)}
+                className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all relative ${
+                  view === ViewState.RESULTS
+                    ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {/* Indicador activo */}
+                {view === ViewState.RESULTS && (
+                  <div className="absolute -top-px inset-x-2 h-0.5 rounded-full bg-[#c8aa6e]" />
                 )}
+                <div className={`p-1.5 rounded-lg transition-colors ${
+                  view === ViewState.RESULTS ? 'bg-[#c8aa6e]/15' : ''
+                }`}>
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <span className="text-[9px] font-bold uppercase tracking-wider">Ranking</span>
+              </button>
 
-                <button 
-                    onClick={handleInstallClick}
-                    className="text-xs border border-[#c8aa6e] bg-[#c8aa6e]/10 rounded-full px-3 py-1.5 text-[#c8aa6e] hover:bg-[#c8aa6e]/20 transition-all font-bold flex items-center gap-1.5"
-                    title="Instalar App"
-                >
-                    <Download className="w-3 h-3" />
-                    Instalar App
-                </button>
-
-                <div className="h-6 w-px bg-gray-700 mx-2"></div>
-                
-                {/* Profile Clickable Area */}
-                <button 
-                    onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); }}
-                    className="flex items-center gap-3 hover:bg-gray-800/50 p-1 pr-3 rounded-full transition-colors group"
-                >
-                    <img 
-                        src={currentUserAvatar || `https://ui-avatars.com/api/?name=${currentUser}&background=random`} 
-                        alt="Avatar" 
-                        className={`w-9 h-9 rounded-full border-2 group-hover:border-[#c8aa6e] transition-colors ${isAdmin ? 'border-red-500' : 'border-gray-600'}`}
-                    />
-                    <div className="flex flex-col items-start justify-center">
-                        <span className="text-sm font-bold text-hextech-300 leading-none group-hover:text-[#c8aa6e] transition-colors max-w-[100px] truncate">{currentUser}</span>
-                        {isAdmin && (
-                            <div className="flex items-center gap-1 mt-0.5 bg-red-900/30 px-1.5 py-0.5 rounded border border-red-500/30">
-                                <ShieldAlert className="w-3 h-3 text-red-400" />
-                                <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest leading-none">Admin</span>
-                            </div>
-                        )}
-                    </div>
-                </button>
-
-                <button 
-                    onClick={handleLogout}
-                    className="p-2 text-gray-400 hover:text-red-400 transition-colors ml-2 hover:bg-red-900/20 rounded-full"
-                    title="Cerrar Sesión"
-                >
-                    <LogOut className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Mobile: solo avatar + cambiar split (el resto va en bottom nav) */}
-              <div className="md:hidden flex items-center gap-2">
-                 {selectedSplit && view !== ViewState.SPLIT_SELECTION && (
-                    <button
-                        onClick={() => setView(ViewState.SPLIT_SELECTION)}
-                        className="p-2 text-gray-500 hover:text-[#c8aa6e] transition-colors"
-                        title="Cambiar Split"
-                    >
-                        <ArrowRightLeft className="w-4 h-4" />
-                    </button>
-                 )}
-                 <button
-                    onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); }}
-                    className="flex items-center"
-                 >
-                    <img
-                        src={currentUserAvatar || `https://ui-avatars.com/api/?name=${currentUser}&background=random`}
-                        alt="Avatar"
-                        className={`w-8 h-8 rounded-full border-2 transition-colors ${isAdmin ? 'border-red-500' : 'border-gray-600'}`}
-                    />
-                 </button>
-              </div>
-            </div>
-          </div>
-        </nav>
-      )}
-
-      {/* Main Content Area */}
-      <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
-        {renderContent()}
-      </main>
-
-      {/* ── Bottom Navigation Bar (mobile only) ── */}
-      {currentUser && view !== ViewState.LOGIN && (
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-[#060f1e]/95 backdrop-blur-md border-t border-gray-800/60">
-          <div className="flex items-center justify-around h-16 px-2 max-w-md mx-auto">
-
-            {/* Inicio / Dashboard */}
-            <button
-              onClick={() => setView(selectedSplit ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION)}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
-                view === ViewState.DASHBOARD || view === ViewState.SPLIT_SELECTION
-                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <Home className="w-5 h-5" />
-              <span className="text-[9px] font-bold uppercase tracking-wider">Inicio</span>
-            </button>
-
-            {/* Jornadas */}
-            <button
-              onClick={() => setView(ViewState.MATCHDAY)}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
-                view === ViewState.MATCHDAY
-                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <Swords className="w-5 h-5" />
-              <span className="text-[9px] font-bold uppercase tracking-wider">Jornada</span>
-            </button>
-
-            {/* Ranking — tab central destacado */}
-            <button
-              onClick={() => setView(ViewState.RESULTS)}
-              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all relative ${
-                view === ViewState.RESULTS
-                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              {/* Indicador activo */}
-              {view === ViewState.RESULTS && (
-                <div className="absolute -top-px inset-x-2 h-0.5 rounded-full bg-[#c8aa6e]" />
-              )}
-              <div className={`p-1.5 rounded-lg transition-colors ${
-                view === ViewState.RESULTS ? 'bg-[#c8aa6e]/15' : ''
-              }`}>
+              {/* Playoffs */}
+              <button
+                onClick={() => setView(ViewState.PLAYOFFS)}
+                className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+                  view === ViewState.PLAYOFFS
+                    ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
                 <Trophy className="w-5 h-5" />
-              </div>
-              <span className="text-[9px] font-bold uppercase tracking-wider">Ranking</span>
-            </button>
+                <span className="text-[9px] font-bold uppercase tracking-wider">Playoffs</span>
+              </button>
 
-            {/* Playoffs */}
-            <button
-              onClick={() => setView(ViewState.PLAYOFFS)}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
-                view === ViewState.PLAYOFFS
-                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <Trophy className="w-5 h-5" />
-              <span className="text-[9px] font-bold uppercase tracking-wider">Playoffs</span>
-            </button>
-
-            {/* Perfil */}
-            <button
-              onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); }}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
-                view === ViewState.PROFILE
-                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              {currentUserAvatar ? (
-                <img
-                  src={currentUserAvatar}
-                  alt=""
-                  className={`w-5 h-5 rounded-full border transition-colors ${
-                    view === ViewState.PROFILE ? 'border-[#c8aa6e]' : 'border-gray-600'
-                  }`}
-                />
-              ) : (
-                <UserCircle2 className="w-5 h-5" />
-              )}
-              <span className="text-[9px] font-bold uppercase tracking-wider">Perfil</span>
-            </button>
-          </div>
-        </nav>
-      )}
-
-      {/* Spacer para que el contenido no quede bajo el bottom nav en móvil */}
-      {currentUser && view !== ViewState.LOGIN && (
-        <div className="md:hidden h-16" />
-      )}
-
-      {/* Footer */}
-      <footer className="w-full bg-[#050a14] border-t border-white/5 py-8 mt-auto backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-medium">
-                Pick’em Pro es una plataforma independiente de predicciones de esports.
-            </p>
-            <p className="text-[10px] text-gray-600 mt-1">
-                No está afiliada, patrocinada ni respaldada por Riot Games ni por ninguna de sus competiciones o equipos.
-            </p>
-        </div>
-      </footer>
-
-      {/* Install Guide Modal */}
-      {showInstallGuide && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#0a1428] border border-hextech-500/30 rounded-xl p-6 max-w-sm w-full shadow-2xl relative">
-            <button 
-              onClick={() => setShowInstallGuide(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-xl font-bold text-[#c8aa6e] mb-4 flex items-center gap-2">
-              <Download className="w-5 h-5" /> Instalar App
-            </h3>
-            <div className="space-y-4 text-sm text-gray-300">
-              <p>Para instalar la aplicación manualmente en tu dispositivo:</p>
-              <div className="bg-[#091428] p-3 rounded-lg border border-gray-800">
-                <p className="font-bold text-white mb-1">📱 En iOS (Safari):</p>
-                <ol className="list-decimal list-inside space-y-1 ml-1">
-                  <li>Toca el botón <strong>Compartir</strong> <Share2 className="w-3 h-3 inline" /> en la barra inferior.</li>
-                  <li>Selecciona <strong>Añadir a la pantalla de inicio</strong>.</li>
-                </ol>
-              </div>
-              <div className="bg-[#091428] p-3 rounded-lg border border-gray-800">
-                <p className="font-bold text-white mb-1">🤖 En Android (Chrome):</p>
-                <ol className="list-decimal list-inside space-y-1 ml-1">
-                  <li>Toca el menú de <strong>3 puntos</strong> arriba a la derecha.</li>
-                  <li>Selecciona <strong>Instalar aplicación</strong> o <strong>Añadir a la pantalla de inicio</strong>.</li>
-                </ol>
-              </div>
-              <div className="bg-[#091428] p-3 rounded-lg border border-gray-800">
-                <p className="font-bold text-white mb-1">💻 En PC (Chrome/Edge):</p>
-                <ol className="list-decimal list-inside space-y-1 ml-1">
-                  <li>Haz clic en el icono de <strong>Instalar</strong> en la barra de direcciones (arriba a la derecha).</li>
-                </ol>
-              </div>
+              {/* Perfil */}
+              <button
+                onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); }}
+                className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+                  view === ViewState.PROFILE
+                    ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {currentUserAvatar ? (
+                  <img
+                    src={currentUserAvatar}
+                    alt=""
+                    className={`w-5 h-5 rounded-full border transition-colors ${
+                      view === ViewState.PROFILE ? 'border-[#c8aa6e]' : 'border-gray-600'
+                    }`}
+                  />
+                ) : (
+                  <UserCircle2 className="w-5 h-5" />
+                )}
+                <span className="text-[9px] font-bold uppercase tracking-wider">Perfil</span>
+              </button>
             </div>
-            <button 
-              onClick={() => setShowInstallGuide(false)}
-              className="w-full mt-6 bg-[#c8aa6e] text-[#0a1428] font-bold py-2 rounded hover:bg-[#d4b87e] transition-colors"
-            >
-              Entendido
-            </button>
+          </nav>
+        )}
+
+        {/* Spacer para que el contenido no quede bajo el bottom nav en móvil */}
+        {currentUser && view !== ViewState.LOGIN && (
+          <div className="md:hidden h-16" />
+        )}
+
+        {/* Footer */}
+        <footer className="w-full bg-[#050a14] border-t border-white/5 py-8 mt-auto backdrop-blur-sm">
+          <div className="max-w-4xl mx-auto px-4 text-center">
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-medium">
+                  Pick’em Pro es una plataforma independiente de predicciones de esports.
+              </p>
+              <p className="text-[10px] text-gray-600 mt-1">
+                  No está afiliada, patrocinada ni respaldada por Riot Games ni por ninguna de sus competiciones o equipos.
+              </p>
           </div>
-        </div>
-      )}
-    </div>
+        </footer>
+
+        {/* Install Guide Modal */}
+        {showInstallGuide && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-[#0a1428] border border-hextech-500/30 rounded-xl p-6 max-w-sm w-full shadow-2xl relative">
+              <button 
+                onClick={() => setShowInstallGuide(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-xl font-bold text-[#c8aa6e] mb-4 flex items-center gap-2">
+                <Download className="w-5 h-5" /> Instalar App
+              </h3>
+              <div className="space-y-4 text-sm text-gray-300">
+                <p>Para instalar la aplicación manualmente en tu dispositivo:</p>
+                <div className="bg-[#091428] p-3 rounded-lg border border-gray-800">
+                  <p className="font-bold text-white mb-1">📱 En iOS (Safari):</p>
+                  <ol className="list-decimal list-inside space-y-1 ml-1">
+                    <li>Toca el botón <strong>Compartir</strong> <Share2 className="w-3 h-3 inline" /> en la barra inferior.</li>
+                    <li>Selecciona <strong>Añadir a la pantalla de inicio</strong>.</li>
+                  </ol>
+                </div>
+                <div className="bg-[#091428] p-3 rounded-lg border border-gray-800">
+                  <p className="font-bold text-white mb-1">🤖 En Android (Chrome):</p>
+                  <ol className="list-decimal list-inside space-y-1 ml-1">
+                    <li>Toca el menú de <strong>3 puntos</strong> arriba a la derecha.</li>
+                    <li>Selecciona <strong>Instalar aplicación</strong> o <strong>Añadir a la pantalla de inicio</strong>.</li>
+                  </ol>
+                </div>
+                <div className="bg-[#091428] p-3 rounded-lg border border-gray-800">
+                  <p className="font-bold text-white mb-1">💻 En PC (Chrome/Edge):</p>
+                  <ol className="list-decimal list-inside space-y-1 ml-1">
+                    <li>Haz clic en el icono de <strong>Instalar</strong> en la barra de direcciones (arriba a la derecha).</li>
+                  </ol>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowInstallGuide(false)}
+                className="w-full mt-6 bg-[#c8aa6e] text-[#0a1428] font-bold py-2 rounded hover:bg-[#d4b87e] transition-colors"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </ToastProvider>
   );
 };
 

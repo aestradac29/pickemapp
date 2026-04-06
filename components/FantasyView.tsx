@@ -199,7 +199,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   const teamInfo = player ? teams[player.teamId] : null;
   const teamColor = teamInfo?.color || '#0ac8b9';
   const [imgError, setImgError] = useState(false);
-  const { toast, ToastContainer } = useToast();
+  const { toast } = useToast();
   
   React.useEffect(() => { setImgError(false); }, [playerId]);
 
@@ -1443,7 +1443,6 @@ export const FantasyView: React.FC<{
           </div>
       )}
 
-      <ToastContainer />
     </div>
   );
 };
