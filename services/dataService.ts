@@ -1,4 +1,3 @@
-
 import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame, Notification, Card, UserCard, TradeOffer, UserPackState, CardType, Region } from '../types';
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, getFantasySchedule } from '../constants';
 import { fantasyService } from './fantasyService';
@@ -310,25 +309,32 @@ export const dataService = {
 
         // 3.5. CARRY OVER TEAMS (Rollover Lineups)
         // This ensures every user starts the new round with their previous team physically saved.
-        await this.carryOverFantasyTeams(newRound, splitId);
+        // Pass updatedPlayers so carryOver uses the NEW prices (already saved to DB),
+        // avoiding the stale-price bug that showed Jornada 1 lineup on Jornada 3.
+        await this.carryOverFantasyTeams(newRound, splitId, updatedPlayers);
 
         // 4. Update Config to new round & UNLOCK explicitly (admin triggers next round, so it starts open)
+        // IMPORTANT: pass splitId so the correct split config document is updated.
         await this.updateGlobalConfig({ 
             fantasyRound: newRound,
             fantasyLocked: false // Reset manual lock if it was set
-        });
+        }, splitId);
     },
 
-    // Explicitly copy previous teams to the new round for all users
-    async carryOverFantasyTeams(newRound: number, splitId?: string) {
+    // Explicitly copy previous teams to the new round for all users.
+    // updatedPlayers: pass the already-updated player list from processRoundTransition
+    // so we use NEW market prices instead of stale cached ones.
+    async carryOverFantasyTeams(newRound: number, splitId?: string, updatedPlayers?: Player[]) {
         if (newRound <= 1) return; // No rollover for first round
 
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
         const currentSplitId = this._normalizeSplitId(splitId || this._getCurrentSplitId());
         
-        // Fetch players to infer legacy costs if missing
-        const players = await this.getPlayers(false, currentSplitId);
+        // Use the freshly-updated player list if provided; otherwise fetch from DB.
+        // IMPORTANT: avoids stale-price bug where purchaseCost ended up as (newCost - priceChange)
+        // = old price, causing Jornada 3 to show Jornada 1 lineup/prices.
+        const players = updatedPlayers || await this.getPlayers(false, currentSplitId);
         const playerMap = new Map<string, Player>(players.map(p => [p.id, p]));
         
         const updates = userSnapshot.docs.map(async (userDoc) => {
@@ -391,7 +397,10 @@ export const dataService = {
                     if (playerId && purchaseCost === undefined) {
                         const player = playerMap.get(playerId as string);
                         if (player) {
-                            purchaseCost = player.cost - (player.priceChange || 0);
+                            // FIX: use player.cost (new price) not (cost - priceChange).
+                            // Previously this set purchaseCost to the OLD price, which caused
+                            // Jornada 3 to display the Jornada 1 lineup with stale prices.
+                            purchaseCost = player.cost;
                         }
                     }
 
