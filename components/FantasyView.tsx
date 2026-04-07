@@ -488,40 +488,46 @@ interface RankingRowProps {
 }
 
 const RankingRow: React.FC<RankingRowProps> = ({ user, rank, score, isMe, isViewing, onClick }) => (
-    <div 
+    <div
         onClick={onClick}
         className={`
-            flex items-center p-3 border-b border-gray-800 transition-all cursor-pointer relative group
-            ${isViewing ? 'bg-[#0ac8b9]/10' : 'hover:bg-[#0f1d36]'}
-            ${isMe ? 'bg-gradient-to-r from-[#0ac8b9]/5 to-transparent' : ''}
+            relative flex items-center gap-3 px-4 py-3 border-b border-gray-800/60
+            cursor-pointer transition-all duration-150
+            ${isViewing ? 'bg-[#0ac8b9]/8' : 'hover:bg-[#0f1923]'}
+            ${isMe ? 'bg-gradient-to-r from-[#0ac8b9]/6 to-transparent' : ''}
         `}
     >
-        {/* Viewing Indicator Bar */}
-        {isViewing && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#0ac8b9]"></div>}
+        {/* Active indicator */}
+        {isViewing && <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-[#0ac8b9] rounded-full" />}
 
-        {/* Rank */}
-        <div className="w-8 text-center font-bold text-sm mr-2">
-            {rank === 1 ? <span className="text-yellow-400 drop-shadow-md">1º</span> :
-             rank === 2 ? <span className="text-gray-300">2º</span> :
-             rank === 3 ? <span className="text-amber-700">3º</span> :
-             <span className="text-gray-600">{rank}</span>}
+        {/* Rank badge */}
+        <div className="w-7 flex-shrink-0 text-center">
+            {rank === 1
+                ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 font-black text-xs">1</span>
+                : rank === 2
+                ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-500/20 border border-slate-500/30 text-slate-300 font-black text-xs">2</span>
+                : rank === 3
+                ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700/20 border border-amber-700/30 text-amber-600 font-black text-xs">3</span>
+                : <span className="text-gray-600 font-bold text-sm">{rank}</span>
+            }
         </div>
 
-        {/* Avatar & Name */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className={`w-8 h-8 rounded-full overflow-hidden border ${rank === 1 ? 'border-yellow-400' : 'border-gray-700'} flex-shrink-0`}>
-                <img src={user.avatar} className="w-full h-full object-cover" />
-            </div>
-            <div className="truncate">
-                <div className={`font-bold text-sm truncate ${isMe ? 'text-[#0ac8b9]' : 'text-gray-200'}`}>
-                    {user.name} {isMe && <span className="text-[9px] text-[#0ac8b9] border border-[#0ac8b9] px-1 rounded ml-1">TU</span>}
-                </div>
-            </div>
+        {/* Avatar */}
+        <div className={`w-8 h-8 rounded-full overflow-hidden border flex-shrink-0 ${rank === 1 ? 'border-yellow-400/60' : isMe ? 'border-[#0ac8b9]/60' : 'border-gray-700/60'}`}>
+            <img src={user.avatar} className="w-full h-full object-cover" alt="" />
         </div>
 
-        {/* Points */}
-        <div className="text-right">
-            <div className="text-sm font-bold text-white">{score.toFixed(1)}</div>
+        {/* Name */}
+        <div className="flex-1 min-w-0">
+            <span className={`font-bold text-sm truncate block ${isMe ? 'text-[#0ac8b9]' : 'text-gray-200'}`}>
+                {user.name}
+            </span>
+            {isMe && <span className="text-[9px] text-[#0ac8b9]/70 font-bold uppercase tracking-wider">Tú</span>}
+        </div>
+
+        {/* Score */}
+        <div className={`text-base font-black flex-shrink-0 ${rank === 1 ? 'text-yellow-400' : isMe ? 'text-[#0ac8b9]' : 'text-gray-300'}`}>
+            {score.toFixed(1)}
         </div>
     </div>
 );
@@ -1301,16 +1307,12 @@ export const FantasyView: React.FC<{
                     {/* Leaderboards... (Same as before) */}
                     <div className="mt-16 grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in slide-in-from-bottom-8">
                         <div>
-                            <div className="flex items-center gap-3 mb-4 border-b border-[#0ac8b9]/20 pb-3">
-                                <div className="p-2 bg-[#0ac8b9]/10 rounded-full border border-[#0ac8b9]/30">
-                                    <ListOrdered className="w-5 h-5 text-[#0ac8b9]" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-white uppercase tracking-widest">Clasificación Jornada {viewRoundId}</h2>
-                                    <p className="text-[10px] text-gray-500 uppercase font-bold">Puntos obtenidos solo en esta ronda</p>
-                                </div>
+                            <div className="flex items-center gap-2 mb-3">
+                                <ListOrdered className="w-4 h-4 text-[#0ac8b9]" />
+                                <h2 className="text-sm font-bold text-white uppercase tracking-wider">Jornada {viewRoundId}</h2>
+                                <span className="text-[10px] text-gray-500 font-bold ml-1">· Puntos de esta ronda</span>
                             </div>
-                            <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
+                            <div className="bg-[#060f1e] border border-gray-800/60 rounded-xl overflow-hidden">
                                 {roundLeaderboard.slice(0, 10).map((user) => (
                                     <RankingRow 
                                         key={user.id}
@@ -1341,16 +1343,12 @@ export const FantasyView: React.FC<{
                         </div>
 
                         <div>
-                            <div className="flex items-center gap-3 mb-4 border-b border-[#c8aa6e]/20 pb-3">
-                                <div className="p-2 bg-[#c8aa6e]/10 rounded-full border border-[#c8aa6e]/30">
-                                    <Trophy className="w-5 h-5 text-[#c8aa6e]" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-white uppercase tracking-widest">Clasificación General</h2>
-                                    <p className="text-[10px] text-gray-500 uppercase font-bold">Puntos Totales Acumulados</p>
-                                </div>
+                            <div className="flex items-center gap-2 mb-3">
+                                <Trophy className="w-4 h-4 text-[#c8aa6e]" />
+                                <h2 className="text-sm font-bold text-white uppercase tracking-wider">Clasificación General</h2>
+                                <span className="text-[10px] text-gray-500 font-bold ml-1">· Puntos totales</span>
                             </div>
-                            <div className="bg-[#091428] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
+                            <div className="bg-[#060f1e] border border-gray-800/60 rounded-xl overflow-hidden">
                                 {totalLeaderboard.slice(0, 10).map((user) => (
                                     <RankingRow 
                                         key={user.id}
