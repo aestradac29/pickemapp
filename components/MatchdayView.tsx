@@ -433,11 +433,11 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
       }
   };
 
-  const handleSaveStats = async (games: any) => {
+  const handleSaveStats = async (games: any, mvpPlayerId?: string) => {
       if (!statsMatch) return;
       setIsSavingStats(true);
       try {
-          await dataService.saveMatchStatsAndCalculate(statsMatch.id, games, selectedSplit);
+          await dataService.saveMatchStatsAndCalculate(statsMatch.id, games, selectedSplit, mvpPlayerId);
           setStatsMatch(null); 
           const updated = await dataService.getMatches(undefined, selectedSplit);
           setAllMatches(updated);

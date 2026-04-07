@@ -150,6 +150,7 @@ export interface Match {
   day?: number | null; // Optional day number for filtering
   bestOf?: number; // BO1, BO3, BO5
   bracketStage?: 'winners' | 'losers' | 'finals'; // Nuevo campo para Playoffs
+  mvpPlayerId?: string; // NEW: MVP de la serie
   stats?: Record<string, PlayerGameStats>; // Mapa playerId -> stats (AGGREGATED/AVERAGE for backward compatibility)
   games?: MatchGame[]; // DETAILED stats per game
 }

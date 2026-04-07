@@ -12,7 +12,7 @@ interface StatsEntryModalProps {
     teamB: Team;
     allPlayers: Player[]; // Required to filter by team
     onClose: () => void;
-    onSave: (games: MatchGame[]) => void;
+    onSave: (games: MatchGame[], mvpPlayerId?: string) => void;
     isSaving?: boolean;
     selectedSplit: string;
 }
@@ -339,6 +339,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     
     // State: Active Tab
     const [activeGame, setActiveGame] = useState(1);
+    const [mvpPlayerId, setMvpPlayerId] = useState<string | undefined>(match.mvpPlayerId);
 
     // State: Data Structure for ALL games
     const [gamesData, setGamesData] = useState<Record<number, { winnerId: string | null, stats: Record<string, PlayerGameStats> }>>({});
@@ -490,7 +491,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
             }
         });
 
-        onSave(gamesList);
+        onSave(gamesList, mvpPlayerId);
     };
 
     // --- AI IMPORT LOGIC ---
@@ -561,6 +562,17 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400 uppercase font-bold">MVP Serie:</span>
+                                <select 
+                                    value={mvpPlayerId || ''} 
+                                    onChange={(e) => setMvpPlayerId(e.target.value || undefined)}
+                                    className="bg-[#1e293b] text-white text-xs rounded p-1 border border-gray-700 outline-none focus:border-red-500"
+                                >
+                                    <option value="">Seleccionar MVP</option>
+                                    {matchPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                            </div>
                             <button 
                                 onClick={() => setShowImportModal(true)}
                                 className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg hover:shadow-purple-500/30 transition-all hover:scale-105 overflow-hidden"

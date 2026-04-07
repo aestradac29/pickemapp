@@ -23,9 +23,10 @@ interface PlayerStatRowProps {
     player: Player;
     stats: PlayerGameStats;
     isWinner: boolean;
+    mvpPlayerId?: string;
 }
 
-const PlayerStatRow: React.FC<PlayerStatRowProps> = ({ player, stats, isWinner }) => {
+const PlayerStatRow: React.FC<PlayerStatRowProps> = ({ player, stats, isWinner, mvpPlayerId }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
     // Calculos básicos
@@ -130,11 +131,23 @@ const PlayerStatRow: React.FC<PlayerStatRowProps> = ({ player, stats, isWinner }
                             <Activity className="w-3 h-3" /> Stats de Rol
                         </span>
                         
-                        <div className={`grid grid-cols-2 gap-2 ${roleColors[player.role]}`}>
+                        <div className={`grid grid-cols-3 gap-2 ${roleColors[player.role]}`}>
                             {(player.role === Role.TOP || player.role === Role.MID) && (
+                                <>
+                                    <div className="flex flex-col bg-black/20 p-1.5 rounded border border-current/20">
+                                        <span className="opacity-70 text-[9px]">Daño Equipo</span>
+                                        <span className="font-bold text-sm">{stats.teamDamagePercentage}%</span>
+                                    </div>
+                                    <div className="flex flex-col bg-black/20 p-1.5 rounded border border-current/20">
+                                        <span className="opacity-70 text-[9px]">Daño Torretas</span>
+                                        <span className="font-bold text-sm">{stats.turretDamage}</span>
+                                    </div>
+                                </>
+                            )}
+                            {player.role === Role.TOP && (
                                 <div className="flex flex-col bg-black/20 p-1.5 rounded border border-current/20">
-                                    <span className="opacity-70 text-[9px]">Daño Equipo</span>
-                                    <span className="font-bold text-sm">{stats.teamDamagePercentage}%</span>
+                                    <span className="opacity-70 text-[9px]">Minions/min</span>
+                                    <span className="font-bold text-sm">{stats.minionsPerMinute}</span>
                                 </div>
                             )}
                             {player.role === Role.JUNGLE && (
@@ -150,7 +163,7 @@ const PlayerStatRow: React.FC<PlayerStatRowProps> = ({ player, stats, isWinner }
                                 </>
                             )}
                             {player.role === Role.ADC && (
-                                <div className="flex flex-col bg-black/20 p-1.5 rounded border border-current/20 col-span-2">
+                                <div className="flex flex-col bg-black/20 p-1.5 rounded border border-current/20 col-span-3">
                                     <span className="opacity-70 text-[9px]">Daño/Minuto</span>
                                     <span className="font-bold text-sm">{stats.damagePerMinute}</span>
                                 </div>
@@ -164,7 +177,7 @@ const PlayerStatRow: React.FC<PlayerStatRowProps> = ({ player, stats, isWinner }
                                         </span>
                                     </div>
                                     {stats.firstDragon && (
-                                        <div className="flex items-center justify-center bg-cyan-900/30 p-1.5 rounded border border-cyan-500/30">
+                                        <div className="flex items-center justify-center bg-cyan-900/30 p-1.5 rounded border border-cyan-500/30 col-span-2">
                                             <span className="font-bold text-cyan-300">1er Dragón</span>
                                         </div>
                                     )}
@@ -175,9 +188,9 @@ const PlayerStatRow: React.FC<PlayerStatRowProps> = ({ player, stats, isWinner }
 
                     {/* Bonus Indicators */}
                     <div className="col-span-2 flex gap-3 pt-2 border-t border-gray-800/50 mt-1">
-                        {stats.isMvp && (
+                        {mvpPlayerId === player.id && (
                             <div className="flex items-center gap-1 text-yellow-400 font-bold uppercase tracking-widest text-[9px]">
-                                <Trophy className="w-3 h-3" /> MVP
+                                <Trophy className="w-3 h-3" /> MVP SERIE
                             </div>
                         )}
                         {stats.firstBlood && (
@@ -332,6 +345,7 @@ export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA
                                             player={p} 
                                             stats={currentStats[p.id] || { kills:0, deaths:0, assists:0, cs:0, totalPoints:0 } as any}
                                             isWinner={currentWinnerId === teamA.id}
+                                            mvpPlayerId={match.mvpPlayerId}
                                         />
                                     ))}
                                 </div>
@@ -355,6 +369,7 @@ export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA
                                             player={p} 
                                             stats={currentStats[p.id] || { kills:0, deaths:0, assists:0, cs:0, totalPoints:0 } as any}
                                             isWinner={currentWinnerId === teamB.id}
+                                            mvpPlayerId={match.mvpPlayerId}
                                         />
                                     ))}
                                 </div>
