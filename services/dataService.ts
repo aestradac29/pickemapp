@@ -344,31 +344,31 @@ export const dataService = {
             let teamToCopy = null;
             let captainToCopy = null;
 
-            // Strategy 1: Look backwards in round history (Priority)
-            for (let r = newRound - 1; r >= 1; r--) {
-                const prevDocName = this._getFantasyRoundDocName(r, currentSplitId);
-                const prevRef = doc(db, "users", userId, "fantasy_rounds", prevDocName);
-                const prevSnap = await getDoc(prevRef);
-                if (prevSnap.exists()) {
-                    const data = prevSnap.data();
-                    if (data.team) {
-                        teamToCopy = data.team;
-                        captainToCopy = data.captain;
-                        break;
-                    }
+            // Strategy 1: Check the 'current active' snapshot (Priority)
+            // This always contains the user's latest saved team across all rounds.
+            const mainRef = doc(db, "users", userId, "fantasy", currentSplitId);
+            const mainSnap = await getDoc(mainRef);
+            if (mainSnap.exists()) {
+                const data = mainSnap.data();
+                if (data.team) {
+                    teamToCopy = data.team;
+                    captainToCopy = data.captain;
                 }
             }
 
-            // Strategy 2: If history is broken/missing, check the 'current active' snapshot
-            // This acts as a safety net if round_4 didn't save correctly but fantasy/winter_2026 has data
+            // Strategy 2: If main snapshot is broken/missing, look backwards in round history
             if (!teamToCopy) {
-                const mainRef = doc(db, "users", userId, "fantasy", currentSplitId);
-                const mainSnap = await getDoc(mainRef);
-                if (mainSnap.exists()) {
-                    const data = mainSnap.data();
-                    if (data.team) {
-                        teamToCopy = data.team;
-                        captainToCopy = data.captain;
+                for (let r = newRound - 1; r >= 1; r--) {
+                    const prevDocName = this._getFantasyRoundDocName(r, currentSplitId);
+                    const prevRef = doc(db, "users", userId, "fantasy_rounds", prevDocName);
+                    const prevSnap = await getDoc(prevRef);
+                    if (prevSnap.exists()) {
+                        const data = prevSnap.data();
+                        if (data.team) {
+                            teamToCopy = data.team;
+                            captainToCopy = data.captain;
+                            break;
+                        }
                     }
                 }
             }

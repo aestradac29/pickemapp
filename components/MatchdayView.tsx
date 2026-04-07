@@ -6,6 +6,7 @@ import { MatchdayImageUploader } from './MatchdayImageUploader';
 import { UserPrediction, Match, Team, Stage, Player, User } from '../types';
 import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, LogOut, User as UserIcon } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import { useToast } from './ui/Toast';
 import { TEAMS, normalizeSplitId } from '../constants';
 import { StatsEntryModal } from './StatsEntryModal';
 import { StatsViewerModal } from './StatsViewerModal';
@@ -73,6 +74,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
+  const { toast } = useToast();
   
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null); 
@@ -339,7 +341,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           setAllMatches(updatedMatches);
       } catch (error) {
           console.error("Failed to update/create match:", error);
-          alert("Error actualizando o creando el partido.");
+          toast.error("Error actualizando el partido.");
       }
   };
 
@@ -357,7 +359,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           setAllMatches(updatedMatches);
       } catch (error: any) {
           console.error("FATAL ERROR deleting match", error);
-          alert("Error crítico al borrar el partido.");
+          toast.error("Error al borrar el partido.");
           setAllMatches(originalMatches);
       }
   };
@@ -443,7 +445,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           setAllMatches(updated);
       } catch (e) {
           console.error(e);
-          alert("Error guardando estadísticas");
+          toast.error("Error guardando estadísticas.");
       } finally {
           setIsSavingStats(false);
       }
@@ -451,7 +453,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
   const handleBatchSave = async () => {
       if (!currentUserId) {
-          alert("Debes iniciar sesión para guardar.");
+          toast.warning("Debes iniciar sesión para guardar.");
           return;
       }
       if (isEditMode || isSpectating) return;
@@ -777,7 +779,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
       {/* Footer Action (Save Button) - Only show if current user */}
       {!isEditMode && matches.length > 0 && isDayVisible && !isManuallyClosed && matches.some(match => !(new Date() >= new Date(match.startTime) && !isExplicitlyOpened)) && !isSpectating && (
-          <div className="fixed bottom-8 left-0 right-0 px-4 flex flex-col items-center pointer-events-none z-40 gap-2">
+          <div className="fixed bottom-20 md:bottom-8 left-0 right-0 px-4 flex flex-col items-center pointer-events-none z-40 gap-2">
             
             {saveStatus === 'error' && errorMessage && (
                  <div className="bg-red-900/90 border border-red-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-2 animate-in slide-in-from-bottom-5">
@@ -844,6 +846,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
               onClose={() => setViewStatsMatch(null)}
           />
       )}
+
     </div>
   );
 };

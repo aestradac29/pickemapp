@@ -4,6 +4,7 @@ import { normalizeSplitId } from '../constants';
 import { Team, User } from '../types';
 import { GripVertical, Save, Trophy, AlertOctagon, Loader2, CheckCircle2, AlertCircle, Settings, Lock, XCircle, Eye } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import { useToast } from './ui/Toast';
 import { OfficialStandings } from './OfficialStandings';
 
 interface RankingViewProps {
@@ -20,6 +21,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const { toast } = useToast();
   const [isLocked, setIsLocked] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
@@ -162,7 +164,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
       if (mode === 'official_result' && !isAdmin) return;
 
       if (!currentUserId && !isAdmin) {
-          alert("Debes iniciar sesión.");
+          toast.warning("Debes iniciar sesión.");
           return;
       }
 
@@ -517,6 +519,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
             </button>
         </div>
       )}
+
     </div>
   );
 };
