@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Player, Team, Role, Match, Stage } from '../types';
 import { dataService } from '../services/dataService';
-import { useToast, ToastContainer } from './ui/Toast';
 import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download, TrendingUp, History, Hash } from 'lucide-react';
 import { ROLE_ICONS, COUNTRIES, getFantasySchedule, normalizeSplitId } from '../constants';
 
@@ -15,7 +14,6 @@ export const DatabaseManager: React.FC = () => {
     const [teams, setTeams] = useState<Team[]>([]);
     const [allMatches, setAllMatches] = useState<Match[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-  const { toast, toasts, dismissToast } = useToast();
 
     // Editing State
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -94,7 +92,7 @@ export const DatabaseManager: React.FC = () => {
             setEditingId(null);
             await loadData();
         } catch (e) {
-            toast.error("Error al guardar jugador.");
+            alert("Error al guardar jugador");
         } finally {
             setIsSaving(false);
         }
@@ -114,7 +112,7 @@ export const DatabaseManager: React.FC = () => {
             setEditingId(null);
             await loadData();
         } catch (e) {
-            toast.error("Error al guardar equipo.");
+            alert("Error al guardar equipo");
         } finally {
             setIsSaving(false);
         }
@@ -259,7 +257,7 @@ export const DatabaseManager: React.FC = () => {
 
             await dataService.updatePlayersBulk(bulkData);
             
-            toast.success("¡Precios actualizados correctamente!");
+            alert("¡Precios actualizados correctamente!");
             setPendingUpdates([]);
             setImportText("");
             await loadData();
@@ -267,7 +265,7 @@ export const DatabaseManager: React.FC = () => {
 
         } catch (e) {
             console.error(e);
-            toast.error("Error al actualizar precios.");
+            alert("Error al actualizar precios.");
         } finally {
             setIsSaving(false);
         }
@@ -302,8 +300,7 @@ export const DatabaseManager: React.FC = () => {
     }
 
     return (
-        <>
-            <div className="max-w-7xl mx-auto pb-20 animate-in fade-in">
+        <div className="max-w-7xl mx-auto pb-20 animate-in fade-in">
             <div className="flex items-center gap-3 mb-6 border-b border-gray-800 pb-4">
                 <Database className="w-8 h-8 text-[#c8aa6e]" />
                 <div>
@@ -896,8 +893,6 @@ export const DatabaseManager: React.FC = () => {
                 </div>
             )}
 
-            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </div>
-        </>
     );
 };

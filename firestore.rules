@@ -38,11 +38,6 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 2.5 Debug Logs
-    match /debug_logs/{logId} {
-      allow read, write: if isAdmin();
-    }
-
     // 3. Users Collection
     match /users/{userId} {
       // El listado está abierto para permitir la búsqueda de email por username

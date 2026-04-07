@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { useToast, ToastContainer } from './ui/Toast';
 import { Match, Team, Player, PlayerGameStats, Role, MatchGame } from '../types';
 import { fantasyService } from '../services/fantasyService';
 import { extractStatsFromData } from '../services/geminiService';
@@ -26,7 +25,6 @@ interface PlayerRowProps {
 
 const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-  const { toast, toasts, dismissToast } = useToast();
     
     const s = stats[player.id] || { 
         playerId: player.id,
@@ -533,7 +531,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
             setShowImportModal(false);
         } catch (error) {
             console.error("AI Import Failed:", error);
-            toast.error("Falló la importación. Revisa los datos e inténtalo de nuevo.");
+            alert("Falló la importación. Inténtalo de nuevo o revisa la consola.");
         } finally {
             setIsImporting(false);
         }
@@ -545,7 +543,6 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     const currentWinner = gamesData[activeGame]?.winnerId;
 
     return (
-        <>
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
             <div className="w-full max-w-5xl bg-[#091428] border-2 border-red-500 rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh] relative">
                 
@@ -734,8 +731,6 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                 )}
 
             </div>
-                <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-            </div>
-        </>
+        </div>
     );
 };

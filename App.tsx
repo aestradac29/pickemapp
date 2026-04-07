@@ -201,6 +201,7 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     await authService.signOut();
+    setIsMenuOpen(false);
   };
 
   const handleViewProfile = (userId: string) => {
