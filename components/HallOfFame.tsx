@@ -10,10 +10,12 @@ interface ScoredPlayer extends Player {
     dayPoints: number;
 }
 
-export const HallOfFame: React.FC = () => {
+interface HallOfFameProps { selectedSplit?: string | null; }
+
+export const HallOfFame: React.FC<HallOfFameProps> = ({ selectedSplit: propSelectedSplit }) => {
     const [viewMode, setViewMode] = useState<'GROUPS' | 'PLAYOFFS'>('GROUPS');
     const [currentDay, setCurrentDay] = useState(1);
-    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+    const selectedSplit = normalizeSplitId(propSelectedSplit || localStorage.getItem('selectedSplit'));
     
     const [matches, setMatches] = useState<Match[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);

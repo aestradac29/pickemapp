@@ -881,6 +881,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
               teamB={viewStatsMatch.teamB}
               allPlayers={allPlayers}
               onClose={() => setViewStatsMatch(null)}
+              selectedSplit={selectedSplit}
           />
       )}
     </div>

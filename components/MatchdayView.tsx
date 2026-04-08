@@ -849,6 +849,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
               teamB={viewStatsMatch.teamB}
               allPlayers={allPlayers}
               onClose={() => setViewStatsMatch(null)}
+              selectedSplit={selectedSplit}
           />
       )}
     </div>

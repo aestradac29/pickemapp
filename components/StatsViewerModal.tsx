@@ -10,6 +10,7 @@ interface StatsViewerModalProps {
     teamB: Team;
     allPlayers: Player[];
     onClose: () => void;
+    selectedSplit?: string | null;
 }
 
 const StatBadge = ({ icon: Icon, value, color, tooltip }: any) => (
@@ -210,8 +211,8 @@ const PlayerStatRow: React.FC<PlayerStatRowProps> = ({ player, stats, isWinner, 
     );
 };
 
-export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA, teamB, allPlayers, onClose }) => {
-    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+export const StatsViewerModal: React.FC<StatsViewerModalProps> = ({ match, teamA, teamB, allPlayers, onClose, selectedSplit: propSelectedSplit }) => {
+    const selectedSplit = normalizeSplitId(propSelectedSplit || localStorage.getItem('selectedSplit'));
     // Detect available games
     const hasDetailedGames = match.games && match.games.length > 0;
     const numGames = match.bestOf || 1;

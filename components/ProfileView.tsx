@@ -11,6 +11,7 @@ import html2canvas from 'html2canvas';
 interface ProfileViewProps {
     viewingUserId: string | null;
     sessionUserId: string | null;
+    selectedSplit?: string | null;
 }
 
 const XP_MULTIPLIER = 3;
@@ -145,8 +146,8 @@ const ShareModal = ({ user, teams, onClose }: { user: User; teams: Team[]; onClo
 };
 
 // ── ProfileView ───────────────────────────────────────────────────────────────
-export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, sessionUserId }) => {
-    const [selectedSplit] = useState(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, sessionUserId, selectedSplit: propSelectedSplit }) => {
+    const selectedSplit = normalizeSplitId(propSelectedSplit || localStorage.getItem('selectedSplit'));
     const [user, setUser]     = useState<User | null>(null);
     const [teams, setTeams]   = useState<Team[]>([]);
     const [isLoading, setIsLoading]  = useState(true);

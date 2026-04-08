@@ -7,6 +7,7 @@ import { FRAME_STYLES, BANNER_STYLES, BADGE_DEFINITIONS, TEAMS, getFantasySchedu
 interface LeaderboardProps {
   users: User[];
   onViewProfile?: (userId: string) => void;
+  selectedSplit?: string | null;
 }
 
 type LeaderboardCategory = 'global' | 'matchday' | 'ranking' | 'playoffs' | 'fantasy';
@@ -41,8 +42,8 @@ const RankBadge = ({ rank }: { rank: number }) => {
   );
 };
 
-export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }) => {
-  const [selectedSplit] = useState(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile, selectedSplit: propSelectedSplit }) => {
+  const selectedSplit = normalizeSplitId(propSelectedSplit || localStorage.getItem('selectedSplit'));
   const [activeCategory, setActiveCategory] = useState<LeaderboardCategory>('global');
 
   if (!users || users.length === 0) {

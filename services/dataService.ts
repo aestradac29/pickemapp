@@ -143,8 +143,8 @@ export const dataService = {
     },
 
     // Helper to get points for a playoff match based on its position
-    getPlayoffMatchPoints(match: Match, allPlayoffMatches: Match[]): number {
-        const isSpring = this._getCurrentSplitId() === 'spring_2026';
+    getPlayoffMatchPoints(match: Match, allPlayoffMatches: Match[], splitId?: string): number {
+        const isSpring = this._normalizeSplitId(splitId) === 'spring_2026';
         const sorted = [...allPlayoffMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         const winners = sorted.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
         const losers = sorted.filter(m => m.bracketStage === 'losers');
@@ -919,7 +919,7 @@ export const dataService = {
     // MANUAL FORCE RECALCULATION WRAPPER
     async forceRecalculateAll(splitId?: string) {
         const matches = await this.getMatches(undefined, splitId);
-        await this.recalculateAllFantasyScores(matches);
+        await this.recalculateAllFantasyScores(matches, splitId);
     },
 
     // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
@@ -1048,15 +1048,15 @@ export const dataService = {
         await setDoc(doc(db, "admin_data", this._getDocName("matches")), { allMatches: cleanPayload(allMatches) }, { merge: true });
 
         // 4. Trigger Recalculation
-        await this.recalculateAllFantasyScores(allMatches);
+        await this.recalculateAllFantasyScores(allMatches, splitId);
     },
 
-    async recalculateAllFantasyScores(allMatches: Match[]) {
+    async recalculateAllFantasyScores(allMatches: Match[], splitId?: string) {
         // ── Paso 1: datos base ────────────────────────────────────────────────
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
         const users = userSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        const currentSplitId = this._getCurrentSplitId();
+        const currentSplitId = this._normalizeSplitId(splitId); // Use explicit splitId, not localStorage
         const schedule = getFantasySchedule(currentSplitId);
 
         // Mapa precomputado: matchId → playerId → puntos (sin Firestore)
@@ -1277,7 +1277,7 @@ export const dataService = {
                     }
 
                     if (predictedWinnerId === m.winnerId) {
-                        playoffsScore += this.getPlayoffMatchPoints(m, playoffMatches);
+                        playoffsScore += this.getPlayoffMatchPoints(m, playoffMatches, targetSplitId);
                     }
                 });
 
@@ -1344,7 +1344,7 @@ export const dataService = {
                         }
 
                         if (predictedWinnerId === m.winnerId) {
-                            const isSpring = this._getCurrentSplitId() === 'spring_2026';
+                            const isSpring = targetSplitId === 'spring_2026';
                             dayPoints += isSpring ? 1.5 : 1;
                         }
                     });
@@ -1380,7 +1380,7 @@ export const dataService = {
                         }
 
                         if (predictedWinnerId === m.winnerId) {
-                            dayPoints += this.getPlayoffMatchPoints(m, playoffMatches);
+                            dayPoints += this.getPlayoffMatchPoints(m, playoffMatches, targetSplitId);
                         }
                      });
 

@@ -187,8 +187,10 @@ const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ player, team, m
     );
 };
 
-export const TeamsView: React.FC = () => {
-    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+interface TeamsViewProps { selectedSplit?: string | null; }
+
+export const TeamsView: React.FC<TeamsViewProps> = ({ selectedSplit: propSelectedSplit }) => {
+    const selectedSplit = normalizeSplitId(propSelectedSplit || localStorage.getItem('selectedSplit'));
     const [teams, setTeams] = useState<Record<string, Team>>({});
     const [players, setPlayers] = useState<Player[]>([]);
     const [matches, setMatches] = useState<Match[]>([]);

@@ -227,16 +227,17 @@ const App: React.FC = () => {
             <ProfileView 
                 viewingUserId={viewingProfileId || currentUserId} 
                 sessionUserId={currentUserId}
+                selectedSplit={selectedSplit}
             />
         );
       case ViewState.TEAMS:
-        return <TeamsView />;
+        return <TeamsView selectedSplit={selectedSplit} />;
       case ViewState.HALL_OF_FAME: // Nuevo caso
-        return <HallOfFame />;
+        return <HallOfFame selectedSplit={selectedSplit} />;
       case ViewState.DB_MANAGER:
          // Protect route
          if (!isAdmin) return <Dashboard onChangeView={setView} currentUser={currentUser} isAdmin={isAdmin} />;
-         return <DatabaseManager />;
+         return <DatabaseManager selectedSplit={selectedSplit} />;
       case ViewState.MATCHDAY:
         return (
             <MatchdayView 
@@ -269,6 +270,7 @@ const App: React.FC = () => {
                  <Leaderboard 
                     users={leaderboardUsers} 
                     onViewProfile={handleViewProfile}
+                    selectedSplit={selectedSplit}
                  />
              )}
            </div>

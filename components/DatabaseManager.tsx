@@ -5,8 +5,10 @@ import { dataService } from '../services/dataService';
 import { Loader2, Search, Settings, PenLine, X, Check, Database, Users, Shield, DollarSign, ArrowRight, AlertTriangle, FileText, Download, TrendingUp, History, Hash } from 'lucide-react';
 import { ROLE_ICONS, COUNTRIES, getFantasySchedule, normalizeSplitId } from '../constants';
 
-export const DatabaseManager: React.FC = () => {
-    const [selectedSplit] = useState<string>(() => normalizeSplitId(localStorage.getItem('selectedSplit')));
+interface DatabaseManagerProps { selectedSplit?: string | null; }
+
+export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ selectedSplit: propSelectedSplit }) => {
+    const selectedSplit = normalizeSplitId(propSelectedSplit || localStorage.getItem('selectedSplit'));
     const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'prices'>('players');
     
     // Data State
