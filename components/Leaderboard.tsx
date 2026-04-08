@@ -58,8 +58,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
     activeCategory === 'global' ? user.score : user.scoreBreakdown[activeCategory];
 
   const sortedUsers = useMemo(() => {
+    const score = (u: User) => activeCategory === 'global' ? u.score : u.scoreBreakdown[activeCategory];
     return [...users].sort((a, b) => {
-      const sa = getScore(a), sb = getScore(b);
+      const sa = score(a), sb = score(b);
       if (sa !== sb) return sb - sa;
       if (activeCategory === 'global') return b.scoreBreakdown.matchday - a.scoreBreakdown.matchday;
       return 0;
@@ -67,13 +68,14 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ users, onViewProfile }
   }, [users, activeCategory]);
 
   const ranks = useMemo(() => {
+    const score = (u: User) => activeCategory === 'global' ? u.score : u.scoreBreakdown[activeCategory];
     const r = new Array(sortedUsers.length).fill(0);
     for (let i = 0; i < sortedUsers.length; i++) {
       if (i === 0) { r[i] = 1; continue; }
       const prev = sortedUsers[i - 1], curr = sortedUsers[i];
       const tie = activeCategory === 'global'
-        ? getScore(prev) === getScore(curr) && prev.scoreBreakdown.matchday === curr.scoreBreakdown.matchday
-        : getScore(prev) === getScore(curr);
+        ? score(prev) === score(curr) && prev.scoreBreakdown.matchday === curr.scoreBreakdown.matchday
+        : score(prev) === score(curr);
       r[i] = tie ? r[i - 1] : i + 1;
     }
     return r;

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { normalizeSplitId } from '../constants';
-import { Team, User } from '../types';
+import { Team } from '../types';
 import { GripVertical, Save, Trophy, AlertOctagon, Loader2, CheckCircle2, AlertCircle, Settings, Lock, XCircle, Eye } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { OfficialStandings } from './OfficialStandings';
@@ -21,7 +21,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isLocked, setIsLocked] = useState(false);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<{ id: string; name: string; avatar: string }[]>([]);
 
   // Admin Mode Toggle: "prediction" (default for users) vs "official_result" (only for admin)
   const [mode, setMode] = useState<'prediction' | 'official_result'>('prediction');
@@ -39,7 +39,8 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
   useEffect(() => {
     const loadUsers = async () => {
         try {
-            const users = await dataService.getAllUsers(selectedSplit);
+            // Lightweight: only needs id/name/avatar for spectator dropdown
+            const users = await dataService.getLightUserList();
             setAllUsers(users);
         } catch (e) {
             console.error("Error loading users", e);
@@ -50,44 +51,26 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
 
   useEffect(() => {
     loadTeamsAndRanking();
-    checkLockStatus();
-  }, [mode, viewingUserId, isAdmin, selectedSplit]); // Reload when mode switches or user changes
-
-  const checkLockStatus = async () => {
-      // Official result editing is never locked for admin (needed for scoring)
-      if (mode === 'official_result') {
-          setIsLocked(false);
-          return;
-      }
-
-      try {
-          // Check start time of Day 1 matches
-          const matches = await dataService.getMatches(1, selectedSplit);
-          if (matches.length > 0) {
-              const sortedMatches = matches.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-              const firstMatchStart = new Date(sortedMatches[0].startTime);
-              const now = new Date();
-              
-              if (now >= firstMatchStart) {
-                  setIsLocked(true);
-              } else {
-                  setIsLocked(false);
-              }
-          }
-      } catch (e) {
-          console.error("Error checking lock status", e);
-      }
-  };
+  }, [mode, viewingUserId, isAdmin, selectedSplit]);
 
   const loadTeamsAndRanking = async () => {
     setIsLoading(true);
     setSaveStatus('idle');
     try {
-        // 1. Cargar equipos y Ranking Oficial SIEMPRE para comparar
-        const [teamsMap, adminRankingIds] = await Promise.all([
+        // 1. Cargar equipos, ranking oficial y (para lock check) partidos del día 1 en paralelo
+        const [teamsMap, adminRankingIds, day1Matches] = await Promise.all([
             dataService.getTeams(false, selectedSplit),
-            dataService.getAdminRanking(selectedSplit)
+            dataService.getAdminRanking(selectedSplit),
+            mode !== 'official_result' ? dataService.getMatches(1, selectedSplit) : Promise.resolve([])
         ]);
+
+        // Lock check merged here — no extra round-trip
+        if (mode === 'official_result') {
+            setIsLocked(false);
+        } else if (day1Matches.length > 0) {
+            const first = day1Matches.sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0];
+            setIsLocked(new Date() >= new Date(first.startTime));
+        }
         
         const teamsList = Object.values(teamsMap).filter(t => t.id !== 'tbd');
         setOfficialRanking(adminRankingIds || []);

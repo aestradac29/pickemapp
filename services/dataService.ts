@@ -1527,6 +1527,28 @@ export const dataService = {
         }
     },
 
+    // Lightweight user list — only reads the user document itself (no picks/fantasy subcollections).
+    // Use this when you only need id, name and avatar (e.g. spectator selector in MatchdayView).
+    // Costs: 1 query for N users vs getAllUsers which costs 1 + N*3 Firestore reads.
+    async getLightUserList(): Promise<{ id: string; name: string; avatar: string }[]> {
+        try {
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, orderBy("username"), limit(50));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(d => {
+                const data = d.data();
+                return {
+                    id: d.id,
+                    name: data.username || 'Invocador',
+                    avatar: data.avatar_url || `https://ui-avatars.com/api/?name=${data.username}&background=random`,
+                };
+            });
+        } catch (e) {
+            console.error("Error fetching light user list:", e);
+            return [];
+        }
+    },
+
     subscribeToUsers(callback: () => void) {
         const usersRef = collection(db, "users");
         return onSnapshot(usersRef, () => {

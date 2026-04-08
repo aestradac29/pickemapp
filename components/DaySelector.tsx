@@ -12,6 +12,7 @@ interface DaySelectorProps {
     closedDays?: number[];
     openedDays?: number[];
     labelPrefix?: string;
+    savedDays?: Set<number>;
 }
 
 export const DaySelector: React.FC<DaySelectorProps> = ({
@@ -24,6 +25,7 @@ export const DaySelector: React.FC<DaySelectorProps> = ({
     closedDays,
     openedDays,
     labelPrefix = 'J',
+    savedDays,
 }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -56,6 +58,7 @@ export const DaySelector: React.FC<DaySelectorProps> = ({
                     const showLock           = isVisible && isManuallyClosed && !isExplicitlyOpened;
                     const isActive           = currentDay === day;
                     const hasUnsaved         = checkUnsaved(day);
+                    const isSaved            = savedDays?.has(day) ?? false;
 
                     return (
                         <button
@@ -84,9 +87,12 @@ export const DaySelector: React.FC<DaySelectorProps> = ({
                                 </>
                             )}
 
-                            {/* Indicador de cambios sin guardar */}
+                            {/* Indicador de estado de picks */}
                             {hasUnsaved && (
-                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#c8aa6e] rounded-full border border-[#050d1a] animate-pulse" />
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#c8aa6e] rounded-full border border-[#050d1a] animate-pulse" title="Cambios sin guardar" />
+                            )}
+                            {!hasUnsaved && isSaved && (
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-400 rounded-full border border-[#050d1a]" title="Picks guardados" />
                             )}
                         </button>
                     );

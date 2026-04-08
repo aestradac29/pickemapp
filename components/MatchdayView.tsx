@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
 import { DaySelector } from './DaySelector';
 import { MatchdayImageUploader } from './MatchdayImageUploader';
-import { UserPrediction, Match, Team, Stage, Player, User } from '../types';
+import { UserPrediction, Match, Team, Stage, Player } from '../types';
 import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, LogOut, User as UserIcon } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { TEAMS, normalizeSplitId } from '../constants';
@@ -37,7 +37,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   const [allMatches, setAllMatches] = useState<Match[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]); // Need players for stats
-  const [allUsers, setAllUsers] = useState<User[]>([]); // For User Selector
+  const [allUsers, setAllUsers] = useState<{ id: string; name: string; avatar: string }[]>([]); // For spectator selector
   const [isLoadingMatches, setIsLoadingMatches] = useState(true);
 
   // Auto-initialize to first incomplete day
@@ -102,18 +102,18 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         setNewMatch(null); 
         try {
             // Cargar TODOS los datos necesarios
-            const [fetchedMatches, teamsMap, config, playersList, usersList] = await Promise.all([
+            const [fetchedMatches, teamsMap, config, playersList, lightUsers] = await Promise.all([
                 dataService.getMatches(undefined, selectedSplit), 
                 dataService.getTeams(false, selectedSplit),
                 dataService.getDaysConfig(selectedSplit),
                 dataService.getPlayers(false, selectedSplit),
-                dataService.getAllUsers(selectedSplit)
+                dataService.getLightUserList() // Lightweight: only id/name/avatar, no scoring
             ]);
             
             setAllMatches(fetchedMatches);
             setAllTeams(Object.values(teamsMap));
             setAllPlayers(playersList);
-            setAllUsers(usersList);
+            setAllUsers(lightUsers);
             
             setVisibleDays(config.visibleDays || []);
             setClosedDays(config.closedDays || []);
@@ -227,6 +227,24 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
         return !init || init.predictedWinnerId !== curr.predictedWinnerId;
     });
   };
+
+  // Días donde el usuario ya tiene picks guardados en servidor para TODOS los partidos visibles
+  const savedDays = useMemo(() => {
+    if (viewingUserId !== currentUserId) return new Set<number>();
+    const saved = new Set<number>();
+    const days = Array.from({ length: daysCount }, (_, i) => i + 1);
+    for (const day of days) {
+      const dayMatches = allMatches.filter(
+        m => m.day === day && m.stage === Stage.GROUPS && !m.id.startsWith('temp-') && !m.isCompleted
+      );
+      if (dayMatches.length === 0) continue;
+      const allSaved = dayMatches.every(m =>
+        initialPredictions.some(p => p.matchId === m.id && p.predictedWinnerId)
+      );
+      if (allSaved) saved.add(day);
+    }
+    return saved;
+  }, [allMatches, initialPredictions, viewingUserId, currentUserId, daysCount]);
 
   // --- LOGIC RULES ---
   const isDayVisible = visibleDays.includes(currentDay);
@@ -563,6 +581,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
             closedDays={closedDays}
             openedDays={openedDays}
             checkUnsaved={checkUnsavedChanges}
+            savedDays={savedDays}
             onSelect={setCurrentDay}
         />
         

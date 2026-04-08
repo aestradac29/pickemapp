@@ -27,8 +27,8 @@ export const HallOfFame: React.FC = () => {
             try {
                 const [m, p, t, conf] = await Promise.all([
                     dataService.getMatches(undefined, selectedSplit),
-                    dataService.getPlayers(),
-                    dataService.getTeams(),
+                    dataService.getPlayers(false, selectedSplit),
+                    dataService.getTeams(false, selectedSplit),
                     dataService.getDaysConfig(selectedSplit)
                 ]);
                 
