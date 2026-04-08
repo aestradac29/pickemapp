@@ -88,7 +88,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         onLogin(safeUsername);
       }
     } catch (err: any) {
-      console.error(err);
       let msg = err.message;
       if (msg.includes('auth/invalid-credential') || msg.includes('auth/wrong-password'))
         msg = 'Credenciales incorrectas.';

@@ -15,7 +15,7 @@ import { TeamsView } from './components/TeamsView';
 import { OfficialStandings } from './components/OfficialStandings';
 import { HallOfFame } from './components/HallOfFame'; // Import nuevo
 import { ViewState, UserPrediction, User } from './types';
-import { Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, Download, Home, Swords, Trophy, UserCircle2, X } from 'lucide-react';
+import { Share2, LogOut, ChevronLeft, Loader2, ShieldAlert, ArrowRightLeft, Download, Home, Swords, Trophy, UserCircle2, X, Zap, Award } from 'lucide-react';
 import { authService } from './services/authService';
 import { dataService } from './services/dataService';
 
@@ -128,7 +128,7 @@ const App: React.FC = () => {
         const fetchLeaderboard = async () => {
             setIsLoadingLeaderboard(true);
             try {
-                const users = await dataService.getAllUsers();
+                const users = await dataService.getAllUsers(selectedSplit || undefined);
                 setLeaderboardUsers(users);
             } catch (e) {
                 console.error("Error loading leaderboard", e);
@@ -410,12 +410,12 @@ const App: React.FC = () => {
       {/* ── Bottom Navigation Bar (mobile only) ── */}
       {currentUser && view !== ViewState.LOGIN && (
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-[#060f1e]/95 backdrop-blur-md border-t border-gray-800/60">
-          <div className="flex items-center justify-around h-16 px-2 max-w-md mx-auto">
+          <div className="flex items-center justify-around h-16 px-1 max-w-md mx-auto">
 
-            {/* Inicio / Dashboard */}
+            {/* Inicio */}
             <button
               onClick={() => setView(selectedSplit ? ViewState.DASHBOARD : ViewState.SPLIT_SELECTION)}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all ${
                 view === ViewState.DASHBOARD || view === ViewState.SPLIT_SELECTION
                   ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
               }`}
@@ -427,51 +427,49 @@ const App: React.FC = () => {
             {/* Jornadas */}
             <button
               onClick={() => setView(ViewState.MATCHDAY)}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all ${
                 view === ViewState.MATCHDAY
-                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
+                  ? 'text-[#3b82f6]' : 'text-gray-500 hover:text-gray-300'
               }`}
             >
               <Swords className="w-5 h-5" />
               <span className="text-[9px] font-bold uppercase tracking-wider">Jornada</span>
             </button>
 
-            {/* Ranking — tab central destacado */}
+            {/* Fantasy — tab central destacado */}
+            <button
+              onClick={() => setView(ViewState.FANTASY)}
+              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all relative ${
+                view === ViewState.FANTASY ? 'text-[#0ac8b9]' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {view === ViewState.FANTASY && (
+                <div className="absolute -top-px inset-x-1 h-0.5 rounded-full bg-[#0ac8b9]" />
+              )}
+              <div className={`p-1.5 rounded-lg transition-colors ${
+                view === ViewState.FANTASY ? 'bg-[#0ac8b9]/15' : ''
+              }`}>
+                <Zap className="w-5 h-5" />
+              </div>
+              <span className="text-[9px] font-bold uppercase tracking-wider">Fantasy</span>
+            </button>
+
+            {/* Ranking */}
             <button
               onClick={() => setView(ViewState.RESULTS)}
-              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all relative ${
+              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all ${
                 view === ViewState.RESULTS
                   ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
               }`}
             >
-              {/* Indicador activo */}
-              {view === ViewState.RESULTS && (
-                <div className="absolute -top-px inset-x-2 h-0.5 rounded-full bg-[#c8aa6e]" />
-              )}
-              <div className={`p-1.5 rounded-lg transition-colors ${
-                view === ViewState.RESULTS ? 'bg-[#c8aa6e]/15' : ''
-              }`}>
-                <Trophy className="w-5 h-5" />
-              </div>
-              <span className="text-[9px] font-bold uppercase tracking-wider">Ranking</span>
-            </button>
-
-            {/* Playoffs */}
-            <button
-              onClick={() => setView(ViewState.PLAYOFFS)}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
-                view === ViewState.PLAYOFFS
-                  ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
               <Trophy className="w-5 h-5" />
-              <span className="text-[9px] font-bold uppercase tracking-wider">Playoffs</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider">Ranking</span>
             </button>
 
             {/* Perfil */}
             <button
               onClick={() => { setViewingProfileId(currentUserId); setView(ViewState.PROFILE); }}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all ${
+              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all ${
                 view === ViewState.PROFILE
                   ? 'text-[#c8aa6e]' : 'text-gray-500 hover:text-gray-300'
               }`}

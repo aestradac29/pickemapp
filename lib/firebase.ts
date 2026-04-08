@@ -2,7 +2,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import * as Auth from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getMessaging, isSupported } from "firebase/messaging";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Configuración Firebase — lectura síncrona, sin fetch, sin Proxy, sin race.
@@ -68,9 +67,3 @@ if (getApps().length === 0) {
 
 export const auth = Auth.getAuth();
 export const db = getFirestore();
-
-// Firebase Messaging — solo si el navegador lo soporta
-export let messaging: any = null;
-isSupported().then((ok) => {
-  if (ok) messaging = getMessaging();
-});

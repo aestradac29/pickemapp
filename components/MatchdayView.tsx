@@ -256,18 +256,6 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
   // 4. Otherwise -> Open
   const isLockedForUser = isManuallyClosed || (isTimeLocked && !isExplicitlyOpened);
 
-  useEffect(() => {
-      if (isAdmin && isEditMode) {
-          console.log(`Day ${currentDay} Debug:`, {
-              isManuallyClosed,
-              isTimeLocked,
-              isExplicitlyOpened,
-              isLockedForUser,
-              firstMatchTime: firstMatchTime?.toISOString(),
-              now: now.toISOString()
-          });
-      }
-  }, [currentDay, isManuallyClosed, isTimeLocked, isExplicitlyOpened, isLockedForUser, isAdmin, isEditMode]);
   
   // Derived state for Spectating
   const isSpectating = viewingUserId !== currentUserId;

@@ -466,31 +466,115 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
                         ))}
 
                         <div className="mt-5 pt-4 border-t border-gray-800 flex items-center justify-between">
-                            <span className="text-xs text-gray-500 uppercase font-bold">Liga Fantasy</span>
+                            <div>
+                                <span className="text-xs text-gray-500 uppercase font-bold">Liga Fantasy</span>
+                                {user.scoreBreakdown.matchdayCount > 0 && (
+                                    <span className="ml-2 text-[10px] text-gray-600">
+                                        · {((user.scoreBreakdown.matchday / (user.scoreBreakdown.matchdayCount || 1))).toFixed(1)} pts/jornada
+                                    </span>
+                                )}
+                            </div>
                             <span className="text-[#0ac8b9] font-black text-xl">{user.scoreBreakdown.fantasy} <span className="text-sm text-[#0ac8b9]/50">pts</span></span>
                         </div>
                     </div>
 
-                    {/* Points history preview */}
+                    {/* Points history — SVG line chart (barras % no funcionan en flex sin altura px fija) */}
                     {user.pointsHistory && user.pointsHistory.length > 0 && (
                         <div className="bg-[#060f1e] rounded-xl border border-gray-800 p-5">
                             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                                 <div className="w-1 h-4 bg-blue-500 rounded-full" /> Progresión por Jornada
                             </h3>
-                            <div className="flex items-end gap-1 h-20">
-                                {user.pointsHistory.map((h, i) => {
-                                    const maxPts = Math.max(...user.pointsHistory.map(p => p.points), 1);
-                                    const pct = (h.points / maxPts) * 100;
-                                    return (
-                                        <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-                                            <div className="relative w-full" style={{ height: `${Math.max(pct, 4)}%` }}>
-                                                <div className="absolute inset-x-0 bottom-0 rounded-t bg-blue-500/60 group-hover:bg-blue-400 transition-colors" style={{ height: '100%' }} />
-                                            </div>
-                                            <span className="text-[8px] text-gray-600 group-hover:text-gray-400">{h.day}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                            {(() => {
+                                const pts = user.pointsHistory;
+                                const maxPts = Math.max(...pts.map(p => p.points), 1);
+                                const minPts = Math.min(...pts.map(p => p.points), 0);
+                                const range = maxPts - minPts || 1;
+                                const W = 300, H = 140, padX = 6, padY = 18;
+                                const n = pts.length;
+                                const xs = pts.map((_, i) => padX + (i / Math.max(n - 1, 1)) * (W - padX * 2));
+                                const ys = pts.map(p => H - padY - ((p.points - minPts) / range) * (H - padY * 2));
+                                const polyline = xs.map((x, i) => x.toFixed(2) + "," + ys[i].toFixed(2)).join(" ");
+                                const areaPoints = xs[0].toFixed(2) + "," + H + " " + polyline + " " + xs[n-1].toFixed(2) + "," + H;
+                                return (
+                                    <svg viewBox={"0 0 " + W + " " + H} className="w-full" style={{ height: 160 }} overflow="visible">
+                                        <defs>
+                                            <linearGradient id="phGrad" x1="0" y1="0" x2="1" y2="0">
+                                                <stop offset="0%" stopColor="#3b82f6" />
+                                                <stop offset="100%" stopColor="#0ac8b9" />
+                                            </linearGradient>
+                                            <linearGradient id="phFill" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.18" />
+                                                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                                            </linearGradient>
+                                        </defs>
+                                        {/* Grid lines */}
+                                        {[0, 0.5, 1].map((t, i) => {
+                                            const y = (padY + t * (H - padY * 2)).toFixed(1);
+                                            return <line key={i} x1={padX} y1={y} x2={W - padX} y2={y} stroke="#1e2d45" strokeWidth="1" />;
+                                        })}
+                                        {/* Area fill */}
+                                        <polygon points={areaPoints} fill="url(#phFill)" />
+                                        {/* Line */}
+                                        <polyline points={polyline} fill="none" stroke="url(#phGrad)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        {/* Dots + labels */}
+                                        {pts.map((p, i) => (
+                                            <g key={i}>
+                                                <circle cx={xs[i]} cy={ys[i]} r="4" fill="#0ac8b9" />
+                                                <text x={xs[i]} y={H - 1} textAnchor="middle" fontSize="9" fill="#4b5563">{p.day}</text>
+                                                {/* Value tooltip on last point */}
+                                                {i === n - 1 && (
+                                                    <text x={xs[i] + 4} y={ys[i] - 5} fontSize="9" fill="#0ac8b9" fontWeight="bold">{p.points}</text>
+                                                )}
+                                            </g>
+                                        ))}
+                                    </svg>
+                                );
+                            })()}
+                        </div>
+                    )}
+
+                    {/* Fantasy history — SVG bar chart por ronda */}
+                    {user.fantasyHistory && user.fantasyHistory.length > 0 && (
+                        <div className="bg-[#060f1e] rounded-xl border border-gray-800 p-5">
+                            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <div className="w-1 h-4 bg-[#0ac8b9] rounded-full" /> Fantasy por Ronda
+                            </h3>
+                            {(() => {
+                                const pts = user.fantasyHistory;
+                                const maxPts = Math.max(...pts.map(p => p.points), 1);
+                                const W = 300, H = 130, padX = 6, padY = 16;
+                                const barW = Math.max(8, (W - padX * 2) / pts.length - 4);
+                                const gap = (W - padX * 2 - barW * pts.length) / Math.max(pts.length - 1, 1);
+                                return (
+                                    <svg viewBox={"0 0 " + W + " " + H} className="w-full" style={{ height: 150 }} overflow="visible">
+                                        <defs>
+                                            <linearGradient id="fhGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#0ac8b9" stopOpacity="0.9" />
+                                                <stop offset="100%" stopColor="#0ac8b9" stopOpacity="0.3" />
+                                            </linearGradient>
+                                        </defs>
+                                        {pts.map((p, i) => {
+                                            const bH = Math.max(1.5, (p.points / maxPts) * (H - padY * 2));
+                                            const x = padX + i * (barW + gap);
+                                            const y = H - padY - bH;
+                                            const isTop = p.points === maxPts;
+                                            return (
+                                                <g key={i}>
+                                                    <rect x={x} y={y} width={barW} height={bH}
+                                                        rx="2.5" fill={isTop ? "#0ac8b9" : "url(#fhGrad)"} />
+                                                    {p.points > 0 && (
+                                                        <text x={x + barW / 2} y={y - 4} textAnchor="middle"
+                                                            fontSize="9" fill={isTop ? "#0ac8b9" : "#6b7280"} fontWeight={isTop ? "bold" : "normal"}>
+                                                            {p.points}
+                                                        </text>
+                                                    )}
+                                                    <text x={x + barW / 2} y={H - 1} textAnchor="middle" fontSize="9" fill="#4b5563">{p.day}</text>
+                                                </g>
+                                            );
+                                        })}
+                                    </svg>
+                                );
+                            })()}
                         </div>
                     )}
                 </div>

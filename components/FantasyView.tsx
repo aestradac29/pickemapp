@@ -586,9 +586,7 @@ export const FantasyView: React.FC<{
   }, [selectedSplit]);
 
   const loadFantasyTeam = useCallback(async (round: number, userId: string) => {
-      console.log("Loading fantasy team for:", userId, round, selectedSplit);
       const savedData = await dataService.getFantasyTeam(userId, round, selectedSplit);
-      console.log("Saved data:", savedData);
       if (savedData) {
           setMyTeam(savedData.team);
           setOriginalTeam(savedData.team); // Save snapshot for price restoration logic
@@ -858,7 +856,6 @@ export const FantasyView: React.FC<{
 
    const handleForceRecalculate = async () => {
        if (!isAdmin) return;
-       console.log("handleForceRecalculate clicked");
        
        setAdminMessage("Recalculando puntos... por favor espera.");
       setIsAdminSaving(true);
@@ -877,11 +874,9 @@ export const FantasyView: React.FC<{
   };
 
    const fetchDebugLogs = async () => {
-       console.log("Fetching debug logs...");
        try {
            const q = query(collection(db, "debug_logs"), orderBy("timestamp", "desc"), limit(5));
            const snap = await getDocs(q);
-           console.log("Fetched logs:", snap.docs.length);
            setDebugLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
        } catch (e: any) {
            console.error("Error fetching debug logs:", e);
@@ -1233,8 +1228,11 @@ export const FantasyView: React.FC<{
                                             <Coins className="w-4 h-4 text-[#0ac8b9]" />
                                             Presupuesto
                                         </span>
-                                        <span className={`${isOverBudget ? 'text-red-500' : 'text-[#0ac8b9]'}`}>
-                                            ${totalCost} / ${MAX_BUDGET}
+                                        <span className={`${isOverBudget ? 'text-red-500' : remainingBudget < 50 ? 'text-yellow-400' : 'text-[#0ac8b9]'}`}>
+                                            {isOverBudget
+                                                ? `−$${Math.abs(remainingBudget)} excedido`
+                                                : `$${remainingBudget} restante`}
+                                            <span className="text-gray-600 font-normal ml-1">· ${totalCost}/${MAX_BUDGET}</span>
                                         </span>
                                     </div>
                                     <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
@@ -1242,14 +1240,20 @@ export const FantasyView: React.FC<{
                                     </div>
                                 </div>
                                 {isViewLocked ? (
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-600 rounded text-gray-400 font-bold uppercase text-xs">
-                                        <Lock className="w-4 h-4" /> 
-                                        {!isOwnTeam ? 'Solo Lectura' : viewRoundId !== activeConfigRound ? 'Jornada Pasada/Futura' : 'Alineación Bloqueada'}
+                                    <div className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold uppercase text-xs border ${
+                                        !isOwnTeam
+                                            ? 'bg-blue-900/20 border-blue-700/50 text-blue-300'
+                                            : roundLocked
+                                            ? 'bg-orange-900/20 border-orange-600/50 text-orange-300'
+                                            : 'bg-gray-800/60 border-gray-700 text-gray-400'
+                                    }`}>
+                                        <Lock className="w-4 h-4" />
+                                        {!isOwnTeam ? 'Solo lectura' : roundLocked ? 'Jornada bloqueada' : 'Jornada pasada'}
                                     </div>
                                 ) : (
                                     viewRoundId < activeConfigRound && (
-                                        <div className="flex items-center gap-2 px-4 py-2 bg-[#0ac8b9]/20 border border-[#0ac8b9]/50 rounded text-[#0ac8b9] font-bold uppercase text-xs">
-                                            <CheckCircle2 className="w-4 h-4" /> FINALIZADO
+                                        <div className="flex items-center gap-2 px-4 py-2 bg-[#0ac8b9]/20 border border-[#0ac8b9]/50 rounded-lg text-[#0ac8b9] font-bold uppercase text-xs">
+                                            <CheckCircle2 className="w-4 h-4" /> Finalizado
                                         </div>
                                     )
                                 )}
@@ -1277,29 +1281,41 @@ export const FantasyView: React.FC<{
                     </div>
 
                     {!isViewLocked && (
-                        <div className="mt-8 flex flex-col items-center gap-4">
+                        <div className="mt-8 flex flex-col items-center gap-3">
+                            {/* Inline hints before attempting save */}
+                            {!myCaptain && (
+                                <div className="bg-yellow-900/20 border border-yellow-600/40 text-yellow-300 px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-medium">
+                                    <Crown className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                                    Elige un Capitán — su puntuación se multiplicará ×1.5
+                                </div>
+                            )}
                             {validationError && (
                                 <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-2 rounded-lg flex items-center gap-2 animate-in slide-in-from-bottom-2">
-                                    <AlertTriangle className="w-5 h-5" />
+                                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                                     <span className="font-bold text-sm">{validationError}</span>
                                 </div>
                             )}
+                            {saveStatus === 'success' && (
+                                <div className="bg-green-900/20 border border-green-600/40 text-green-300 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold animate-in slide-in-from-bottom-2">
+                                    <CheckCircle2 className="w-4 h-4" /> ¡Alineación guardada correctamente!
+                                </div>
+                            )}
 
-                            <button 
+                            <button
                                 onClick={handleSave}
-                                disabled={isSaving || isOverBudget}
+                                disabled={isSaving || isOverBudget || !myCaptain}
                                 className={`
-                                    font-bold px-10 py-3 rounded-xl shadow-lg transition-all transform hover:scale-105 flex items-center gap-2 border
-                                    ${isOverBudget 
-                                        ? 'bg-red-900/20 border-red-500 text-red-400 cursor-not-allowed' 
-                                        : 'bg-gradient-to-r from-[#0ac8b9] to-[#0a7e78] text-black border-[#0ac8b9]'
+                                    font-bold px-10 py-3 rounded-xl shadow-lg transition-all transform flex items-center gap-2 border
+                                    ${isOverBudget
+                                        ? 'bg-red-900/20 border-red-500 text-red-400 cursor-not-allowed'
+                                        : !myCaptain
+                                        ? 'bg-gray-800/60 border-gray-700 text-gray-500 cursor-not-allowed'
+                                        : 'hover:scale-105 bg-gradient-to-r from-[#0ac8b9] to-[#0a7e78] text-black border-[#0ac8b9]'
                                     }
                                 `}
                             >
-                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 
-                                saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> : 
-                                <Save className="w-5 h-5" />}
-                                {saveStatus === 'success' ? '¡Guardado!' : 'Guardar Alineación'}
+                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                                Guardar Alineación
                             </button>
                         </div>
                     )}

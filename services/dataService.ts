@@ -1,4 +1,4 @@
-import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame, Notification, Card, UserCard, TradeOffer, UserPackState, CardType, Region } from '../types';
+import { Team, Player, Match, Role, Stage, User, PlayerGameStats, FantasyTeamState, FantasySlot, MatchGame, Card, UserCard, TradeOffer, UserPackState, CardType, Region } from '../types';
 import { TEAMS, PLAYERS, MATCHES, getMatchesForDay, getFantasySchedule } from '../constants';
 import { fantasyService } from './fantasyService';
 import { db } from '../lib/firebase';
@@ -190,38 +190,6 @@ export const dataService = {
 
         return 3; // Default
     },
-    async getNotifications(): Promise<Notification[]> {
-        try {
-            const q = query(collection(db, "notifications"), orderBy("createdAt", "desc"), limit(10));
-            const querySnapshot = await getDocs(q);
-            return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-        } catch (e) {
-            console.error("Error fetching notifications:", e);
-            return [];
-        }
-    },
-
-    async createNotification(notification: Omit<Notification, 'id' | 'createdAt'>) {
-        try {
-            await addDoc(collection(db, "notifications"), {
-                ...notification,
-                createdAt: new Date().toISOString()
-            });
-        } catch (e) {
-            console.error("Error creating notification:", e);
-            throw e;
-        }
-    },
-
-    async deleteNotification(id: string) {
-        try {
-            await deleteDoc(doc(db, "notifications", id));
-        } catch (e) {
-            console.error("Error deleting notification:", e);
-            throw e;
-        }
-    },
-
     // NEW: Handle Round Transitions (Price Updates)
     async processRoundTransition(newRound: number, splitId?: string) {
         // 1. Get current state (Using fresh stats)
@@ -1330,12 +1298,17 @@ export const dataService = {
                 let fantasyTotal = 0;
                 const fantasyHistory = [];
                 const schedule = getFantasySchedule(targetSplitId);
+                // Batch: read all fantasy_rounds subcollection in one trip instead of N sequential getDoc calls
+                const allRoundsRef = collection(db, "users", userId, "fantasy_rounds");
+                const allRoundsSnap = await getDocs(allRoundsRef);
+                const roundsMap: Record<string, any> = {};
+                allRoundsSnap.docs.forEach(d => { roundsMap[d.id] = d.data(); });
+
                 for(const roundConfig of schedule) {
                     const r = roundConfig.id;
                     const roundDocName = this._getFantasyRoundDocName(r, targetSplitId);
-                    const roundRef = doc(db, "users", userId, "fantasy_rounds", roundDocName);
-                    const roundSnap = await getDoc(roundRef);
-                    const points = roundSnap.exists() ? (roundSnap.data().score || 0) : 0;
+                    const roundData = roundsMap[roundDocName];
+                    const points = roundData ? (roundData.score || 0) : 0;
                     
                     const label = roundConfig.stage === Stage.GROUPS ? `J${roundConfig.matchdays.join('-')}` : roundConfig.label.replace('Playoffs R', 'PO R');
                     fantasyHistory.push({ day: label, points: points });

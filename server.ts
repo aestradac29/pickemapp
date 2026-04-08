@@ -1,6 +1,5 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import admin from "firebase-admin";
 import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
@@ -51,49 +50,6 @@ const corsOptions: cors.CorsOptions = {
   credentials: true,
 };
 
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Firebase Admin (sólo para push notifications)
-// ──────────────────────────────────────────────────────────────────────────────
-let isFirebaseAdminInitialized = false;
-
-try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-    isFirebaseAdminInitialized = true;
-    console.log("✅ Firebase Admin inicializado correctamente.");
-  } else {
-    console.warn(
-      "⚠️  FIREBASE_SERVICE_ACCOUNT_JSON no está configurado. Las push notifications no funcionarán."
-    );
-  }
-} catch (error) {
-  console.error("❌ Error al inicializar Firebase Admin:", error);
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Middleware de autenticación para rutas de API internas
-// Verifica que la petición lleva el header X-Internal-Token correcto.
-// ──────────────────────────────────────────────────────────────────────────────
-function requireInternalToken(
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction
-) {
-  const internalToken = process.env.INTERNAL_API_TOKEN;
-  // Si no está configurado el token, sólo se permite en desarrollo
-  if (!internalToken) {
-    if (!IS_PRODUCTION) return next();
-    return res.status(503).json({ error: "API no disponible: INTERNAL_API_TOKEN no configurado." });
-  }
-  const provided = req.headers["x-internal-token"];
-  if (provided !== internalToken) {
-    return res.status(401).json({ error: "No autorizado." });
-  }
-  next();
-}
-
 // ──────────────────────────────────────────────────────────────────────────────
 // Servidor
 // ──────────────────────────────────────────────────────────────────────────────
@@ -124,49 +80,9 @@ async function startServer() {
         storageBucket:     process.env.VITE_FIREBASE_STORAGE_BUCKET     || process.env.FIREBASE_STORAGE_BUCKET     || "",
         messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || "",
         appId:             process.env.VITE_FIREBASE_APP_ID             || process.env.FIREBASE_APP_ID             || "",
-        vapidKey:          process.env.VITE_FIREBASE_VAPID_KEY          || process.env.FIREBASE_VAPID_KEY          || "",
       },
       geminiApiKey: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "",
     });
-  });
-
-  // Envío de push notifications (requiere Firebase Admin + token interno)
-  app.post("/api/notifications/send", requireInternalToken, async (req, res) => {
-    if (!isFirebaseAdminInitialized) {
-      return res
-        .status(503)
-        .json({ error: "Firebase Admin no inicializado. Configura FIREBASE_SERVICE_ACCOUNT_JSON." });
-    }
-
-    const { title, body, tokens, data } = req.body;
-
-    if (!title || !body || !tokens || !Array.isArray(tokens) || tokens.length === 0) {
-      return res
-        .status(400)
-        .json({ error: "Faltan campos obligatorios: title, body o el array tokens." });
-    }
-
-    try {
-      const message = {
-        notification: { title, body },
-        data: data || {},
-        tokens,
-      };
-
-      const response = await admin.messaging().sendEachForMulticast(message);
-      console.log(
-        `📨 Notificaciones: ${response.successCount} ok, ${response.failureCount} fallidas.`
-      );
-
-      res.json({
-        success: true,
-        successCount: response.successCount,
-        failureCount: response.failureCount,
-      });
-    } catch (error) {
-      console.error("Error enviando push notification:", error);
-      res.status(500).json({ error: "Error interno al enviar la notificación." });
-    }
   });
 
   // ── Frontend ──────────────────────────────────────────────────────────────
@@ -184,7 +100,6 @@ async function startServer() {
         storageBucket:     process.env.VITE_FIREBASE_STORAGE_BUCKET     || process.env.FIREBASE_STORAGE_BUCKET     || "",
         messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || "",
         appId:             process.env.VITE_FIREBASE_APP_ID             || process.env.FIREBASE_APP_ID             || "",
-        vapidKey:          process.env.VITE_FIREBASE_VAPID_KEY          || process.env.FIREBASE_VAPID_KEY          || "",
       },
       geminiApiKey: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "",
     };
