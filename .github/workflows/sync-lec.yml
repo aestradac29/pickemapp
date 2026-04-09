@@ -35,7 +35,7 @@ jobs:
 
       - name: 📦 Instalar dependencias
         working-directory: lec-sync
-        run: npm ci
+        run: npm install
 
       - name: 🔄 Ejecutar sync
         working-directory: lec-sync
