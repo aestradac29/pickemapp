@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { ROLE_ICONS, getFantasySchedule, COUNTRIES, normalizeSplitId } from '../constants';
 import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User, PlayerGameStats } from '../types';
 import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, TrendingDown, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole, Skull, Crosshair, Droplet } from 'lucide-react';
@@ -551,6 +550,11 @@ export const FantasyView: React.FC<{
 
   const [activeTab, setActiveTab] = useState<'lineup' | 'history'>('lineup');
   const [viewingUserId, setViewingUserId] = useState<string | null>(currentUserId || null);
+  // Refs para acceder a los IDs actuales desde dentro del closure de subscribeToUsers sin dependencias
+  const viewingUserIdRef = useRef(viewingUserId);
+  const currentUserIdRef = useRef(currentUserId);
+  useEffect(() => { viewingUserIdRef.current = viewingUserId; }, [viewingUserId]);
+  useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
   const [isAdminSaving, setIsAdminSaving] = useState(false);
   const [debugLogs, setDebugLogs] = useState<any[]>([]);
   const [showDebugLogs, setShowDebugLogs] = useState(false);
@@ -601,6 +605,8 @@ export const FantasyView: React.FC<{
   const loadData = useCallback(async () => {
     setIsLoadingData(true);
     try {
+        // Cargamos datos base (jugadores, equipos, partidos, config) y usuarios en paralelo.
+        // getAllUsers es costoso — se hace en paralelo para no bloquear el resto.
         const [fetchedPlayers, fetchedTeams, fetchedMatches, config, fetchedUsers] = await Promise.all([
             dataService.getPlayers(false, selectedSplit),
             dataService.getTeams(false, selectedSplit),
@@ -619,38 +625,62 @@ export const FantasyView: React.FC<{
         setViewRoundId(currentRound);
         setRoundLocked(config.fantasyLocked || false);
 
+        // viewingUserId se inicializa aquí solo si es la primera carga
         if (currentUserId && !viewingUserId) {
             setViewingUserId(currentUserId);
         }
-        
-        const targetUserId = viewingUserId || currentUserId;
-        if (targetUserId) {
-            await loadHistory(targetUserId);
-        }
+        // loadHistory se dispara desde su propio useEffect al cambiar viewingUserId/activeTab
+        // NO lo llamamos aquí para no duplicar trabajo
     } catch (err) {
         console.error(err);
     } finally {
         setIsLoadingData(false);
     }
-  }, [currentUserId, selectedSplit, viewingUserId, loadHistory]);
+  // viewingUserId y loadHistory intencionalmente excluidos — cada uno tiene su propio efecto
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId, selectedSplit]);
 
   useEffect(() => {
     loadData();
   }, [currentUserId, selectedSplit]);
 
+  // Cargar historial cuando los datos base están listos (primera carga o cambio de split)
   useEffect(() => {
+      if (!isLoadingData) {
+          const uid = viewingUserId || currentUserId;
+          if (uid) loadHistory(uid);
+      }
+  // Solo cuando isLoadingData pasa a false — no en cada render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoadingData]);
+
+  useEffect(() => {
+    // subscribeToUsers dispara cuando cualquier usuario cambia en Firestore.
+    // Llamar loadData() completo aquí es muy costoso (getAllUsers + todo lo demás).
+    // Solo refrescamos la config de ronda activa y si estamos viendo nuestro propio equipo
+    // recargamos el historial — nada más.
     let timeoutId: any;
     const unsubscribe = dataService.subscribeToUsers(() => {
         if (timeoutId) clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-            loadData();
-        }, 1000);
+        timeoutId = setTimeout(async () => {
+            try {
+                const config = await dataService.getDaysConfig(selectedSplit);
+                const newRound = config.fantasyRound || 1;
+                setActiveConfigRound(newRound);
+                setRoundLocked(config.fantasyLocked || false);
+                // Solo refrescar historial del usuario actual, no recargar todo
+                const uid = viewingUserIdRef.current || currentUserIdRef.current;
+                if (uid) await loadHistory(uid);
+            } catch (_) {}
+        }, 1500);
     });
     return () => {
         if (unsubscribe) unsubscribe();
         if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [loadData]);
+  // selectedSplit, loadHistory son estables; refs para evitar stale closures
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSplit]);
 
   useEffect(() => {
       if (currentUserId && !viewingUserId) {
@@ -658,33 +688,40 @@ export const FantasyView: React.FC<{
       }
   }, [currentUserId, viewingUserId]);
 
+  // dataReadyRef: true una vez que loadData ha terminado la primera carga.
+  // Evita que el efecto de carga del equipo se dispare dos veces durante el mount
+  // (una vez con isLoadingData=true→false y otra al cambiar viewRoundId).
+  const dataReadyRef = useRef(false);
   useEffect(() => {
-      if (viewingUserId && !isLoadingData) {
-          const fetchTeam = async () => {
-              setIsTeamLoading(true);
-              // Reset States
-              setMyTeam({
-                  [Role.TOP]: {playerId:null}, 
-                  [Role.JUNGLE]: {playerId:null}, 
-                  [Role.MID]: {playerId:null}, 
-                  [Role.ADC]: {playerId:null}, 
-                  [Role.SUPPORT]: {playerId:null}
-              });
-              setOriginalTeam(null);
-              setMyCaptain(null);
-              setValidationError(null);
+      if (!isLoadingData) dataReadyRef.current = true;
+  }, [isLoadingData]);
 
-              try {
-                  await loadFantasyTeam(viewRoundId, viewingUserId);
-              } catch (e) {
-                  console.error(e);
-              } finally {
-                  setIsTeamLoading(false);
-              }
+  useEffect(() => {
+      if (!viewingUserId || !dataReadyRef.current) return;
+      let cancelled = false;
+      const fetchTeam = async () => {
+          setIsTeamLoading(true);
+          setMyTeam({
+              [Role.TOP]: {playerId:null},
+              [Role.JUNGLE]: {playerId:null},
+              [Role.MID]: {playerId:null},
+              [Role.ADC]: {playerId:null},
+              [Role.SUPPORT]: {playerId:null}
+          });
+          setOriginalTeam(null);
+          setMyCaptain(null);
+          setValidationError(null);
+          try {
+              await loadFantasyTeam(viewRoundId, viewingUserId);
+          } catch (e) {
+              if (!cancelled) console.error(e);
+          } finally {
+              if (!cancelled) setIsTeamLoading(false);
           }
-          fetchTeam();
-      }
-  }, [viewRoundId, viewingUserId, isLoadingData, loadFantasyTeam]);
+      };
+      fetchTeam();
+      return () => { cancelled = true; };
+  }, [viewRoundId, viewingUserId, loadFantasyTeam]);
 
   // NEW: Calculate Points for Specific Selected Round
   const roundPointsMap = useMemo(() => {
@@ -720,8 +757,13 @@ export const FantasyView: React.FC<{
   }, [allMatches, viewRoundId]);
 
 
+  // Cargar historial solo cuando se abre la pestaña de historial
+  // (el cambio de viewingUserId para lineup ya lo maneja el efecto de loadFantasyTeam)
+  const prevTabRef = useRef<string>('lineup');
   useEffect(() => {
-      if(viewingUserId && activeTab === 'history') {
+      const switchedToHistory = activeTab === 'history' && prevTabRef.current !== 'history';
+      prevTabRef.current = activeTab;
+      if (viewingUserId && switchedToHistory) {
           loadHistory(viewingUserId);
       }
   }, [viewingUserId, activeTab, loadHistory]);
