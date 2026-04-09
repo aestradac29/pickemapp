@@ -1,0 +1,47 @@
+name: 🎮 Sync LEC Results
+
+on:
+  schedule:
+    # Se ejecuta cada 15 min los viernes, sábados y domingos entre 17:00 y 22:00 UTC
+    # (LEC juega normalmente 18:00–22:00 hora España en primavera/verano = 13:00–00:00 UTC)
+    - cron: "0,15,30,45 13,14,15,16,17,18,19,20,21,22,23,00 * * 6"   # Sábado
+    - cron: "0,15,30,45 13,14,15,16,17,18,19,20,21,22,23,00 * * 0"   # Domingo
+    - cron: "0,15,30,45 13,14,15,16,17,18,19,20,21,22,23,00 * * 1"   # Lunes
+
+  # Permite lanzarlo manualmente desde GitHub → Actions → Run workflow
+  workflow_dispatch:
+    inputs:
+      split_id:
+        description: "Split ID (spring_2026 / winter_2026 / summer_2026)"
+        required: false
+        default: "spring_2026"
+
+jobs:
+  sync:
+    name: Sincronizar resultados LEC
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout repo
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: lec-sync/package.json
+
+      - name: 📦 Instalar dependencias
+        working-directory: lec-sync
+        run: npm ci
+
+      - name: 🔄 Ejecutar sync
+        working-directory: lec-sync
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          SPLIT_ID: ${{ github.event.inputs.split_id || 'spring_2026' }}
+        run: node sync.js

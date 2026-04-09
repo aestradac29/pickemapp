@@ -1,0 +1,16 @@
+{
+  "name": "lec-sync",
+  "version": "1.0.0",
+  "description": "Sincronizador automático de resultados LEC → Firestore para Pick'em Pro",
+  "main": "sync.js",
+  "scripts": {
+    "sync": "node sync.js",
+    "test": "SPLIT_ID=spring_2026 node sync.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
