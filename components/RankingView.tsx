@@ -145,7 +145,7 @@ export const RankingView: React.FC<RankingViewProps> = ({ currentUserId, isAdmin
       if (mode === 'official_result' && !isAdmin) return;
 
       if (!currentUserId && !isAdmin) {
-          alert("Debes iniciar sesión.");
+          setSaveStatus("error");
           return;
       }
 

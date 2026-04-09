@@ -341,11 +341,11 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
              };
              await dataService.updateMatch(matchId, dbUpdates);
           }
-          const updatedMatches = await dataService.getMatches();
+          const updatedMatches = await dataService.getMatches(undefined, selectedSplit);
           setAllMatches(updatedMatches);
       } catch (error) {
           console.error("Failed to update/create match:", error);
-          alert("Error actualizando o creando el partido.");
+          setErrorMessage("Error actualizando o creando el partido.");
       }
   };
 
@@ -359,11 +359,11 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
               return;
           }
           await dataService.deleteMatch(matchId);
-          const updatedMatches = await dataService.getMatches();
+          const updatedMatches = await dataService.getMatches(undefined, selectedSplit);
           setAllMatches(updatedMatches);
       } catch (error: any) {
           console.error("FATAL ERROR deleting match", error);
-          alert("Error crítico al borrar el partido.");
+          setErrorMessage("Error al borrar el partido.");
           setAllMatches(originalMatches);
       }
   };
@@ -449,7 +449,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
           setAllMatches(updated);
       } catch (e) {
           console.error(e);
-          alert("Error guardando estadísticas");
+          setErrorMessage("Error guardando estadísticas.");
       } finally {
           setIsSavingStats(false);
       }
@@ -457,7 +457,7 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
   const handleBatchSave = async () => {
       if (!currentUserId) {
-          alert("Debes iniciar sesión para guardar.");
+          setErrorMessage("Debes iniciar sesión para guardar.");
           return;
       }
       if (isEditMode || isSpectating) return;
@@ -614,9 +614,10 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                     {isExplicitlyOpened && <span className="ml-1 opacity-50 text-[8px]">(Forzada)</span>}
                 </button>
                 <MatchdayImageUploader 
-                    currentDay={currentDay} 
+                    currentDay={currentDay}
+                    selectedSplit={selectedSplit}
                     onMatchesCreated={async () => {
-                        const updatedMatches = await dataService.getMatches();
+                        const updatedMatches = await dataService.getMatches(undefined, selectedSplit);
                         setAllMatches(updatedMatches);
                     }}
                 />

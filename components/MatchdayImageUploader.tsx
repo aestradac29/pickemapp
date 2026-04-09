@@ -9,9 +9,10 @@ import { getGeminiApiKey } from '../lib/geminiConfig';
 interface MatchdayImageUploaderProps {
     currentDay: number;
     onMatchesCreated: () => void;
+    selectedSplit?: string | null;
 }
 
-export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ currentDay, onMatchesCreated }) => {
+export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ currentDay, onMatchesCreated, selectedSplit }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pendingMatches, setPendingMatches] = useState<{ teamAId: string; teamBId: string; startTime: string; bestOf?: number }[]>([]);
@@ -94,7 +95,7 @@ export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ cu
         try {
             for (const match of matches) {
                 await dataService.createMatch({
-                    split_id: dataService._getCurrentSplitId(),
+                    split_id: selectedSplit || localStorage.getItem('selectedSplit') || 'winter_2026',
                     team_a_id: match.teamAId,
                     team_b_id: match.teamBId,
                     start_time: match.startTime,

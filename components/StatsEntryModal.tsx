@@ -347,6 +347,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     // Import AI State
     const [isImporting, setIsImporting] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
+    const [importError, setImportError] = useState<string | null>(null);
     const [importText, setImportText] = useState("");
 
     // Players lists
@@ -499,6 +500,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
         if (!importText.trim()) return;
         
         setIsImporting(true);
+        setImportError(null);
         try {
             // Call Gemini service
             const extractedStats = await extractStatsFromData(importText, matchPlayers);
@@ -532,7 +534,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
             setShowImportModal(false);
         } catch (error) {
             console.error("AI Import Failed:", error);
-            alert("Falló la importación. Inténtalo de nuevo o revisa la consola.");
+            setImportError("Falló la importación. Inténtalo de nuevo.");
         } finally {
             setIsImporting(false);
         }
@@ -729,6 +731,11 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                                 >
                                     Cancelar
                                 </button>
+                                {importError && (
+                                    <div className="text-red-400 text-xs font-medium bg-red-900/20 border border-red-700/40 rounded px-3 py-2">
+                                        ✗ {importError}
+                                    </div>
+                                )}
                                 <button 
                                     onClick={handleAIImport}
                                     disabled={isImporting || !importText}

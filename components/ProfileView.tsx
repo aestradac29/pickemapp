@@ -166,13 +166,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ viewingUserId, session
 
     const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); };
 
-    useEffect(() => { loadData(); }, [viewingUserId]);
+    useEffect(() => { loadData(); }, [viewingUserId, selectedSplit]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const loadData = async () => {
         setIsLoading(true);
         try {
             const [champs, teamsMap, users, allMatches] = await Promise.all([
-                getChampions(), dataService.getTeams(), dataService.getAllUsers(), dataService.getMatches(),
+                getChampions(),
+                dataService.getTeams(false, selectedSplit),
+                dataService.getAllUsers(selectedSplit),
+                dataService.getMatches(undefined, selectedSplit),
             ]);
             setChampionOptions(champs.sort((a, b) => a.label.localeCompare(b.label)));
             setTeams(Object.values(teamsMap));

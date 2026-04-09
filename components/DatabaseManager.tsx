@@ -38,6 +38,11 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ selectedSplit:
         path?: number[] // Para mostrar la evolución visual
     }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+    const showStatus = (text: string, type: 'success' | 'error' = 'success') => {
+        setStatusMsg({ text, type });
+        setTimeout(() => setStatusMsg(null), 4000);
+    };
     
     // Simulation Mode State
     const [isSimulationMode, setIsSimulationMode] = useState(false);
@@ -58,9 +63,9 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ selectedSplit:
         setIsLoading(true);
         try {
             const [p, tMap, matches] = await Promise.all([
-                dataService.getPlayers(),
-                dataService.getTeams(),
-                dataService.getMatches()
+                dataService.getPlayers(false, selectedSplit),
+                dataService.getTeams(false, selectedSplit),
+                dataService.getMatches(undefined, selectedSplit)
             ]);
             setPlayers(p);
             setTeams(Object.values(tMap));
@@ -94,7 +99,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ selectedSplit:
             setEditingId(null);
             await loadData();
         } catch (e) {
-            alert("Error al guardar jugador");
+            showStatus("Error al guardar jugador", "error");
         } finally {
             setIsSaving(false);
         }
@@ -114,7 +119,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ selectedSplit:
             setEditingId(null);
             await loadData();
         } catch (e) {
-            alert("Error al guardar equipo");
+            showStatus("Error al guardar equipo", "error");
         } finally {
             setIsSaving(false);
         }
@@ -259,7 +264,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ selectedSplit:
 
             await dataService.updatePlayersBulk(bulkData);
             
-            alert("¡Precios actualizados correctamente!");
+            showStatus("¡Precios actualizados correctamente!");
             setPendingUpdates([]);
             setImportText("");
             await loadData();
@@ -267,7 +272,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ selectedSplit:
 
         } catch (e) {
             console.error(e);
-            alert("Error al actualizar precios.");
+            showStatus("Error al actualizar precios.", "error");
         } finally {
             setIsSaving(false);
         }
@@ -303,6 +308,17 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ selectedSplit:
 
     return (
         <div className="max-w-7xl mx-auto pb-20 animate-in fade-in">
+
+            {/* Status toast */}
+            {statusMsg && (
+                <div className={`fixed top-20 right-4 z-[200] px-4 py-3 rounded-xl shadow-2xl border text-sm font-bold animate-in slide-in-from-right-4 flex items-center gap-2 ${
+                    statusMsg.type === 'success'
+                        ? 'bg-green-900/95 border-green-500/50 text-green-200'
+                        : 'bg-red-900/95 border-red-500/50 text-red-200'
+                }`}>
+                    {statusMsg.type === 'success' ? '✓' : '✗'} {statusMsg.text}
+                </div>
+            )}
             <div className="flex items-center gap-3 mb-6 border-b border-gray-800 pb-4">
                 <Database className="w-8 h-8 text-[#c8aa6e]" />
                 <div>

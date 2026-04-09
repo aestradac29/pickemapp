@@ -48,7 +48,7 @@ export const HallOfFame: React.FC<HallOfFameProps> = ({ selectedSplit: propSelec
             }
         };
         load();
-    }, []);
+    }, [selectedSplit]);
 
     // Filter available days based on View Mode
     const availableDays = useMemo(() => {

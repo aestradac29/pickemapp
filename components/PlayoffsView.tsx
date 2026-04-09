@@ -356,11 +356,11 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
              };
              await dataService.updateMatch(matchId, dbUpdates);
           }
-          const updatedMatches = await dataService.getMatches();
+          const updatedMatches = await dataService.getMatches(undefined, selectedSplit);
           setAllMatches(updatedMatches);
       } catch (error) {
           console.error("Failed to update/create match:", error);
-          alert("Error actualizando o creando el partido.");
+          setErrorMessage("Error actualizando o creando el partido.");
       }
   };
 
@@ -374,11 +374,11 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
               return;
           }
           await dataService.deleteMatch(matchId);
-          const updatedMatches = await dataService.getMatches();
+          const updatedMatches = await dataService.getMatches(undefined, selectedSplit);
           setAllMatches(updatedMatches);
       } catch (error: any) {
           console.error("Error deleting match", error);
-          alert("Error al borrar el partido.");
+          setErrorMessage("Error al borrar el partido.");
           setAllMatches(originalMatches);
       }
   };
@@ -433,7 +433,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
           setAllMatches(updated);
       } catch (e) {
           console.error(e);
-          alert("Error guardando estadísticas");
+          setErrorMessage("Error guardando estadísticas.");
       } finally {
           setIsSavingStats(false);
       }
@@ -441,7 +441,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
 
   const handleBatchSave = async () => {
       if (!currentUserId) {
-          alert("Debes iniciar sesión para guardar.");
+          setErrorMessage("Debes iniciar sesión para guardar.");
           return;
       }
       if (isEditMode || isSpectating) return;

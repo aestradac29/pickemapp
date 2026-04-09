@@ -206,9 +206,9 @@ export const TeamsView: React.FC<TeamsViewProps> = ({ selectedSplit: propSelecte
     useEffect(() => {
         const load = async () => {
             const [t, p, m] = await Promise.all([
-                dataService.getTeams(),
-                dataService.getPlayers(),
-                dataService.getMatches()
+                dataService.getTeams(false, selectedSplit),
+                dataService.getPlayers(false, selectedSplit),
+                dataService.getMatches(undefined, selectedSplit)
             ]);
             setTeams(t);
             setPlayers(p);
@@ -216,7 +216,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({ selectedSplit: propSelecte
             setLoading(false);
         };
         load();
-    }, []);
+    }, [selectedSplit]);
 
     // Calculate Role Stats
     const roleStats = useMemo(() => {

@@ -138,7 +138,7 @@ const App: React.FC = () => {
         }
         fetchLeaderboard();
     }
-  }, [view]);
+  }, [view, selectedSplit]);
 
   const handleUserAuthenticated = (user: any) => {
       // Si ya tenemos un usuario seteado manualmente (por el registro), intentamos no sobrescribirlo con 'Invocador' si es posible

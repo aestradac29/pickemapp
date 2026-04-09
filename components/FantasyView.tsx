@@ -928,7 +928,7 @@ export const FantasyView: React.FC<{
         await loadData();
       } catch (error) {
         console.error("Error updating active round", error);
-        alert("Error al cambiar de jornada.");
+        setAdminMessage("Error al cambiar de jornada.");
       } finally {
         setIsAdminSaving(false);
       }
