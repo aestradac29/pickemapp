@@ -507,6 +507,9 @@ const App: React.FC = () => {
             <p className="text-[10px] text-gray-600 mt-1">
                 No está afiliada, patrocinada ni respaldada por Riot Games ni por ninguna de sus competiciones o equipos.
             </p>
+            <p className="text-[10px] text-gray-600 mt-1">
+                Datos de resultados obtenidos de Leaguepedia bajo licencia CC BY-SA 3.0
+            </p>
         </div>
       </footer>
 
