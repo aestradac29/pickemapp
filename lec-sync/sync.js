@@ -20,16 +20,18 @@ const OVERVIEW_PAGES = {
 
 // Mapa nombre Leaguepedia -> ID interno de la app
 const TEAM_NAME_MAP = {
-  "Fnatic": "fnc",
-  "G2 Esports": "g2",
-  "GIANTX": "gx",
-  "Karmine Corp": "kc",
+  "Fnatic":        "fnc",
+  "G2 Esports":    "g2",
+  "GIANTX":        "gx",
+  "Karmine Corp":  "kc",
   "Team Vitality": "vit",
-  "Movistar KOI": "mkoi",
-  "Natus Vincere": "navi",
-  "SK Gaming": "sk",
+  "Movistar KOI":  "mkoi",
+  "Natus Vincere": "nvi",
+  "SK Gaming":     "sk",
   "Team Heretics": "th",
-  "Shifters": "shf",
+  "Shifters":      "shf",
+  "Karmine Corp Blue": "kcb",
+  "Los Ratones":   "rat",
 };
 
 function initFirebase() {
