@@ -6,10 +6,10 @@
  *  - Ganador de la serie (winnerId, isCompleted)
  *  - Resultado por game: games[] -> la app muestra 2-1, 3-0, etc.
  *
- * NOTA Leaguepedia:
- *  MatchSchedule.Winner      = 1 (gana Team1) | 2 (gana Team2)
- *  MatchScheduleGame.Winner  = 1 (gana Blue)  | 2 (gana Red)
- *  JOIN entre tablas: MatchSchedule.UniqueMatch = MatchScheduleGame.MatchId
+ * Variables de entorno:
+ *  FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
+ *  SPLIT_ID  (spring_2026 | winter_2026 | summer_2026)
+ *  RESET_MATCH_ID  (opcional) si se indica, resetea ese partido a pendiente antes de sincronizar
  */
 
 const { initializeApp, cert } = require("firebase-admin/app");
@@ -124,7 +124,6 @@ async function leaguepediaQuery(tables, fields, where, orderBy, limit) {
   throw new Error("Rate limit persistente tras 3 intentos.");
 }
 
-// Resultados de serie (quien gano el BO3/BO5)
 async function getSeriesResults(splitId) {
   var normalized   = normalizeSplit(splitId);
   var overviewPage = OVERVIEW_PAGES[normalized];
@@ -138,10 +137,7 @@ async function getSeriesResults(splitId) {
   );
 }
 
-// Resultado por game usando JOIN entre MatchSchedule y MatchScheduleGame
-// UniqueMatch de MatchSchedule == MatchId de MatchScheduleGame
 async function getGamesForMatch(uniqueMatch) {
-  // Escapar caracteres especiales en el UniqueMatch para la query
   var escapedId = uniqueMatch.replace(/"/g, '\\"');
   var where = 'MatchScheduleGame.MatchId="' + escapedId + '"';
 
@@ -153,12 +149,11 @@ async function getGamesForMatch(uniqueMatch) {
     10
   );
 
-  for (var g = 0; g < gameResults.length; g++) {
-  var gr = gameResults[g];
-  // TEMPORAL: ver qué devuelve Leaguepedia exactamente
-  console.log("  Game " + gr.N_GameInMatch + ": Blue='" + gr.Blue + "' Red='" + gr.Red + "' Winner=" + gr.Winner);
-  ...
-}
+  // Log de diagnostico para ver los valores exactos que devuelve Leaguepedia
+  for (var g = 0; g < results.length; g++) {
+    var gr = results[g];
+    console.log("  Game " + gr.N_GameInMatch + ": Blue='" + gr.Blue + "' Red='" + gr.Red + "' Winner=" + gr.Winner);
+  }
 
   return results;
 }
@@ -181,7 +176,29 @@ async function sync() {
   }
 
   var allMatches = snap.data().allMatches || [];
-  var pending    = allMatches.filter(function(m) { return !m.isCompleted; });
+
+  // Soporte para resetear un partido concreto (util para reprocessar)
+  // Uso: añadir variable RESET_MATCH_ID en el workflow antes de ejecutar
+  var resetId = process.env.RESET_MATCH_ID;
+  if (resetId) {
+    var resetIdx = allMatches.findIndex(function(m) { return m.id === resetId; });
+    if (resetIdx !== -1) {
+      allMatches[resetIdx] = Object.assign({}, allMatches[resetIdx], {
+        isCompleted: false,
+        winnerId:    null,
+        games:       [],
+      });
+      await docRef.set({ allMatches: allMatches }, { merge: true });
+      console.log("Partido " + resetId + " reseteado a pendiente.");
+    } else {
+      console.log("RESET_MATCH_ID '" + resetId + "' no encontrado en Firestore.");
+    }
+    // Recargar tras el reset
+    snap = await docRef.get();
+    allMatches = snap.data().allMatches || [];
+  }
+
+  var pending = allMatches.filter(function(m) { return !m.isCompleted; });
 
   if (pending.length === 0) {
     console.log("No hay partidos pendientes.");
@@ -206,7 +223,6 @@ async function sync() {
     var teamA    = appMatch.teamA || {};
     var teamB    = appMatch.teamB || {};
 
-    // Buscar la serie en Leaguepedia
     var found = null;
     for (var j = 0; j < seriesResults.length; j++) {
       var r    = seriesResults[j];
@@ -231,7 +247,6 @@ async function sync() {
 
     if (!found) continue;
 
-    // Ganador de la serie
     var winnerName = null;
     if (found.Winner === "1" || found.Winner === 1) {
       winnerName = found.Team1;
@@ -268,6 +283,9 @@ async function sync() {
             gameWinnerId = redTeamId;
           }
 
+          if (!blueTeamId) console.log("  AVISO: Blue='" + gr.Blue + "' no mapeado");
+          if (!redTeamId)  console.log("  AVISO: Red='"  + gr.Red  + "' no mapeado");
+
           games.push({
             id:       gameNum,
             winnerId: gameWinnerId,
@@ -279,14 +297,12 @@ async function sync() {
       }
     }
 
-    // Calcular marcador para el log
     var winsA = games.filter(function(g) { return g.winnerId === teamA.id; }).length;
     var winsB = games.filter(function(g) { return g.winnerId === teamB.id; }).length;
     var score = games.length > 0 ? " (" + winsA + "-" + winsB + ")" : " (sin marcador)";
     console.log("OK: " + (teamA.shortName || "") + " vs " + (teamB.shortName || "") +
       " -> " + winnerName + score + " (id: " + winnerId + ")");
 
-    // Actualizar en Firestore
     var idx = allMatches.findIndex(function(m) { return m.id === appMatch.id; });
     var updatedMatch = Object.assign({}, allMatches[idx], {
       isCompleted: true,
