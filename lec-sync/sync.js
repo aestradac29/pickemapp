@@ -21,13 +21,12 @@ const OVERVIEW_PAGES = {
 // Mapa nombre Leaguepedia -> ID interno de la app
 const TEAM_NAME_MAP = {
   "Fnatic": "fnc",
-  "G2 Esports": "gx",
+  "G2 Esports": "g2",
   "GIANTX": "gx",
   "Karmine Corp": "kc",
   "Team Vitality": "vit",
-  "KOI": "mkoi",
   "Movistar KOI": "mkoi",
-  "Natus Vincere": "nvi",
+  "Natus Vincere": "navi",
   "SK Gaming": "sk",
   "Team Heretics": "th",
   "Shifters": "shf",
