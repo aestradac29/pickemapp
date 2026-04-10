@@ -1,24 +1,39 @@
 /**
  * sync.js — Sincronizador automático de resultados LEC → Firestore
- * Fuente: api.lolesports.com (con headers de navegador para evitar el 403)
+ *
+ * La API de Lolesports bloquea IPs de GitHub Actions con 403.
+ * Solución: usamos el Wikia/Fandom API (lol.fandom.com) que es completamente
+ * abierta y no tiene restricciones de IP. Es la misma fuente que usan
+ * herramientas como Leaguepedia y tiene datos oficiales de LEC.
  */
 
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 
-// ─── Mapa shortName app → ID interno ─────────────────────────────────────────
+// ─── Mapa código Leaguepedia → ID interno de la app ──────────────────────────
+// "team" en Leaguepedia usa el nombre corto oficial
 const TEAM_CODE_MAP = {
-  FNC:  "fnc",
-  G2:   "gx",
-  G2E:  "gx",
-  KC:   "kc",
-  KOI:  "mkoi",
-  NAVI: "nvi",
-  NVI:  "nvi",
-  SK:   "sk",
-  SHF:  "shf",
-  TH:   "th",
-  VIT:  "vit",
+  "Fnatic":           "fnc",
+  "G2 Esports":       "g2",
+  "Karmine Corp":     "kc",
+  "Team Vitality":    "vit",
+  "KOI":              "mkoi",
+  "Natus Vincere":    "navi",
+  "SK Gaming":        "sk",
+  "Team Heretics":    "th",
+  "Shifters":         "shf",
+  "Giantx":           "gx"
+  // shortnames como fallback
+  "FNC": "fnc",
+  "G2":  "g2",
+  "KC":  "kc",
+  "VIT": "vit",
+  "KOI": "mkoi",
+  "NAVI":"navi",
+  "GX":  "gx",
+  "SK":  "sk",
+  "TH":  "th",
+  "SHF": "shf",
 };
 
 // ─── Firebase Admin ───────────────────────────────────────────────────────────
@@ -38,43 +53,50 @@ function getDocName(baseName, splitId) {
   const s = (splitId || "").toLowerCase();
   if (s.includes("spring")) return `${baseName}_spring_2026`;
   if (s.includes("summer")) return `${baseName}_summer_2026`;
-  return baseName; // winter_2026 no lleva sufijo
+  return baseName;
 }
 
-// ─── Lolesports API con headers de navegador (evita el 403 desde servidores) ──
+// ─── Leaguepedia API (lol.fandom.com) ────────────────────────────────────────
+// Documentación: https://lol.fandom.com/wiki/Help:Leaguepedia_API
 async function getCompletedLecMatches() {
-  const headers = {
-    "x-api-key":  "0TvQnueqKa5mxJntVWt0w4LlLfW6krZa",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Origin":     "https://lolesports.com",
-    "Referer":    "https://lolesports.com/",
-  };
+  // Obtener partidos completados de LEC 2026 Spring
+  // ScoreboardGames tiene los resultados de cada partido con fecha y ganador
+  const tournament = getTournamentName();
+  
+  const params = new URLSearchParams({
+    action: "cargoquery",
+    tables: "MatchSchedule",
+    fields: "Team1, Team2, Winner, DateTime_UTC, OverviewPage",
+    where: `OverviewPage="${tournament}" AND Winner IS NOT NULL`,
+    order_by: "DateTime_UTC DESC",
+    limit: "100",
+    format: "json",
+  });
 
-  // Intentar obtener el ID de LEC dinámicamente
-  let leagueId = "98767991302996019"; // ID fijo de LEC como fallback
-  try {
-    const leaguesRes = await fetch(
-      "https://esports-api.lolesports.com/persisted/gw/getLeagues?hl=es-ES",
-      { headers }
-    );
-    if (leaguesRes.ok) {
-      const data = await leaguesRes.json();
-      const lec  = data.data.leagues.find((l) => l.slug?.toLowerCase() === "lec");
-      if (lec) leagueId = lec.id;
-    } else {
-      console.warn(`⚠️  getLeagues devolvió ${leaguesRes.status}, usando ID fijo de LEC`);
-    }
-  } catch (e) {
-    console.warn("⚠️  Error en getLeagues, usando ID fijo:", e.message);
+  const url = `https://lol.fandom.com/api.php?${params}`;
+  console.log(`🔗 Consultando Leaguepedia: ${tournament}`);
+
+  const res = await fetch(url, {
+    headers: { "User-Agent": "PickemSync/1.0 (github-actions)" },
+  });
+
+  if (!res.ok) throw new Error(`Leaguepedia HTTP ${res.status}`);
+
+  const json = await res.json();
+  const rows = json.cargoquery || [];
+
+  if (rows.length === 0) {
+    console.warn("⚠️  Leaguepedia no devolvió resultados. Comprueba el nombre del torneo.");
   }
 
-  const url = `https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=es-ES&leagueId=${leagueId}`;
-  const res  = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`getSchedule HTTP ${res.status}`);
+  return rows.map((r) => r.title);
+}
 
-  const json   = await res.json();
-  const events = json.data.schedule.events || [];
-  return events.filter((e) => e.type === "match" && e.state === "completed");
+function getTournamentName() {
+  const splitId = (process.env.SPLIT_ID || "spring_2026").toLowerCase();
+  if (splitId.includes("spring")) return "LEC/2026 Season/Spring Season";
+  if (splitId.includes("summer")) return "LEC/2026 Season/Summer Season";
+  return "LEC/2026 Season/Winter Season";
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -102,14 +124,18 @@ async function sync() {
   }
   console.log(`📋 Partidos pendientes en la app: ${pending.length}`);
 
-  let lecCompleted;
+  let lecResults;
   try {
-    lecCompleted = await getCompletedLecMatches();
+    lecResults = await getCompletedLecMatches();
   } catch (err) {
-    console.error("❌ Error al consultar Lolesports:", err.message);
+    console.error("❌ Error al consultar Leaguepedia:", err.message);
     process.exit(1);
   }
-  console.log(`🌐 Partidos completados en Lolesports: ${lecCompleted.length}`);
+  console.log(`🌐 Resultados encontrados en Leaguepedia: ${lecResults.length}`);
+
+  if (lecResults.length > 0) {
+    console.log("📄 Ejemplo de resultado:", JSON.stringify(lecResults[0]));
+  }
 
   let updated = 0;
 
@@ -119,34 +145,62 @@ async function sync() {
     const teamBCode = appMatch.teamB?.shortName?.toUpperCase();
     if (!teamACode || !teamBCode) continue;
 
-    const found = lecCompleted.find((e) => {
-      const diff  = Math.abs(new Date(e.startTime).getTime() - appTime);
-      if (diff > 3 * 60 * 60 * 1000) return false;
-      const codes = e.match.teams.map((t) => t.code?.toUpperCase());
-      return codes.includes(teamACode) && codes.includes(teamBCode);
+    // Buscar en Leaguepedia por equipos + fecha (±4h de margen)
+    const found = lecResults.find((r) => {
+      const t1 = r.Team1?.toUpperCase();
+      const t2 = r.Team2?.toUpperCase();
+
+      // Comprobar que los equipos coinciden (en cualquier orden)
+      const teamsMatch =
+        (t1 === teamACode || getShortName(r.Team1) === teamACode) &&
+        (t2 === teamBCode || getShortName(r.Team2) === teamBCode) ||
+        (t1 === teamBCode || getShortName(r.Team1) === teamBCode) &&
+        (t2 === teamACode || getShortName(r.Team2) === teamACode);
+
+      if (!teamsMatch) return false;
+
+      // Comprobar fecha (±4h)
+      if (r.DateTime_UTC) {
+        const apiTime = new Date(r.DateTime_UTC + " UTC").getTime();
+        const diff    = Math.abs(apiTime - appTime);
+        return diff < 4 * 60 * 60 * 1000;
+      }
+      return true; // si no hay fecha, confiar en los equipos
     });
 
     if (!found) continue;
 
-    const winnerTeam = found.match.teams.find((t) => t.result?.outcome === "win");
-    if (!winnerTeam) continue;
+    const winnerName = found.Winner;
+    if (!winnerName) continue;
 
-    const winnerCode = winnerTeam.code?.toUpperCase();
-    let   winnerId   = null;
+    // Determinar winnerId
+    let winnerId = TEAM_CODE_MAP[winnerName] || null;
 
-    if      (winnerCode === teamACode) winnerId = appMatch.teamA.id;
-    else if (winnerCode === teamBCode) winnerId = appMatch.teamB.id;
-    else    winnerId = TEAM_CODE_MAP[winnerCode] || null;
+    // Si no está en el mapa por nombre completo, intentar por shortName
+    if (!winnerId) {
+      const shortWinner = getShortName(winnerName);
+      winnerId = TEAM_CODE_MAP[shortWinner] || null;
+    }
+
+    // Último recurso: comparar con los equipos del partido
+    if (!winnerId) {
+      const winnerUpper = winnerName.toUpperCase();
+      if (winnerUpper === teamACode || getShortName(winnerName) === teamACode) {
+        winnerId = appMatch.teamA.id;
+      } else if (winnerUpper === teamBCode || getShortName(winnerName) === teamBCode) {
+        winnerId = appMatch.teamB.id;
+      }
+    }
 
     if (!winnerId) {
-      console.warn(`⚠️  Código "${winnerCode}" no mapeado — añádelo a TEAM_CODE_MAP`);
+      console.warn(`⚠️  Ganador "${winnerName}" no mapeado — añádelo a TEAM_CODE_MAP`);
       continue;
     }
 
     const idx = allMatches.findIndex((m) => m.id === appMatch.id);
     allMatches[idx] = { ...allMatches[idx], isCompleted: true, winnerId };
 
-    console.log(`✅ ${teamACode} vs ${teamBCode} → ganador: ${winnerCode} (id: ${winnerId})`);
+    console.log(`✅ ${teamACode} vs ${teamBCode} → ganador: ${winnerName} (id: ${winnerId})`);
     updated++;
   }
 
@@ -157,6 +211,24 @@ async function sync() {
 
   await docRef.set({ allMatches }, { merge: true });
   console.log(`\n🎉 Firestore actualizado: ${updated} partido(s).`);
+}
+
+// Extrae un shortname aproximado del nombre completo del equipo
+function getShortName(fullName) {
+  if (!fullName) return "";
+  const map = {
+    "Fnatic":        "FNC",
+    "G2 Esports":    "G2",
+    "Karmine Corp":  "KC",
+    "Team Vitality": "VIT",
+    "KOI":           "KOI",
+    "Natus Vincere": "NAVI",
+    "SK Gaming":     "SK",
+    "Team Heretics": "TH",
+    "Giantx":        "GX",
+    "Shifters":      "SHF",
+  };
+  return (map[fullName] || fullName.toUpperCase().substring(0, 3));
 }
 
 sync().catch((err) => {
