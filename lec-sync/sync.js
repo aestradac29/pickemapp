@@ -1,8 +1,10 @@
 /**
  * sync.js - Sincronizador automatico de resultados LEC a Firestore
- *
  * Fuente: Leaguepedia (lol.fandom.com/api.php)
- * Estrategia: busca resultados equipo por equipo (evita operador IN que puede fallar)
+ *
+ * NOTA: En MatchSchedule, el campo Winner es un numero:
+ *   1 = gana Team1
+ *   2 = gana Team2
  */
 
 const { initializeApp, cert } = require("firebase-admin/app");
@@ -10,7 +12,6 @@ const { getFirestore } = require("firebase-admin/firestore");
 
 const LEAGUEPEDIA_API = "https://lol.fandom.com/api.php";
 
-// Nombre del torneo en Leaguepedia segun el split
 const OVERVIEW_PAGES = {
   spring_2026: "LEC/2026 Season/Spring Season",
   winter_2026: "LEC/2026 Season/Versus Season",
@@ -57,12 +58,9 @@ function normalizeSplit(splitId) {
   return "winter_2026";
 }
 
-function resolveTeamId(teamName, appTeamA, appTeamB) {
+function resolveTeamIdByName(teamName) {
   if (!teamName) return null;
   if (TEAM_NAME_MAP[teamName]) return TEAM_NAME_MAP[teamName];
-  // Comparar contra los equipos del partido directamente
-  if (appTeamA && (teamName === appTeamA.name || teamName.toUpperCase() === (appTeamA.shortName || "").toUpperCase())) return appTeamA.id;
-  if (appTeamB && (teamName === appTeamB.name || teamName.toUpperCase() === (appTeamB.shortName || "").toUpperCase())) return appTeamB.id;
   return null;
 }
 
@@ -70,10 +68,10 @@ async function leaguepediaQuery(where, fields, limit) {
   const params = new URLSearchParams({
     action: "cargoquery",
     tables: "MatchSchedule",
-    fields: fields || "Team1, Team2, Winner, DateTime_UTC",
+    fields: fields,
     where: where,
     order_by: "DateTime_UTC DESC",
-    limit: String(limit || 50),
+    limit: String(limit || 100),
     format: "json",
   });
 
@@ -87,48 +85,25 @@ async function leaguepediaQuery(where, fields, limit) {
 
   if (!res.ok) throw new Error("Leaguepedia HTTP " + res.status);
   const json = await res.json();
-  if (json.error) throw new Error("Leaguepedia API error: " + JSON.stringify(json.error));
+  if (json.error) throw new Error("Leaguepedia error: " + JSON.stringify(json.error));
   return (json.cargoquery || []).map(function(r) { return r.title; });
 }
 
 async function getLecResults(splitId) {
   const normalized = normalizeSplit(splitId);
   const overviewPage = OVERVIEW_PAGES[normalized];
-  console.log("Buscando resultados para: " + overviewPage);
+  console.log("Buscando en: " + overviewPage);
 
-  // Query directa por OverviewPage
   const where = 'OverviewPage="' + overviewPage + '" AND Winner IS NOT NULL AND Winner != ""';
+  // Winner es 1 o 2, Team1 y Team2 son los nombres de los equipos
   const results = await leaguepediaQuery(where, "Team1, Team2, Winner, DateTime_UTC", 100);
 
   console.log("Resultados obtenidos: " + results.length);
   if (results.length > 0) {
-    console.log("Primeros resultados:");
     results.slice(0, 3).forEach(function(r) {
-      console.log("  " + r.Team1 + " vs " + r.Team2 + " -> " + r.Winner + " (" + r.DateTime_UTC + ")");
+      var winnerName = r.Winner === "1" ? r.Team1 : r.Winner === "2" ? r.Team2 : "?";
+      console.log("  " + r.Team1 + " vs " + r.Team2 + " -> ganador: " + winnerName + " (Winner=" + r.Winner + ")");
     });
-  }
-
-  // Si no hay resultados, intentar sin el filtro de OverviewPage para diagnosticar
-  if (results.length === 0) {
-    console.log("Sin resultados con OverviewPage exacto. Intentando busqueda amplia...");
-    const broadWhere = 'Winner IS NOT NULL AND Winner != "" AND DateTime_UTC > "2026-01-01"';
-    const broadResults = await leaguepediaQuery(broadWhere, "OverviewPage, Team1, Team2, Winner, DateTime_UTC", 5);
-    console.log("Resultados en busqueda amplia (muestra):");
-    broadResults.forEach(function(r) {
-      console.log("  OverviewPage: " + r.OverviewPage + " | " + r.Team1 + " vs " + r.Team2);
-    });
-
-    // Si hay resultados en la busqueda amplia, filtrar los LEC
-    const lecBroad = broadResults.filter(function(r) {
-      return r.OverviewPage && r.OverviewPage.toLowerCase().includes("lec");
-    });
-    if (lecBroad.length > 0) {
-      const correctPage = lecBroad[0].OverviewPage;
-      console.log("Nombre correcto detectado: " + correctPage);
-      console.log("ACCION: actualiza OVERVIEW_PAGES en sync.js con este nombre");
-    }
-
-    return [];
   }
 
   return results;
@@ -145,7 +120,7 @@ async function sync() {
   const snap = await docRef.get();
 
   if (!snap.exists) {
-    console.log("Documento de partidos no encontrado en Firestore.");
+    console.log("Documento de partidos no encontrado.");
     return;
   }
 
@@ -162,12 +137,12 @@ async function sync() {
   try {
     lecResults = await getLecResults(splitId);
   } catch (err) {
-    console.error("Error al consultar Leaguepedia: " + err.message);
+    console.error("Error Leaguepedia: " + err.message);
     process.exit(1);
   }
 
   if (lecResults.length === 0) {
-    console.log("Sin resultados de Leaguepedia. Revisa el log para ver el nombre correcto del OverviewPage.");
+    console.log("Sin resultados de Leaguepedia.");
     return;
   }
 
@@ -178,25 +153,25 @@ async function sync() {
     var appTime = new Date(appMatch.startTime).getTime();
     var teamA = appMatch.teamA || {};
     var teamB = appMatch.teamB || {};
-    var teamAShort = (teamA.shortName || "").toUpperCase();
-    var teamBShort = (teamB.shortName || "").toUpperCase();
-
-    if (!teamAShort || !teamBShort) continue;
 
     var found = null;
     for (var j = 0; j < lecResults.length; j++) {
       var r = lecResults[j];
-      var t1id = TEAM_NAME_MAP[r.Team1];
-      var t2id = TEAM_NAME_MAP[r.Team2];
 
-      var teamsMatch =
-        (t1id === teamA.id && t2id === teamB.id) ||
-        (t1id === teamB.id && t2id === teamA.id) ||
-        (r.Team1 && r.Team1.toUpperCase() === teamAShort && r.Team2 && r.Team2.toUpperCase() === teamBShort) ||
-        (r.Team1 && r.Team1.toUpperCase() === teamBShort && r.Team2 && r.Team2.toUpperCase() === teamAShort);
+      // Resolver IDs de los equipos de Leaguepedia
+      var r_t1_id = resolveTeamIdByName(r.Team1);
+      var r_t2_id = resolveTeamIdByName(r.Team2);
 
+      // Comparar por ID interno o por nombre
+      var t1matchesA = r_t1_id === teamA.id || (r.Team1 || "").toUpperCase() === (teamA.shortName || "").toUpperCase();
+      var t1matchesB = r_t1_id === teamB.id || (r.Team1 || "").toUpperCase() === (teamB.shortName || "").toUpperCase();
+      var t2matchesA = r_t2_id === teamA.id || (r.Team2 || "").toUpperCase() === (teamA.shortName || "").toUpperCase();
+      var t2matchesB = r_t2_id === teamB.id || (r.Team2 || "").toUpperCase() === (teamB.shortName || "").toUpperCase();
+
+      var teamsMatch = (t1matchesA && t2matchesB) || (t1matchesB && t2matchesA);
       if (!teamsMatch) continue;
 
+      // Verificar fecha (margen 6h)
       if (r.DateTime_UTC) {
         var apiTime = new Date(r.DateTime_UTC + " UTC").getTime();
         if (Math.abs(apiTime - appTime) > 6 * 60 * 60 * 1000) continue;
@@ -206,18 +181,40 @@ async function sync() {
       break;
     }
 
-    if (!found || !found.Winner) continue;
+    if (!found) continue;
 
-    var winnerId = resolveTeamId(found.Winner, teamA, teamB);
+    // Winner=1 -> gana Team1, Winner=2 -> gana Team2
+    var winnerName = null;
+    if (found.Winner === "1" || found.Winner === 1) {
+      winnerName = found.Team1;
+    } else if (found.Winner === "2" || found.Winner === 2) {
+      winnerName = found.Team2;
+    } else {
+      console.log("Winner inesperado: " + found.Winner);
+      continue;
+    }
+
+    // Resolver a ID interno
+    var winnerId = resolveTeamIdByName(winnerName);
+    if (!winnerId) {
+      // Fallback: comparar con los equipos del partido
+      var r_t1_id = resolveTeamIdByName(found.Team1);
+      var r_t2_id = resolveTeamIdByName(found.Team2);
+      if (winnerName === found.Team1) {
+        winnerId = r_t1_id || (resolveTeamIdByName(found.Team1) === teamA.id ? teamA.id : teamB.id);
+      } else {
+        winnerId = r_t2_id || (resolveTeamIdByName(found.Team2) === teamB.id ? teamB.id : teamA.id);
+      }
+    }
 
     if (!winnerId) {
-      console.log("Ganador no mapeado: '" + found.Winner + "' - anadelo a TEAM_NAME_MAP");
+      console.log("No se pudo resolver el ID para: " + winnerName + " - anadelo a TEAM_NAME_MAP");
       continue;
     }
 
     var idx = allMatches.findIndex(function(m) { return m.id === appMatch.id; });
     allMatches[idx] = Object.assign({}, allMatches[idx], { isCompleted: true, winnerId: winnerId });
-    console.log("OK: " + teamAShort + " vs " + teamBShort + " -> " + found.Winner + " (id: " + winnerId + ")");
+    console.log("OK: " + (teamA.shortName || "") + " vs " + (teamB.shortName || "") + " -> " + winnerName + " (id: " + winnerId + ")");
     updated++;
   }
 
