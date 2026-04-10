@@ -74,7 +74,41 @@ async function leaguepediaQuery(where, fields, limit) {
     order_by: "DateTime_UTC DESC",
     limit: String(limit || 100),
     format: "json",
+    maxlag: "5",  // ← NUEVO: evita ejecutar si el servidor está bajo carga
   });
+
+  const url = LEAGUEPEDIA_API + "?" + params.toString();
+
+  // Reintentar hasta 3 veces con espera exponencial si hay ratelimit
+  for (var attempt = 1; attempt <= 3; attempt++) {
+    const res = await fetch(url, {
+      headers: {
+        // Formato correcto según política de MediaWiki
+        "User-Agent": "PickemSync/1.0 (https://github.com/racinguista10/pickemapp; bot)",
+      },
+    });
+
+    if (res.status === 429 || res.status === 503) {
+      var waitSecs = attempt * 30; // 30s, 60s, 90s
+      console.log("Rate limited. Esperando " + waitSecs + "s antes de reintentar...");
+      await new Promise(function(r) { setTimeout(r, waitSecs * 1000); });
+      continue;
+    }
+
+    if (!res.ok) throw new Error("Leaguepedia HTTP " + res.status);
+    const json = await res.json();
+    if (json.error && json.error.code === "ratelimited") {
+      var waitSecs = attempt * 30;
+      console.log("Rate limited (API). Esperando " + waitSecs + "s...");
+      await new Promise(function(r) { setTimeout(r, waitSecs * 1000); });
+      continue;
+    }
+    if (json.error) throw new Error("Leaguepedia error: " + JSON.stringify(json.error));
+    return (json.cargoquery || []).map(function(r) { return r.title; });
+  }
+
+  throw new Error("Rate limit persistente tras 3 intentos. Prueba mas tarde.");
+}
 
   const url = LEAGUEPEDIA_API + "?" + params.toString();
   const res = await fetch(url, {
