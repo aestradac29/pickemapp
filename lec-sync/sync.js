@@ -18,26 +18,26 @@ const OVERVIEW_PAGES = {
   summer_2026: "LEC/2026 Season/Summer Season",
 };
 
-// Mapa nombre Leaguepedia -> ID interno de la app
 const TEAM_NAME_MAP = {
-  "Fnatic":        "fnc",
-  "G2 Esports":    "g2",
-  "GIANTX":        "gx",
-  "Karmine Corp":  "kc",
-  "Team Vitality": "vit",
-  "Movistar KOI":  "mkoi",
-  "Natus Vincere": "nvi",
-  "SK Gaming":     "sk",
-  "Team Heretics": "th",
-  "Shifters":      "shf",
+  "Fnatic":            "fnc",
+  "G2 Esports":        "g2",
+  "GIANTX":            "gx",
+  "Karmine Corp":      "kc",
+  "Team Vitality":     "vit",
+  "KOI":               "mkoi",
+  "Movistar KOI":      "mkoi",
+  "Natus Vincere":     "nvi",
+  "SK Gaming":         "sk",
+  "Team Heretics":     "th",
+  "Shifters":          "shf",
   "Karmine Corp Blue": "kcb",
-  "Los Ratones":   "rat",
+  "Los Ratones":       "rat",
 };
 
 function initFirebase() {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+  var projectId   = process.env.FIREBASE_PROJECT_ID;
+  var clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  var privateKey  = (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error("Faltan variables de entorno de Firebase");
   }
@@ -46,14 +46,14 @@ function initFirebase() {
 }
 
 function getDocName(baseName, splitId) {
-  const s = (splitId || "").toLowerCase();
+  var s = (splitId || "").toLowerCase();
   if (s.includes("spring")) return baseName + "_spring_2026";
   if (s.includes("summer")) return baseName + "_summer_2026";
   return baseName;
 }
 
 function normalizeSplit(splitId) {
-  const s = (splitId || "").toLowerCase();
+  var s = (splitId || "").toLowerCase();
   if (s.includes("spring")) return "spring_2026";
   if (s.includes("summer")) return "summer_2026";
   return "winter_2026";
@@ -61,83 +61,73 @@ function normalizeSplit(splitId) {
 
 function resolveTeamIdByName(teamName) {
   if (!teamName) return null;
-  if (TEAM_NAME_MAP[teamName]) return TEAM_NAME_MAP[teamName];
-  return null;
+  return TEAM_NAME_MAP[teamName] || null;
+}
+
+function sleep(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
 async function leaguepediaQuery(where, fields, limit) {
-  const params = new URLSearchParams({
-    action: "cargoquery",
-    tables: "MatchSchedule",
-    fields: fields,
-    where: where,
+  var params = new URLSearchParams({
+    action:   "cargoquery",
+    tables:   "MatchSchedule",
+    fields:   fields,
+    where:    where,
     order_by: "DateTime_UTC DESC",
-    limit: String(limit || 100),
-    format: "json",
-    maxlag: "5",  // ← NUEVO: evita ejecutar si el servidor está bajo carga
+    limit:    String(limit || 100),
+    format:   "json",
+    maxlag:   "5",
   });
 
-  const url = LEAGUEPEDIA_API + "?" + params.toString();
+  var url = LEAGUEPEDIA_API + "?" + params.toString();
 
-  // Reintentar hasta 3 veces con espera exponencial si hay ratelimit
   for (var attempt = 1; attempt <= 3; attempt++) {
-    const res = await fetch(url, {
+    var res = await fetch(url, {
       headers: {
-        // Formato correcto según política de MediaWiki
         "User-Agent": "PickemSync/1.0 (https://github.com/racinguista10/pickemapp; bot)",
       },
     });
 
     if (res.status === 429 || res.status === 503) {
-      var waitSecs = attempt * 30; // 30s, 60s, 90s
-      console.log("Rate limited. Esperando " + waitSecs + "s antes de reintentar...");
-      await new Promise(function(r) { setTimeout(r, waitSecs * 1000); });
+      var waitSecs = attempt * 30;
+      console.log("Rate limited (HTTP " + res.status + "). Esperando " + waitSecs + "s...");
+      await sleep(waitSecs * 1000);
       continue;
     }
 
     if (!res.ok) throw new Error("Leaguepedia HTTP " + res.status);
-    const json = await res.json();
+
+    var json = await res.json();
+
     if (json.error && json.error.code === "ratelimited") {
       var waitSecs = attempt * 30;
       console.log("Rate limited (API). Esperando " + waitSecs + "s...");
-      await new Promise(function(r) { setTimeout(r, waitSecs * 1000); });
+      await sleep(waitSecs * 1000);
       continue;
     }
+
     if (json.error) throw new Error("Leaguepedia error: " + JSON.stringify(json.error));
+
     return (json.cargoquery || []).map(function(r) { return r.title; });
   }
 
   throw new Error("Rate limit persistente tras 3 intentos. Prueba mas tarde.");
 }
 
-  const url = LEAGUEPEDIA_API + "?" + params.toString();
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 PickemSync/1.0",
-      "Accept": "application/json",
-    },
-  });
-
-  if (!res.ok) throw new Error("Leaguepedia HTTP " + res.status);
-  const json = await res.json();
-  if (json.error) throw new Error("Leaguepedia error: " + JSON.stringify(json.error));
-  return (json.cargoquery || []).map(function(r) { return r.title; });
-}
-
 async function getLecResults(splitId) {
-  const normalized = normalizeSplit(splitId);
-  const overviewPage = OVERVIEW_PAGES[normalized];
+  var normalized   = normalizeSplit(splitId);
+  var overviewPage = OVERVIEW_PAGES[normalized];
   console.log("Buscando en: " + overviewPage);
 
-  const where = 'OverviewPage="' + overviewPage + '" AND Winner IS NOT NULL AND Winner != ""';
-  // Winner es 1 o 2, Team1 y Team2 son los nombres de los equipos
-  const results = await leaguepediaQuery(where, "Team1, Team2, Winner, DateTime_UTC", 100);
+  var where   = 'OverviewPage="' + overviewPage + '" AND Winner IS NOT NULL AND Winner != ""';
+  var results = await leaguepediaQuery(where, "Team1, Team2, Winner, DateTime_UTC", 100);
 
   console.log("Resultados obtenidos: " + results.length);
   if (results.length > 0) {
     results.slice(0, 3).forEach(function(r) {
       var winnerName = r.Winner === "1" ? r.Team1 : r.Winner === "2" ? r.Team2 : "?";
-      console.log("  " + r.Team1 + " vs " + r.Team2 + " -> ganador: " + winnerName + " (Winner=" + r.Winner + ")");
+      console.log("  " + r.Team1 + " vs " + r.Team2 + " -> " + winnerName + " (Winner=" + r.Winner + ")");
     });
   }
 
@@ -145,22 +135,22 @@ async function getLecResults(splitId) {
 }
 
 async function sync() {
-  const splitId = process.env.SPLIT_ID || "spring_2026";
+  var splitId = process.env.SPLIT_ID || "spring_2026";
   console.log("\nIniciando sync - Split: " + splitId + "\n");
 
-  const db = initFirebase();
+  var db = initFirebase();
 
-  const docName = getDocName("matches", splitId);
-  const docRef = db.collection("admin_data").doc(docName);
-  const snap = await docRef.get();
+  var docName = getDocName("matches", splitId);
+  var docRef  = db.collection("admin_data").doc(docName);
+  var snap    = await docRef.get();
 
   if (!snap.exists) {
     console.log("Documento de partidos no encontrado.");
     return;
   }
 
-  const allMatches = snap.data().allMatches || [];
-  const pending = allMatches.filter(function(m) { return !m.isCompleted; });
+  var allMatches = snap.data().allMatches || [];
+  var pending    = allMatches.filter(function(m) { return !m.isCompleted; });
 
   if (pending.length === 0) {
     console.log("No hay partidos pendientes.");
@@ -185,28 +175,24 @@ async function sync() {
 
   for (var i = 0; i < pending.length; i++) {
     var appMatch = pending[i];
-    var appTime = new Date(appMatch.startTime).getTime();
-    var teamA = appMatch.teamA || {};
-    var teamB = appMatch.teamB || {};
+    var appTime  = new Date(appMatch.startTime).getTime();
+    var teamA    = appMatch.teamA || {};
+    var teamB    = appMatch.teamB || {};
 
     var found = null;
     for (var j = 0; j < lecResults.length; j++) {
-      var r = lecResults[j];
+      var r      = lecResults[j];
+      var t1id   = resolveTeamIdByName(r.Team1);
+      var t2id   = resolveTeamIdByName(r.Team2);
 
-      // Resolver IDs de los equipos de Leaguepedia
-      var r_t1_id = resolveTeamIdByName(r.Team1);
-      var r_t2_id = resolveTeamIdByName(r.Team2);
-
-      // Comparar por ID interno o por nombre
-      var t1matchesA = r_t1_id === teamA.id || (r.Team1 || "").toUpperCase() === (teamA.shortName || "").toUpperCase();
-      var t1matchesB = r_t1_id === teamB.id || (r.Team1 || "").toUpperCase() === (teamB.shortName || "").toUpperCase();
-      var t2matchesA = r_t2_id === teamA.id || (r.Team2 || "").toUpperCase() === (teamA.shortName || "").toUpperCase();
-      var t2matchesB = r_t2_id === teamB.id || (r.Team2 || "").toUpperCase() === (teamB.shortName || "").toUpperCase();
+      var t1matchesA = t1id === teamA.id || (r.Team1 || "").toUpperCase() === (teamA.shortName || "").toUpperCase();
+      var t1matchesB = t1id === teamB.id || (r.Team1 || "").toUpperCase() === (teamB.shortName || "").toUpperCase();
+      var t2matchesA = t2id === teamA.id || (r.Team2 || "").toUpperCase() === (teamA.shortName || "").toUpperCase();
+      var t2matchesB = t2id === teamB.id || (r.Team2 || "").toUpperCase() === (teamB.shortName || "").toUpperCase();
 
       var teamsMatch = (t1matchesA && t2matchesB) || (t1matchesB && t2matchesA);
       if (!teamsMatch) continue;
 
-      // Verificar fecha (margen 6h)
       if (r.DateTime_UTC) {
         var apiTime = new Date(r.DateTime_UTC + " UTC").getTime();
         if (Math.abs(apiTime - appTime) > 6 * 60 * 60 * 1000) continue;
@@ -218,7 +204,6 @@ async function sync() {
 
     if (!found) continue;
 
-    // Winner=1 -> gana Team1, Winner=2 -> gana Team2
     var winnerName = null;
     if (found.Winner === "1" || found.Winner === 1) {
       winnerName = found.Team1;
@@ -229,21 +214,9 @@ async function sync() {
       continue;
     }
 
-    // Resolver a ID interno
     var winnerId = resolveTeamIdByName(winnerName);
     if (!winnerId) {
-      // Fallback: comparar con los equipos del partido
-      var r_t1_id = resolveTeamIdByName(found.Team1);
-      var r_t2_id = resolveTeamIdByName(found.Team2);
-      if (winnerName === found.Team1) {
-        winnerId = r_t1_id || (resolveTeamIdByName(found.Team1) === teamA.id ? teamA.id : teamB.id);
-      } else {
-        winnerId = r_t2_id || (resolveTeamIdByName(found.Team2) === teamB.id ? teamB.id : teamA.id);
-      }
-    }
-
-    if (!winnerId) {
-      console.log("No se pudo resolver el ID para: " + winnerName + " - anadelo a TEAM_NAME_MAP");
+      console.log("ID no encontrado para: '" + winnerName + "' - anadelo a TEAM_NAME_MAP");
       continue;
     }
 
