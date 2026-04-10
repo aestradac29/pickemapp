@@ -153,6 +153,13 @@ async function getGamesForMatch(uniqueMatch) {
     10
   );
 
+  for (var g = 0; g < gameResults.length; g++) {
+  var gr = gameResults[g];
+  // TEMPORAL: ver qué devuelve Leaguepedia exactamente
+  console.log("  Game " + gr.N_GameInMatch + ": Blue='" + gr.Blue + "' Red='" + gr.Red + "' Winner=" + gr.Winner);
+  ...
+}
+
   return results;
 }
 
