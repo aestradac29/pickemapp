@@ -923,7 +923,7 @@ export const dataService = {
     },
 
     // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
-    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[], splitId?: string, mvpPlayerId?: string) {
+    async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[], splitId?: string) {
         // 1. Get Match & Players
         const [docSnap, players] = await Promise.all([
             getDoc(doc(db, "admin_data", this._getDocName("matches", splitId))),
@@ -936,7 +936,6 @@ export const dataService = {
         if (index === -1) throw new Error("Match not found");
 
         const match = allMatches[index];
-        match.mvpPlayerId = mvpPlayerId;
 
         // 2. Aggregate Stats Logic (Normalization)
         // We will sum up all raw stats to store them for posterity.

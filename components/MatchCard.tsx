@@ -212,12 +212,15 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     const safe  = isNaN(d.getTime()) ? new Date() : d;
     const iso   = new Date(safe.getTime() - safe.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     const isPO  = match.stage === Stage.PLAYOFFS || match.stage === Stage.FINALS;
-    const sel   = (val: string, onChange: (v: string) => void, opts: [string,string][]) => (
+    const sel   = (val: string, onChange: (v: string) => void, opts: [string,string][]) => {
+      const uniqueOpts = Array.from(new Map(opts.map(o => [o[0], o])).values());
+      return (
       <select value={val} onChange={e => onChange(e.target.value)}
         className="w-full bg-black/40 border border-gray-700 rounded-lg p-2 text-sm text-white focus:border-red-500 outline-none">
-        {opts.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+        {uniqueOpts.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
       </select>
     );
+    };
 
     return (
       <div className="relative w-full bg-red-950/15 rounded-xl border border-red-500/25 overflow-hidden mb-3 p-4 animate-in fade-in">
