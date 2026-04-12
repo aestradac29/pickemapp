@@ -423,11 +423,11 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
       await dataService.updateGlobalConfig({ playoffRounds: newTotal });
   };
 
-  const handleSaveStats = async (stats: any, mvpPlayerId?: string) => {
+  const handleSaveStats = async (stats: any) => {
       if (!statsMatch) return;
       setIsSavingStats(true);
       try {
-          await dataService.saveMatchStatsAndCalculate(statsMatch.id, stats, selectedSplit, mvpPlayerId);
+          await dataService.saveMatchStatsAndCalculate(statsMatch.id, stats, selectedSplit);
           setStatsMatch(null); 
           const updated = await dataService.getMatches(undefined, selectedSplit);
           setAllMatches(updated);

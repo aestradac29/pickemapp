@@ -152,7 +152,7 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
 
                 {/* Score Preview with 2 Decimals */}
                 <div className="col-span-1 text-right font-bold text-[#0ac8b9] text-xs sm:text-sm">
-                    {s.totalPoints.toFixed(2)}
+                    {(s.totalPoints || 0).toFixed(2)}
                 </div>
             </div>
 
@@ -380,17 +380,22 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                 
                 const statsMap: Record<string, PlayerGameStats> = {};
                 matchPlayers.forEach(p => {
+                    const defaultStats: PlayerGameStats = {
+                        playerId: p.id,
+                        kills: 0, deaths: 0, assists: 0, cs: 0,
+                        isMvp: false, firstBlood: false,
+                        doubleKills:0, tripleKills:0, quadraKills:0, pentaKills:0,
+                        teamDamagePercentage:0, turretDamage: 0, minionsPerMinute: 0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false,
+                        totalPoints: 0
+                    };
                     if (useLegacyStats && match.stats && match.stats[p.id]) {
-                        statsMap[p.id] = { ...match.stats[p.id] };
+                        statsMap[p.id] = { ...defaultStats, ...match.stats[p.id] };
+                        // Ensure totalPoints is a number even if legacy stats had it as undefined/null
+                        if (typeof statsMap[p.id].totalPoints !== 'number' || isNaN(statsMap[p.id].totalPoints)) {
+                            statsMap[p.id].totalPoints = 0;
+                        }
                     } else {
-                        statsMap[p.id] = {
-                            playerId: p.id,
-                            kills: 0, deaths: 0, assists: 0, cs: 0,
-                            isMvp: false, firstBlood: false,
-                            doubleKills:0, tripleKills:0, quadraKills:0, pentaKills:0,
-                            teamDamagePercentage:0, turretDamage: 0, minionsPerMinute: 0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false,
-                            totalPoints: 0
-                        };
+                        statsMap[p.id] = defaultStats;
                     }
                 });
                 
@@ -503,6 +508,10 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
         try {
             // Call Gemini service
             const extractedStats = await extractStatsFromData(importText, matchPlayers);
+            
+            if (Object.keys(extractedStats).length === 0) {
+                throw new Error("No se encontraron estadísticas válidas para los jugadores de este partido.");
+            }
             
             // Merge into current game state
             setGamesData(prev => {

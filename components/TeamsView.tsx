@@ -175,7 +175,7 @@ const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ player, team, m
 
                                 {/* Right: Points */}
                                 <div className="w-1/3 text-right">
-                                    <div className="text-lg font-bold text-[#0ac8b9]">{game.stats.totalPoints.toFixed(1)}</div>
+                                    <div className="text-lg font-bold text-[#0ac8b9]">{(game.stats.totalPoints || 0).toFixed(1)}</div>
                                     <div className="text-[9px] text-[#0ac8b9]/60 uppercase font-bold">Puntos Fantasy</div>
                                 </div>
                             </div>

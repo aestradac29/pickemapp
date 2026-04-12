@@ -34,7 +34,8 @@ const statsSchema: Schema = {
           baronsKilled: { type: Type.NUMBER, description: "Total barones matados por SU equipo" },
           firstBlood: { type: Type.BOOLEAN },
           firstDragon: { type: Type.BOOLEAN, description: "Si su equipo hizo el primer dragón" }
-        }
+        },
+        required: ["playerName", "kills", "deaths", "assists"]
       }
     }
   }
@@ -97,11 +98,13 @@ export const extractStatsFromData = async (
     if (parsed.stats && Array.isArray(parsed.stats)) {
       parsed.stats.forEach((extracted: any) => {
         // Encontrar el jugador en nuestra DB haciendo matching flexible de nombre
-        const player = availablePlayers.find(p =>
-          p.name.toLowerCase() === extracted.playerName?.toLowerCase() ||
-          extracted.playerName?.toLowerCase().includes(p.name.toLowerCase()) ||
-          p.name.toLowerCase().includes(extracted.playerName?.toLowerCase())
-        );
+        const extractedName = extracted.playerName?.toLowerCase() || "";
+        const player = availablePlayers.find(p => {
+          const dbName = p.name.toLowerCase();
+          return dbName === extractedName ||
+                 extractedName.includes(dbName) ||
+                 (extractedName.length > 0 && dbName.includes(extractedName));
+        });
 
         if (player) {
           // Calcular porcentaje de daño si tenemos los datos

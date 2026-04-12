@@ -86,7 +86,7 @@ const PlayerStatRow: React.FC<PlayerStatRowProps> = ({ player, stats, isWinner, 
                 {/* Fantasy Points */}
                 <div className="w-1/6 text-right">
                     <span className="text-sm font-bold text-[#0ac8b9] drop-shadow-md">
-                        {stats.totalPoints.toFixed(1)}
+                        {(stats.totalPoints || 0).toFixed(1)}
                     </span>
                     <span className="block text-[8px] text-[#0ac8b9]/60 uppercase font-bold">Pts</span>
                 </div>
