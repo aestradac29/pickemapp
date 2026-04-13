@@ -82,6 +82,8 @@ async function startServer() {
         appId:             process.env.VITE_FIREBASE_APP_ID             || process.env.FIREBASE_APP_ID             || "",
       },
       geminiApiKey: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "",
+      claudeApiKey: process.env.VITE_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || "",
+      groqApiKey:   process.env.VITE_GROQ_API_KEY   || process.env.GROQ_API_KEY   || "",
     });
   });
 
@@ -102,6 +104,8 @@ async function startServer() {
         appId:             process.env.VITE_FIREBASE_APP_ID             || process.env.FIREBASE_APP_ID             || "",
       },
       geminiApiKey: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "",
+      claudeApiKey: process.env.VITE_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || "",
+      groqApiKey:   process.env.VITE_GROQ_API_KEY   || process.env.GROQ_API_KEY   || "",
     };
     return `<script>window.__APP_CONFIG__ = ${JSON.stringify(config)};</script>`;
   }

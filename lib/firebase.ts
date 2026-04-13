@@ -26,6 +26,8 @@ declare global {
         vapidKey?: string;
       };
       geminiApiKey: string;
+      claudeApiKey: string;
+      groqApiKey: string;
     };
   }
 }
