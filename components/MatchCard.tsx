@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Match, Team, Stage } from '../types';
+import { Match, Team, Stage, MatchStatus } from '../types';
 import {
   CheckCircle2, Save, X, Trophy, Loader2, AlertCircle, Lock,
   Trash2, AlertTriangle, Swords, ShieldAlert, Crown, GitMerge,
@@ -35,7 +35,7 @@ const TeamButton = ({
 }) => {
   const isWinner    = match.winnerId === team.id;
   const isWrongPick = match.isCompleted && isSelected && !!match.winnerId && !isWinner;
-  const isPending   = !match.isCompleted && !isLocked;
+  const isPending   = match.status === MatchStatus.SCHEDULED && !isLocked;
   const canInteract = isPending && !isEditing;
 
   // Estado visual dominante
@@ -225,19 +225,23 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     return (
       <div className="relative w-full bg-red-950/15 rounded-xl border border-red-500/25 overflow-hidden mb-3 p-4 animate-in fade-in">
         {showDeleteConfirm && (
-          <div className="absolute inset-0 bg-black/92 z-50 flex flex-col items-center justify-center p-4 text-center animate-in fade-in">
-            <AlertTriangle className="w-9 h-9 text-red-500 mb-2" />
-            <h4 className="text-white font-bold mb-1">¿Borrar este partido?</h4>
-            <p className="text-gray-500 text-xs mb-4">Esta acción no se puede deshacer.</p>
-            <div className="flex gap-3">
-              <button onClick={e => { e.stopPropagation(); setShowDeleteConfirm(false); }}
-                className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold">
-                Cancelar
-              </button>
-              <button onClick={e => { e.stopPropagation(); onDelete?.(); setShowDeleteConfirm(false); }}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5">
-                <Trash2 className="w-3 h-3" /> Confirmar
-              </button>
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-6 animate-in fade-in" onClick={e => { e.stopPropagation(); setShowDeleteConfirm(false); }}>
+            <div className="bg-[#0d1b2e] border border-red-500/40 rounded-2xl p-6 max-w-xs w-full shadow-2xl text-center animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+              <div className="w-12 h-12 rounded-full bg-red-900/30 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <h4 className="text-white font-bold text-base mb-1">¿Borrar este partido?</h4>
+              <p className="text-gray-500 text-xs mb-5">Esta acción no se puede deshacer.</p>
+              <div className="flex gap-3">
+                <button onClick={e => { e.stopPropagation(); setShowDeleteConfirm(false); }}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white text-sm font-bold transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={e => { e.stopPropagation(); onDelete?.(); setShowDeleteConfirm(false); }}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-red-900/30">
+                  <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                </button>
+              </div>
             </div>
           </div>
         )}

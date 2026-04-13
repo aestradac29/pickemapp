@@ -5,6 +5,12 @@ export enum Stage {
   FINALS = 'Gran Final'
 }
 
+export enum MatchStatus {
+  SCHEDULED = 'SCHEDULED',
+  LIVE = 'LIVE',
+  COMPLETED = 'COMPLETED'
+}
+
 export enum Region {
   LEC = 'LEC',
   LCK = 'LCK',
@@ -145,6 +151,7 @@ export interface Match {
   teamB: Team;
   startTime: string; // ISO String
   stage: Stage;
+  status?: MatchStatus; // New: SCHEDULED, LIVE, COMPLETED
   isCompleted: boolean;
   winnerId?: string | null; // If completed
   day?: number | null; // Optional day number for filtering

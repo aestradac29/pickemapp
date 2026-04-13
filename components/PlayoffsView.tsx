@@ -765,7 +765,10 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                                 </p>
                             </div>
                         ) : (
-                            listMatches.map(match => (
+                            listMatches.map(match => {
+                                    const matchHasStarted = new Date() >= new Date(match.startTime);
+                                    const isMatchLocked = (isManuallyClosed || matchHasStarted) && !isSpectating;
+                                    return (
                                 <MatchCard 
                                     key={match.id} 
                                     match={match}
@@ -773,14 +776,15 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
                                     selectedWinnerId={visiblePredictions.find(p => p.matchId === match.id)?.predictedWinnerId}
                                     onSelectWinner={handleSelectWinner}
                                     isEditing={isEditMode}
-                                    isDayLocked={isLockedForUser || isSpectating} 
+                                    isLocked={isMatchLocked || isSpectating}
                                     customTitle={getBracketLabel(match)} 
                                     onUpdate={(updates) => handleAdminUpdate(match.id, updates)}
                                     onDelete={() => handleAdminDelete(match.id)}
                                     onEditStats={(m) => setStatsMatch(m)}
                                     onViewStats={(m) => setViewStatsMatch(m)}
                                 />
-                            ))
+                                    );
+                                })
                         )}
 
                         {newMatch && (

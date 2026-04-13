@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
 import { DaySelector } from './DaySelector';
 import { MatchdayImageUploader } from './MatchdayImageUploader';
-import { UserPrediction, Match, Team, Stage, Player } from '../types';
+import { UserPrediction, Match, Team, Stage, Player, MatchStatus } from '../types';
 import { CalendarCheck, Save, Loader2, CheckCircle2, Settings, Plus, CalendarOff, AlertTriangle, AlertCircle, Lock, Unlock, Eye, EyeOff, Trophy, LogOut, User as UserIcon } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { TEAMS, normalizeSplitId } from '../constants';
@@ -110,7 +110,12 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
                 dataService.getLightUserList() // Lightweight: only id/name/avatar, no scoring
             ]);
             
-            setAllMatches(fetchedMatches);
+            const processedMatches = fetchedMatches.map(m => {
+                if (m.isCompleted) return { ...m, status: MatchStatus.COMPLETED };
+                if (new Date() >= new Date(m.startTime)) return { ...m, status: MatchStatus.LIVE };
+                return { ...m, status: MatchStatus.SCHEDULED };
+            });
+            setAllMatches(processedMatches);
             setAllTeams(Object.values(teamsMap));
             setAllPlayers(playersList);
             setAllUsers(lightUsers);
@@ -722,9 +727,9 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
                         // Visibility Logic for Spectating
                         // If spectating, you can ONLY see the pick if the match has started OR the day is closed
-                        const matchStarted = new Date() >= new Date(match.startTime);
-                        const isMatchLocked = (isManuallyClosed || (matchStarted && !isExplicitlyOpened)) && !isSpectating;
-                        const canSeePick = !isSpectating || isLockedForUser || matchStarted || isAdmin;
+                        const matchHasStarted = new Date() >= new Date(match.startTime);
+                        const isMatchLocked = (isManuallyClosed || (matchHasStarted && !isExplicitlyOpened)) && !isSpectating;
+                        const canSeePick = !isSpectating || isLockedForUser || match.status !== MatchStatus.SCHEDULED || isAdmin;
                         const userPick = predictions.find(p => p.matchId === match.id)?.predictedWinnerId;
 
                         return (
