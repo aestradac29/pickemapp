@@ -86,7 +86,7 @@ export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ cu
                         
                         if (e.message && e.message.includes('503')) {
                             await new Promise(resolve => setTimeout(resolve, 2000));
-                            if (retries === 1) currentModel = "gemini-1.5-flash";
+                            if (retries === 1) currentModel = "gemini-2.0-flash";
                         } else {
                             await new Promise(resolve => setTimeout(resolve, 1000));
                         }

@@ -104,7 +104,7 @@ export const extractStatsFromData = async (
         if (e.message && e.message.includes('503')) {
            await new Promise(resolve => setTimeout(resolve, 2000)); // wait 2 seconds
            if (retries === 1) {
-             currentModel = 'gemini-1.5-flash'; // Fallback to older model on last retry
+             currentModel = 'gemini-2.0-flash'; // Fallback to older model on last retry
            }
         } else {
            // For other errors, just wait a bit
