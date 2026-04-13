@@ -79,41 +79,17 @@ export const extractStatsFromData = async (
   // Limitamos caracteres para no exceder tokens si pegan HTML gigante
 
   try {
-    let response;
-    let retries = 3;
-    let currentModel = 'gemini-2.5-flash';
-
-    while (retries > 0) {
-      try {
-        response = await ai.models.generateContent({
-          model: currentModel,
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: statsSchema,
-            temperature: 0.1 // Baja temperatura para mayor precisión en datos
-          }
-        });
-        break; // Success, exit loop
-      } catch (e: any) {
-        console.warn(`Gemini API error (${currentModel}):`, e.message);
-        retries--;
-        if (retries === 0) throw e;
-        
-        // If it's a 503, wait a bit and maybe switch model
-        if (e.message && e.message.includes('503')) {
-           await new Promise(resolve => setTimeout(resolve, 2000)); // wait 2 seconds
-           if (retries === 1) {
-             currentModel = 'gemini-2.0-flash'; // Fallback to older model on last retry
-           }
-        } else {
-           // For other errors, just wait a bit
-           await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: statsSchema,
+        temperature: 0.1 // Baja temperatura para mayor precisión en datos
       }
-    }
+    });
 
-    const resultText = response?.text;
+    const resultText = response.text;
     if (!resultText) return {};
 
     const parsed = JSON.parse(resultText);

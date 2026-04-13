@@ -34,66 +34,46 @@ export const MatchdayImageUploader: React.FC<MatchdayImageUploaderProps> = ({ cu
                 const apiKey = getGeminiApiKey();
                 const ai = new GoogleGenAI({ apiKey });
 
-                let response;
-                let retries = 3;
-                let currentModel = "gemini-2.5-flash"; // More stable model for image parsing
-
-                while (retries > 0) {
-                    try {
-                        response = await ai.models.generateContent({
-                            model: currentModel,
-                            contents: {
-                                parts: [
-                                    {
-                                        inlineData: {
-                                            mimeType: file.type,
-                                            data: base64Image,
-                                        },
-                                    },
-                                    {
-                                        text: `Extract ALL matches from this image. Return a JSON array of objects, each with: "teamAId" (string, e.g., 'fnc', 'g2', 'nvi', 'shf'), "teamBId" (string), "startTime" (string, format YYYY-MM-DDTHH:mm as it appears in the image, do NOT add timezone), "bestOf" (number, 1, 3, or 5). Assume the matches are for day ${currentDay}. 
-                                        
-                                        IMPORTANT: Be extremely accurate with team identification. 
-                                        - Use 'nvi' for Natus Vincere.
-                                        - Use 'shf' for Shifters.
-                                        - Ensure you extract every single match visible in the image.
-                                        - The current date is ${new Date().toISOString()}. The year is ${new Date().getFullYear()}. If the image only shows a time or a day of the week, infer the correct upcoming date. Do NOT use dates in the past. Always use the current year ${new Date().getFullYear()} unless explicitly stated otherwise.`,
-                                    },
-                                ],
-                            },
-                            config: {
-                                responseMimeType: "application/json",
-                                responseSchema: {
-                                    type: Type.ARRAY,
-                                    items: {
-                                        type: Type.OBJECT,
-                                        properties: {
-                                            teamAId: { type: Type.STRING },
-                                            teamBId: { type: Type.STRING },
-                                            startTime: { type: Type.STRING, description: "Local time format YYYY-MM-DDTHH:mm" },
-                                            bestOf: { type: Type.NUMBER },
-                                        },
-                                        required: ["teamAId", "teamBId", "startTime", "bestOf"],
-                                    },
+                const response = await ai.models.generateContent({
+                    model: "gemini-3-flash-preview",
+                    contents: {
+                        parts: [
+                            {
+                                inlineData: {
+                                    mimeType: file.type,
+                                    data: base64Image,
                                 },
                             },
-                        });
-                        break;
-                    } catch (e: any) {
-                        console.warn(`Gemini API error (${currentModel}):`, e.message);
-                        retries--;
-                        if (retries === 0) throw e;
-                        
-                        if (e.message && e.message.includes('503')) {
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                            if (retries === 1) currentModel = "gemini-2.0-flash";
-                        } else {
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                        }
-                    }
-                }
+                            {
+                                text: `Extract ALL matches from this image. Return a JSON array of objects, each with: "teamAId" (string, e.g., 'fnc', 'g2', 'nvi', 'shf'), "teamBId" (string), "startTime" (string, format YYYY-MM-DDTHH:mm as it appears in the image, do NOT add timezone), "bestOf" (number, 1, 3, or 5). Assume the matches are for day ${currentDay}. 
+                                
+                                IMPORTANT: Be extremely accurate with team identification. 
+                                - Use 'nvi' for Natus Vincere.
+                                - Use 'shf' for Shifters.
+                                - Ensure you extract every single match visible in the image.
+                                - The current date is ${new Date().toISOString()}. The year is ${new Date().getFullYear()}. If the image only shows a time or a day of the week, infer the correct upcoming date. Do NOT use dates in the past. Always use the current year ${new Date().getFullYear()} unless explicitly stated otherwise.`,
+                            },
+                        ],
+                    },
+                    config: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    teamAId: { type: Type.STRING },
+                                    teamBId: { type: Type.STRING },
+                                    startTime: { type: Type.STRING, description: "Local time format YYYY-MM-DDTHH:mm" },
+                                    bestOf: { type: Type.NUMBER },
+                                },
+                                required: ["teamAId", "teamBId", "startTime", "bestOf"],
+                            },
+                        },
+                    },
+                });
 
-                const matches = JSON.parse(response?.text || '[]');
+                const matches = JSON.parse(response.text || '[]');
                 // Ensure startTime is treated as local if it doesn't have a timezone
                 const processedMatches = matches.filter(Boolean).map((m: any) => ({
                     ...m,
