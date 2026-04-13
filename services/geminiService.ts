@@ -122,6 +122,37 @@ async function extractWithGemini(prompt: string, apiKey: string): Promise<any[]>
 // ─── Motor Groq ───────────────────────────────────────────────────────────────
 
 async function extractWithGroq(prompt: string, apiKey: string): Promise<any[]> {
+  const systemPrompt = `Eres un asistente experto en League of Legends que extrae estadísticas de partidos.
+Responde ÚNICAMENTE con un objeto JSON válido. Sin texto adicional, sin bloques markdown, sin explicaciones.
+El JSON debe tener exactamente esta estructura:
+{
+  "stats": [
+    {
+      "playerName": "string",
+      "kills": number,
+      "deaths": number,
+      "assists": number,
+      "cs": number,
+      "isMvp": boolean,
+      "doubleKills": number,
+      "tripleKills": number,
+      "quadraKills": number,
+      "pentaKills": number,
+      "totalDamage": number,
+      "teamTotalDamage": number,
+      "damagePerMinute": number,
+      "turretDamage": number,
+      "minionsPerMinute": number,
+      "visionScore": number,
+      "dragonsKilled": number,
+      "baronsKilled": number,
+      "firstBlood": boolean,
+      "firstDragon": boolean
+    }
+  ]
+}
+CRÍTICO: Para calcular teamDamagePercentage necesito que extraigas SIEMPRE totalDamage (daño del jugador) Y teamTotalDamage (suma del daño de todos los jugadores de su equipo). Esto es especialmente importante para Top y Mid.`;
+
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -133,10 +164,7 @@ async function extractWithGroq(prompt: string, apiKey: string): Promise<any[]> {
       temperature: 0.1,
       response_format: { type: "json_object" },
       messages: [
-        {
-          role: "system",
-          content: "Eres un asistente experto en League of Legends. Responde ÚNICAMENTE con JSON válido, sin texto adicional ni bloques markdown."
-        },
+        { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
       ],
     }),
