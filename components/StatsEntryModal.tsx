@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Match, Team, Player, PlayerGameStats, Role, MatchGame } from '../types';
 import { fantasyService } from '../services/fantasyService';
-import { extractStatsFromData } from '../services/geminiService';
+import { extractStatsFromData, AIImportResult } from '../services/geminiService';
 import { X, Save, RefreshCw, Trophy, Skull, Target, Swords, HeartHandshake, Crosshair, Droplet, ChevronDown, ChevronUp, Eye, Flame, Activity, CheckCircle2, Bot, FileText, Download, Sparkles, AlertTriangle, Crown } from 'lucide-react';
 import { ROLE_ICONS } from '../constants';
 
@@ -25,15 +25,15 @@ interface PlayerRowProps {
 
 const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    
-    const s = stats[player.id] || { 
+
+    const s = stats[player.id] || {
         playerId: player.id,
-        kills:0, deaths:0, assists:0, cs:0, totalPoints:0, 
-        isMvp: false, firstBlood: false, 
-        doubleKills:0, tripleKills:0, quadraKills:0, pentaKills:0,
-        teamDamagePercentage:0, turretDamage: 0, minionsPerMinute: 0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false
+        kills: 0, deaths: 0, assists: 0, cs: 0, totalPoints: 0,
+        isMvp: false, firstBlood: false,
+        doubleKills: 0, tripleKills: 0, quadraKills: 0, pentaKills: 0,
+        teamDamagePercentage: 0, turretDamage: 0, minionsPerMinute: 0, dragonsKilled: 0, baronsKilled: 0, damagePerMinute: 0, visionScore: 0, firstDragon: false
     };
-    
+
     // Indicadores visuales para los bonus (informativo)
     const hasHighKillBonus = s.kills >= 10;
     const kda = (s.kills + s.assists) / Math.max(1, s.deaths);
@@ -50,7 +50,7 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
 
     return (
         <div className={`bg-[#0a1428] rounded border border-gray-700 text-xs transition-all mb-1 ${isExpanded ? 'border-gray-500 shadow-lg' : 'hover:border-gray-500'}`}>
-            
+
             {/* --- MAIN ROW --- */}
             <div className="grid grid-cols-12 gap-2 items-center p-2">
                 {/* ID Info */}
@@ -69,12 +69,12 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                         <div className="absolute left-1 top-1/2 -translate-y-1/2 pointer-events-none">
                             <Swords className={`w-3 h-3 ${hasHighKillBonus ? 'text-red-500' : 'text-red-400'}`} />
                         </div>
-                        <input 
-                            type="number" 
-                            placeholder="K" 
-                            className={`w-full bg-[#1e293b] rounded py-1 pl-5 pr-1 text-right text-white outline-none focus:border-red-500 border font-mono ${hasHighKillBonus ? 'border-red-500/50 text-red-200' : 'border-transparent'}`} 
-                            value={s.kills} 
-                            onChange={(e) => onStatChange(player.id, 'kills', Number(e.target.value))} 
+                        <input
+                            type="number"
+                            placeholder="K"
+                            className={`w-full bg-[#1e293b] rounded py-1 pl-5 pr-1 text-right text-white outline-none focus:border-red-500 border font-mono ${hasHighKillBonus ? 'border-red-500/50 text-red-200' : 'border-transparent'}`}
+                            value={s.kills}
+                            onChange={(e) => onStatChange(player.id, 'kills', Number(e.target.value))}
                         />
                     </div>
 
@@ -83,12 +83,12 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                         <div className="absolute left-1 top-1/2 -translate-y-1/2 pointer-events-none">
                             <Skull className={`w-3 h-3 ${hasPerfectBonus ? 'text-blue-400' : 'text-gray-400'}`} />
                         </div>
-                        <input 
-                            type="number" 
-                            placeholder="D" 
-                            className={`w-full bg-[#1e293b] rounded py-1 pl-5 pr-1 text-right text-white outline-none focus:border-gray-500 border font-mono ${hasPerfectBonus ? 'border-blue-500/50 text-blue-200' : 'border-transparent'}`} 
-                            value={s.deaths} 
-                            onChange={(e) => onStatChange(player.id, 'deaths', Number(e.target.value))} 
+                        <input
+                            type="number"
+                            placeholder="D"
+                            className={`w-full bg-[#1e293b] rounded py-1 pl-5 pr-1 text-right text-white outline-none focus:border-gray-500 border font-mono ${hasPerfectBonus ? 'border-blue-500/50 text-blue-200' : 'border-transparent'}`}
+                            value={s.deaths}
+                            onChange={(e) => onStatChange(player.id, 'deaths', Number(e.target.value))}
                         />
                     </div>
 
@@ -97,12 +97,12 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                         <div className="absolute left-1 top-1/2 -translate-y-1/2 pointer-events-none">
                             <HeartHandshake className="w-3 h-3 text-blue-400" />
                         </div>
-                        <input 
-                            type="number" 
-                            placeholder="A" 
-                            className="w-full bg-[#1e293b] rounded py-1 pl-5 pr-1 text-right text-white outline-none focus:border-blue-500 border border-transparent font-mono" 
-                            value={s.assists} 
-                            onChange={(e) => onStatChange(player.id, 'assists', Number(e.target.value))} 
+                        <input
+                            type="number"
+                            placeholder="A"
+                            className="w-full bg-[#1e293b] rounded py-1 pl-5 pr-1 text-right text-white outline-none focus:border-blue-500 border border-transparent font-mono"
+                            value={s.assists}
+                            onChange={(e) => onStatChange(player.id, 'assists', Number(e.target.value))}
                         />
                     </div>
 
@@ -111,12 +111,12 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                         <div className="absolute left-1 top-1/2 -translate-y-1/2 pointer-events-none">
                             <Target className="w-3 h-3 text-yellow-400" />
                         </div>
-                        <input 
-                            type="number" 
-                            placeholder="CS" 
-                            className="w-full bg-[#1e293b] rounded py-1 pl-5 pr-1 text-right text-white outline-none focus:border-yellow-500 border border-transparent font-mono" 
-                            value={s.cs} 
-                            onChange={(e) => onStatChange(player.id, 'cs', Number(e.target.value))} 
+                        <input
+                            type="number"
+                            placeholder="CS"
+                            className="w-full bg-[#1e293b] rounded py-1 pl-5 pr-1 text-right text-white outline-none focus:border-yellow-500 border border-transparent font-mono"
+                            value={s.cs}
+                            onChange={(e) => onStatChange(player.id, 'cs', Number(e.target.value))}
                         />
                     </div>
                 </div>
@@ -125,9 +125,9 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                 <div className="col-span-2 flex items-center justify-center gap-1.5">
                     {/* MVP */}
                     <label className="relative cursor-pointer group/check" title="MVP del Partido (+3 Puntos)">
-                        <input 
-                            type="checkbox" 
-                            className="peer sr-only" 
+                        <input
+                            type="checkbox"
+                            className="peer sr-only"
                             checked={s.isMvp}
                             onChange={(e) => onStatChange(player.id, 'isMvp', e.target.checked)}
                         />
@@ -138,9 +138,9 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
 
                     {/* First Blood */}
                     <label className="relative cursor-pointer group/check" title="First Blood (+1 Punto)">
-                        <input 
-                            type="checkbox" 
-                            className="peer sr-only" 
+                        <input
+                            type="checkbox"
+                            className="peer sr-only"
                             checked={s.firstBlood}
                             onChange={(e) => onStatChange(player.id, 'firstBlood', e.target.checked)}
                         />
@@ -160,15 +160,15 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
             {isExpanded && (
                 <div className="px-4 pb-4 pt-0 animate-in slide-in-from-top-2 border-t border-gray-800/50">
                     <div className="grid grid-cols-2 gap-6 mt-3">
-                        
+
                         {/* LEFT: MULTIKILLS */}
                         <div className="bg-black/20 p-2 rounded border border-gray-800">
                             <span className="text-[10px] uppercase font-bold text-gray-500 mb-2 block tracking-wider">Multikills</span>
                             <div className="grid grid-cols-4 gap-2">
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[9px] text-gray-400 text-center">Double</span>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         className="bg-[#1e293b] rounded py-1 text-center text-white border border-gray-700 focus:border-red-500 outline-none"
                                         value={s.doubleKills}
                                         onChange={(e) => onStatChange(player.id, 'doubleKills', Number(e.target.value))}
@@ -176,8 +176,8 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[9px] text-yellow-200 text-center">Triple</span>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         className="bg-[#1e293b] rounded py-1 text-center text-white border border-gray-700 focus:border-red-500 outline-none"
                                         value={s.tripleKills}
                                         onChange={(e) => onStatChange(player.id, 'tripleKills', Number(e.target.value))}
@@ -185,8 +185,8 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[9px] text-orange-400 text-center">Quadra</span>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         className="bg-[#1e293b] rounded py-1 text-center text-white border border-gray-700 focus:border-red-500 outline-none"
                                         value={s.quadraKills}
                                         onChange={(e) => onStatChange(player.id, 'quadraKills', Number(e.target.value))}
@@ -194,8 +194,8 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[9px] text-red-500 font-bold text-center">PENTA</span>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         className="bg-[#1e293b] rounded py-1 text-center text-white border border-gray-700 focus:border-red-500 outline-none ring-1 ring-red-900"
                                         value={s.pentaKills}
                                         onChange={(e) => onStatChange(player.id, 'pentaKills', Number(e.target.value))}
@@ -218,9 +218,9 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                                 <span className="text-[9px] opacity-80">% Daño Equipo</span>
                                                 <span className="text-[9px] font-bold">{player.role === Role.TOP ? '>= 25%' : '>= 30%'}</span>
                                             </div>
-                                            <input 
-                                                type="number" 
-                                                placeholder="0-100" 
+                                            <input
+                                                type="number"
+                                                placeholder="0-100"
                                                 className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
                                                 value={s.teamDamagePercentage}
                                                 onChange={(e) => onStatChange(player.id, 'teamDamagePercentage', Number(e.target.value))}
@@ -231,9 +231,9 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                                 <span className="text-[9px] opacity-80">Daño a Torretas</span>
                                                 <span className="text-[9px] font-bold">&gt;= 5000</span>
                                             </div>
-                                            <input 
-                                                type="number" 
-                                                placeholder="0" 
+                                            <input
+                                                type="number"
+                                                placeholder="0"
                                                 className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
                                                 value={s.turretDamage}
                                                 onChange={(e) => onStatChange(player.id, 'turretDamage', Number(e.target.value))}
@@ -245,9 +245,9 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                                     <span className="text-[9px] opacity-80">Minions/Min</span>
                                                     <span className="text-[9px] font-bold">&gt;= 8.5</span>
                                                 </div>
-                                                <input 
-                                                    type="number" 
-                                                    placeholder="0.0" 
+                                                <input
+                                                    type="number"
+                                                    placeholder="0.0"
                                                     className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
                                                     value={s.minionsPerMinute}
                                                     onChange={(e) => onStatChange(player.id, 'minionsPerMinute', Number(e.target.value))}
@@ -261,9 +261,9 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                     <>
                                         <div className="flex flex-col gap-1">
                                             <span className="text-[9px] opacity-80">Dragones Team</span>
-                                            <input 
-                                                type="number" 
-                                                placeholder="Total" 
+                                            <input
+                                                type="number"
+                                                placeholder="Total"
                                                 className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
                                                 value={s.dragonsKilled}
                                                 onChange={(e) => onStatChange(player.id, 'dragonsKilled', Number(e.target.value))}
@@ -271,9 +271,9 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                         </div>
                                         <div className="flex flex-col gap-1">
                                             <span className="text-[9px] opacity-80">Barones Team</span>
-                                            <input 
-                                                type="number" 
-                                                placeholder="Total" 
+                                            <input
+                                                type="number"
+                                                placeholder="Total"
                                                 className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
                                                 value={s.baronsKilled}
                                                 onChange={(e) => onStatChange(player.id, 'baronsKilled', Number(e.target.value))}
@@ -288,9 +288,9 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                             <span className="text-[9px] opacity-80">Daño por Minuto</span>
                                             <span className="text-[9px] font-bold">{'>= 1000'}</span>
                                         </div>
-                                        <input 
-                                            type="number" 
-                                            placeholder="DPM" 
+                                        <input
+                                            type="number"
+                                            placeholder="DPM"
                                             className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
                                             value={s.damagePerMinute}
                                             onChange={(e) => onStatChange(player.id, 'damagePerMinute', Number(e.target.value))}
@@ -302,9 +302,9 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                     <>
                                         <div className="flex flex-col gap-1">
                                             <span className="text-[9px] opacity-80">Vision Score</span>
-                                            <input 
-                                                type="number" 
-                                                placeholder="Total" 
+                                            <input
+                                                type="number"
+                                                placeholder="Total"
                                                 className="bg-black/30 rounded py-1 px-2 text-white border border-white/10 focus:border-white/50 outline-none"
                                                 value={s.visionScore}
                                                 onChange={(e) => onStatChange(player.id, 'visionScore', Number(e.target.value))}
@@ -312,8 +312,8 @@ const PlayerRow: React.FC<PlayerRowProps> = ({ player, stats, onStatChange }) =>
                                         </div>
                                         <div className="flex flex-col gap-1 justify-center">
                                             <label className="flex items-center gap-2 cursor-pointer bg-black/30 p-1.5 rounded border border-white/10 hover:bg-black/50">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     className="accent-cyan-500"
                                                     checked={s.firstDragon}
                                                     onChange={(e) => onStatChange(player.id, 'firstDragon', e.target.checked)}
@@ -336,18 +336,19 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     // Determine number of games based on BO format
     const numGames = match.bestOf || 1;
     const gameIndices = Array.from({ length: numGames }, (_, i) => i + 1);
-    
+
     // State: Active Tab
     const [activeGame, setActiveGame] = useState(1);
 
     // State: Data Structure for ALL games
     const [gamesData, setGamesData] = useState<Record<number, { winnerId: string | null, stats: Record<string, PlayerGameStats> }>>({});
-    
+
     // Import AI State
     const [isImporting, setIsImporting] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [importError, setImportError] = useState<string | null>(null);
     const [importText, setImportText] = useState("");
+    const [importResult, setImportResult] = useState<AIImportResult | null>(null);
 
     // Players lists
     const playersA = allPlayers.filter(p => p.teamId === teamA.id);
@@ -357,7 +358,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     // Initialize logic (FIXED)
     useEffect(() => {
         const initialData: Record<number, any> = {};
-        
+
         // Helper to find existing game data in match object
         const getExistingGame = (id: number) => match.games?.find(g => g.id === id);
 
@@ -366,26 +367,26 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
 
             if (existingGame) {
                 // Load existing data if available
-                initialData[i] = { 
-                    winnerId: existingGame.winnerId, 
-                    stats: existingGame.stats 
+                initialData[i] = {
+                    winnerId: existingGame.winnerId,
+                    stats: existingGame.stats
                 };
             } else {
                 // Initialize New / Empty Structure
-                
+
                 // Legacy fallback: Only if NO match.games exist at all, and it's game 1, and match.stats exists.
                 // This covers cases where data was saved before multi-game support.
                 const isLegacyStatsAvailable = (!match.games || match.games.length === 0) && match.stats;
                 const useLegacyStats = i === 1 && isLegacyStatsAvailable;
-                
+
                 const statsMap: Record<string, PlayerGameStats> = {};
                 matchPlayers.forEach(p => {
                     const defaultStats: PlayerGameStats = {
                         playerId: p.id,
                         kills: 0, deaths: 0, assists: 0, cs: 0,
                         isMvp: false, firstBlood: false,
-                        doubleKills:0, tripleKills:0, quadraKills:0, pentaKills:0,
-                        teamDamagePercentage:0, turretDamage: 0, minionsPerMinute: 0, dragonsKilled:0, baronsKilled:0, damagePerMinute:0, visionScore:0, firstDragon:false,
+                        doubleKills: 0, tripleKills: 0, quadraKills: 0, pentaKills: 0,
+                        teamDamagePercentage: 0, turretDamage: 0, minionsPerMinute: 0, dragonsKilled: 0, baronsKilled: 0, damagePerMinute: 0, visionScore: 0, firstDragon: false,
                         totalPoints: 0
                     };
                     if (useLegacyStats && match.stats && match.stats[p.id]) {
@@ -398,7 +399,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                         statsMap[p.id] = defaultStats;
                     }
                 });
-                
+
                 initialData[i] = {
                     winnerId: useLegacyStats ? match.winnerId || null : null,
                     stats: statsMap
@@ -415,7 +416,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
             const currentPlayerStats = currentStatsMap[playerId];
 
             let updates: any = { [field]: value };
-            
+
             // Logic for MVP/First Blood exclusivity within THIS GAME
             const newStatsMap = { ...currentStatsMap };
 
@@ -445,9 +446,9 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
             const currentGameData = prev[activeGame];
             // Toggle logic: if clicking same winner, unselect
             const newWinner = currentGameData.winnerId === teamId ? null : teamId;
-            
+
             const newStatsMap = { ...currentGameData.stats };
-            
+
             // Recalculate ALL players points because Win Bonus changed
             Object.keys(newStatsMap).forEach(pid => {
                 recalculatePlayerPoints(newStatsMap[pid], newWinner);
@@ -464,9 +465,9 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     const recalculatePlayerPoints = (stats: PlayerGameStats, winnerId: string | null) => {
         const player = allPlayers.find(p => p.id === stats.playerId);
         if (!player) return;
-        
+
         const isWinner = winnerId === player.teamId;
-        
+
         stats.totalPoints = fantasyService.calculatePoints(
             { ...stats, win: isWinner } as any,
             player.role,
@@ -481,12 +482,12 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     const handleSave = () => {
         // Transform internal state to array
         const gamesList: MatchGame[] = [];
-        
+
         Object.keys(gamesData).forEach(key => {
             const gameId = parseInt(key);
             const data = gamesData[gameId];
             const hasData = data.winnerId !== null || Object.values(data.stats).some((s: PlayerGameStats) => s.totalPoints !== 0);
-            
+
             if (hasData) {
                 gamesList.push({
                     id: gameId,
@@ -502,17 +503,18 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     // --- AI IMPORT LOGIC ---
     const handleAIImport = async () => {
         if (!importText.trim()) return;
-        
+
         setIsImporting(true);
         setImportError(null);
+        setImportResult(null);
         try {
-            // Call Gemini service
-            const extractedStats = await extractStatsFromData(importText, matchPlayers);
-            
+            const result = await extractStatsFromData(importText, matchPlayers);
+            const extractedStats = result.stats;
+
             if (Object.keys(extractedStats).length === 0) {
                 throw new Error("No se encontraron estadísticas válidas para los jugadores de este partido.");
             }
-            
+
             // Merge into current game state
             setGamesData(prev => {
                 const currentGameData = prev[activeGame];
@@ -538,11 +540,11 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                 };
             });
 
+            setImportResult(result);
             setImportText("");
-            setShowImportModal(false);
         } catch (error) {
             console.error("AI Import Failed:", error);
-            setImportError("Falló la importación. Inténtalo de nuevo.");
+            setImportError("Falló la importación: " + ((error as any)?.message || "Inténtalo de nuevo."));
         } finally {
             setIsImporting(false);
         }
@@ -556,7 +558,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
             <div className="w-full max-w-5xl bg-[#091428] border-2 border-red-500 rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh] relative">
-                
+
                 {/* Header */}
                 <div className="p-4 bg-red-900/20 border-b border-red-500/30">
                     <div className="flex justify-between items-center mb-4">
@@ -572,7 +574,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button 
+                            <button
                                 onClick={() => setShowImportModal(true)}
                                 className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg hover:shadow-purple-500/30 transition-all hover:scale-105 overflow-hidden"
                             >
@@ -597,8 +599,8 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                                     onClick={() => setActiveGame(i)}
                                     className={`
                                         px-4 py-2 rounded-t-lg text-xs font-bold uppercase tracking-wider transition-all border-t border-x border-b-0 relative
-                                        ${isActive 
-                                            ? 'bg-[#091428] text-white border-red-500/50 z-10' 
+                                        ${isActive
+                                            ? 'bg-[#091428] text-white border-red-500/50 z-10'
                                             : 'bg-black/40 text-gray-500 border-transparent hover:bg-black/60'
                                         }
                                     `}
@@ -615,7 +617,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                 {/* Game Specific Toolbar (Winner Selection) */}
                 <div className="p-2 bg-[#050a14] border-b border-gray-800 flex justify-center gap-6 items-center">
                     <span className="text-xs text-gray-500 uppercase font-bold">Ganador Partida {activeGame}:</span>
-                    <button 
+                    <button
                         onClick={() => handleWinnerChange(teamA.id)}
                         className={`flex items-center gap-2 px-3 py-1 rounded border transition-all ${currentWinner === teamA.id ? 'bg-green-900/30 border-green-500 text-green-400' : 'bg-[#1e293b] border-gray-700 text-gray-400 hover:border-gray-500'}`}
                     >
@@ -623,7 +625,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                         <span className="text-xs font-bold">{teamA.shortName}</span>
                         {currentWinner === teamA.id && <CheckCircle2 className="w-3 h-3" />}
                     </button>
-                    <button 
+                    <button
                         onClick={() => handleWinnerChange(teamB.id)}
                         className={`flex items-center gap-2 px-3 py-1 rounded border transition-all ${currentWinner === teamB.id ? 'bg-green-900/30 border-green-500 text-green-400' : 'bg-[#1e293b] border-gray-700 text-gray-400 hover:border-gray-500'}`}
                     >
@@ -635,7 +637,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-8 custom-scrollbar bg-[#091428]">
-                    
+
                     {/* Team A Column */}
                     <div>
                         <div className="flex items-center gap-2 mb-4 border-b border-gray-700 pb-2">
@@ -665,7 +667,7 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                     <button onClick={onClose} className="px-6 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
                         Cancelar
                     </button>
-                    <button 
+                    <button
                         onClick={handleSave}
                         disabled={isSaving}
                         className="bg-green-600 hover:bg-green-500 text-white px-8 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 transition-all transform hover:scale-105"
@@ -679,12 +681,12 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                 {showImportModal && (
                     <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-8 backdrop-blur-sm animate-in fade-in">
                         <div className="w-full max-w-2xl bg-[#0f1d36] rounded-xl border border-purple-500/50 shadow-2xl p-6 relative">
-                            <button onClick={() => setShowImportModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
+                            <button onClick={() => { setShowImportModal(false); setImportResult(null); setImportError(null); }} className="absolute top-4 right-4 text-gray-400 hover:text-white">
                                 <X className="w-5 h-5" />
                             </button>
-                            
+
                             <h3 className="text-xl font-bold text-purple-300 mb-4 flex items-center gap-2">
-                                <Bot className="w-6 h-6" /> Importación Inteligente (Gemini)
+                                <Bot className="w-6 h-6" /> Importación Inteligente con IA
                             </h3>
 
                             {/* WARNING NOTICE */}
@@ -708,12 +710,12 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div className="mb-4">
                                 <p className="text-sm text-gray-300 mb-2">
                                     Copia todo el texto de la página de estadísticas (Ctrl+A, Ctrl+C en <strong>gol.gg</strong>) y pégalo aquí.
                                 </p>
-                                <textarea 
+                                <textarea
                                     className="w-full h-64 bg-black/50 border border-gray-600 rounded-lg p-4 text-xs font-mono text-gray-300 focus:border-purple-500 outline-none resize-none"
                                     placeholder="Pega aquí el contenido crudo de la web de estadísticas..."
                                     value={importText}
@@ -721,26 +723,46 @@ export const StatsEntryModal: React.FC<StatsEntryModalProps> = ({ match, teamA, 
                                 />
                             </div>
 
+                            {/* Result / Error banners */}
+                            {importResult && (
+                                <div className="mb-4 bg-green-500/10 border border-green-500/40 rounded-lg px-4 py-3 flex items-center gap-3">
+                                    <span className="text-green-400 text-lg">✓</span>
+                                    <div>
+                                        <p className="text-green-300 text-sm font-bold">Importación completada</p>
+                                        <p className="text-green-400/70 text-xs">
+                                            Modelo usado: <span className="font-mono font-bold uppercase">{importResult.usedModel === "gemini" ? "Gemini 2.5 Flash" : "Groq — Llama 3.3 70B"}</span>
+                                            {" · "}{Object.keys(importResult.stats).length} jugadores procesados
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                            {importError && (
+                                <div className="mb-4 bg-red-500/10 border border-red-500/40 rounded-lg px-4 py-3 flex items-start gap-3">
+                                    <span className="text-red-400 text-lg mt-0.5">✗</span>
+                                    <div>
+                                        <p className="text-red-300 text-sm font-bold">Error en la importación</p>
+                                        <p className="text-red-400/70 text-xs">{importError}</p>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex justify-end gap-3">
-                                <button 
-                                    onClick={() => setShowImportModal(false)}
+                                <button
+                                    onClick={() => { setShowImportModal(false); setImportResult(null); setImportError(null); }}
                                     className="px-4 py-2 rounded text-gray-400 hover:text-white"
                                 >
-                                    Cancelar
+                                    {importResult ? "Cerrar" : "Cancelar"}
                                 </button>
-                                {importError && (
-                                    <div className="text-red-400 text-xs font-medium bg-red-900/20 border border-red-700/40 rounded px-3 py-2">
-                                        ✗ {importError}
-                                    </div>
+                                {!importResult && (
+                                    <button
+                                        onClick={handleAIImport}
+                                        disabled={isImporting || !importText}
+                                        className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded font-bold flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                        {isImporting ? 'Analizando...' : 'Procesar Datos'}
+                                    </button>
                                 )}
-                                <button 
-                                    onClick={handleAIImport}
-                                    disabled={isImporting || !importText}
-                                    className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded font-bold flex items-center gap-2 disabled:opacity-50"
-                                >
-                                    {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                    {isImporting ? 'Analizando...' : 'Procesar Datos'}
-                                </button>
                             </div>
                         </div>
                     </div>

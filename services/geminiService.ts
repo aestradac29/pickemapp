@@ -4,7 +4,8 @@ import { Player, PlayerGameStats } from '../types';
 import { getGeminiApiKey } from '../lib/geminiConfig';
 import { getGroqApiKey } from '../lib/groqConfig';
 
-// Definición del esquema de respuesta esperado
+// ─── Schema Gemini ────────────────────────────────────────────────────────────
+
 const statsSchema: Schema = {
   type: Type.OBJECT,
   properties: {
@@ -13,27 +14,27 @@ const statsSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          playerName:       { type: Type.STRING, description: "Nombre del jugador encontrado en el texto (ej: 'Yike', 'Caps')" },
+          playerName:       { type: Type.STRING },
           kills:            { type: Type.NUMBER },
           deaths:           { type: Type.NUMBER },
           assists:          { type: Type.NUMBER },
-          cs:               { type: Type.NUMBER, description: "Creep Score / Súbditos" },
+          cs:               { type: Type.NUMBER },
           isMvp:            { type: Type.BOOLEAN },
           doubleKills:      { type: Type.NUMBER },
           tripleKills:      { type: Type.NUMBER },
           quadraKills:      { type: Type.NUMBER },
           pentaKills:       { type: Type.NUMBER },
-          totalDamage:      { type: Type.NUMBER, description: "Daño total a campeones" },
-          damagePerMinute:  { type: Type.NUMBER, description: "Daño por minuto (DPM)" },
-          teamTotalDamage:  { type: Type.NUMBER, description: "Daño total del equipo de este jugador (para calcular porcentaje)" },
-          turretDamage:     { type: Type.NUMBER, description: "Daño infligido a torretas (Damage dealt to turrets)" },
-          minionsPerMinute: { type: Type.NUMBER, description: "Súbditos por minuto (CSM o Minions/Min)" },
+          totalDamage:      { type: Type.NUMBER, description: "Daño total a campeones del jugador" },
+          damagePerMinute:  { type: Type.NUMBER, description: "DPM del jugador" },
+          teamTotalDamage:  { type: Type.NUMBER, description: "Daño total del equipo de este jugador" },
+          turretDamage:     { type: Type.NUMBER, description: "Daño infligido a torretas" },
+          minionsPerMinute: { type: Type.NUMBER, description: "Súbditos por minuto (CSM)" },
           gold:             { type: Type.NUMBER },
           visionScore:      { type: Type.NUMBER },
-          dragonsKilled:    { type: Type.NUMBER, description: "Total dragones matados por SU equipo" },
-          baronsKilled:     { type: Type.NUMBER, description: "Total barones matados por SU equipo" },
+          dragonsKilled:    { type: Type.NUMBER, description: "Dragones del equipo del jugador" },
+          baronsKilled:     { type: Type.NUMBER, description: "Barones del equipo del jugador" },
           firstBlood:       { type: Type.BOOLEAN },
-          firstDragon:      { type: Type.BOOLEAN, description: "Si su equipo hizo el primer dragón" }
+          firstDragon:      { type: Type.BOOLEAN },
         },
         required: ["playerName", "kills", "deaths", "assists"]
       }
@@ -41,16 +42,13 @@ const statsSchema: Schema = {
   }
 };
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const isRetryableError = (error: unknown): boolean => {
   const msg = String((error as any)?.message || error);
   return msg.includes("503") || msg.includes("UNAVAILABLE") || msg.includes("high demand");
 };
 
-/** Mapea el array de stats extraídas a un Record<playerId, PlayerGameStats> */
 function mapExtractedStats(
   extractedList: any[],
   availablePlayers: Player[]
@@ -100,61 +98,30 @@ function mapExtractedStats(
   return mappedStats;
 }
 
-// ─── Motor Gemini ────────────────────────────────────────────────────────────
+// ─── Motor Gemini (sin reintentos) ───────────────────────────────────────────
 
-async function extractWithGemini(
-  prompt: string,
-  apiKey: string
-): Promise<any[]> {
+async function extractWithGemini(prompt: string, apiKey: string): Promise<any[]> {
   const ai = new GoogleGenAI({ apiKey });
 
-  const MAX_RETRIES = 3;
-  const BASE_DELAY_MS = 3000; // 3s → 6s → 12s
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: statsSchema,
+      temperature: 0.1,
+    },
+  });
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: statsSchema,
-          temperature: 0.1,
-        },
-      });
-
-      const resultText = response.text;
-      if (!resultText) return [];
-
-      const parsed = JSON.parse(resultText);
-      return parsed.stats ?? [];
-
-    } catch (error) {
-      console.error(`Gemini intento ${attempt}/${MAX_RETRIES}:`, error);
-
-      if (isRetryableError(error) && attempt < MAX_RETRIES) {
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
-        console.warn(`Gemini saturado (503). Reintentando en ${delay / 1000}s...`);
-        await sleep(delay);
-        continue;
-      }
-
-      // Lanzar para que el caller decida si hace fallback
-      throw error;
-    }
-  }
-
-  throw new Error("Gemini no respondió tras varios intentos.");
+  const resultText = response.text;
+  if (!resultText) return [];
+  const parsed = JSON.parse(resultText);
+  return parsed.stats ?? [];
 }
 
-// ─── Motor Groq (fallback) ───────────────────────────────────────────────────
+// ─── Motor Groq ───────────────────────────────────────────────────────────────
 
-async function extractWithGroq(
-  prompt: string,
-  apiKey: string
-): Promise<any[]> {
-  console.info("Usando Groq (Llama 3.3 70B) como fallback...");
-
+async function extractWithGroq(prompt: string, apiKey: string): Promise<any[]> {
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -189,18 +156,25 @@ async function extractWithGroq(
   return parsed.stats ?? [];
 }
 
+// ─── Resultado de la importación ─────────────────────────────────────────────
+
+export type AIImportResult = {
+  stats: Record<string, Partial<PlayerGameStats>>;
+  usedModel: "gemini" | "groq";
+};
+
 // ─── Función principal exportada ─────────────────────────────────────────────
 
 export const extractStatsFromData = async (
   rawData: string,
   availablePlayers: Player[]
-): Promise<Record<string, Partial<PlayerGameStats>>> => {
+): Promise<AIImportResult> => {
 
   const geminiKey = getGeminiApiKey();
   const groqKey   = getGroqApiKey();
 
   if (!geminiKey && !groqKey) {
-    throw new Error("No hay ninguna API Key configurada (Gemini ni Groq).");
+    throw new Error("No hay ninguna API Key configurada (GEMINI_API_KEY ni GROQ_API_KEY).");
   }
 
   const playerNamesList = availablePlayers.map(p => p.name).join(", ");
@@ -211,14 +185,17 @@ export const extractStatsFromData = async (
 
     IMPORTANTE:
     1. Intenta coincidir los nombres encontrados con esta lista de jugadores conocidos: [${playerNamesList}].
-    2. Si encuentras datos de daño (Total Damage), extrae el daño del jugador Y el daño total de su equipo.
-    3. Busca explícitamente el valor 'DPM' o 'Damage Per Minute' y asígnalo al campo damagePerMinute.
+    2. Para calcular el % de daño del equipo:
+       - Extrae el daño total (totalDamage) del jugador.
+       - Extrae el daño total del equipo de ese jugador (teamTotalDamage).
+       - Esto aplica a TODOS los roles, incluyendo Top y Mid.
+    3. Busca explícitamente el valor 'DPM' o 'Damage Per Minute' → campo damagePerMinute.
     4. Para roles específicos:
-       - Top: daño a torretas (turretDamage) y CSM (minionsPerMinute).
-       - Mid: daño a torretas (turretDamage).
-       - Jungle: dragones y barones matados por SU equipo.
-       - Support: Vision Score.
-    5. Detecta Multikills (Double, Triple, Quadra, Penta).
+       - Top: turretDamage (Damage dealt to turrets) y minionsPerMinute (CSM/Minions per Min).
+       - Mid: turretDamage.
+       - Jungle: dragonsKilled y baronsKilled del equipo.
+       - Support: visionScore y firstDragon.
+    5. Detecta Multikills (doubleKills, tripleKills, quadraKills, pentaKills).
 
     Devuelve un JSON con esta estructura exacta:
     { "stats": [ { "playerName": "...", "kills": 0, "deaths": 0, "assists": 0, ... } ] }
@@ -232,14 +209,17 @@ export const extractStatsFromData = async (
     try {
       const extracted = await extractWithGemini(prompt, geminiKey);
       console.info(`✅ Gemini OK — ${extracted.length} jugadores extraídos`);
-      return mapExtractedStats(extracted, availablePlayers);
+      return { stats: mapExtractedStats(extracted, availablePlayers), usedModel: "gemini" };
     } catch (geminiError) {
-      console.warn("Gemini falló definitivamente, cambiando a Groq...", geminiError);
-
+      const isServiceDown = isRetryableError(geminiError);
+      console.warn(
+        isServiceDown
+          ? "Gemini saturado (503), cambiando a Groq..."
+          : "Gemini falló, cambiando a Groq...",
+        geminiError
+      );
       if (!groqKey) {
-        throw new Error(
-          "Gemini no está disponible y no hay API Key de Groq configurada (GROQ_API_KEY)."
-        );
+        throw new Error("Gemini no está disponible y no hay GROQ_API_KEY configurada.");
       }
     }
   }
@@ -247,5 +227,5 @@ export const extractStatsFromData = async (
   // 2. Fallback a Groq
   const extracted = await extractWithGroq(prompt, groqKey!);
   console.info(`✅ Groq OK — ${extracted.length} jugadores extraídos`);
-  return mapExtractedStats(extracted, availablePlayers);
+  return { stats: mapExtractedStats(extracted, availablePlayers), usedModel: "groq" };
 };
