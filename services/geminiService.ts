@@ -58,12 +58,11 @@ function mapExtractedStats(
   extractedList.forEach((extracted: any) => {
     const extractedName = extracted.playerName?.toLowerCase() || "";
     const player = availablePlayers.find(p => {
-      const dbName = p.name.toLowerCase().replace(/\s+/g, '');
-      const exName = extractedName.replace(/\s+/g, '');
+      const dbName = p.name.toLowerCase();
       return (
-        dbName === exName ||
-        exName.includes(dbName) ||
-        (exName.length > 0 && dbName.includes(exName))
+        dbName === extractedName ||
+        extractedName.includes(dbName) ||
+        (extractedName.length > 0 && dbName.includes(extractedName))
       );
     });
 
@@ -73,39 +72,26 @@ function mapExtractedStats(
         dmgPercent = Math.round((extracted.totalDamage / extracted.teamTotalDamage) * 100);
       }
 
-      const playerStats: Partial<PlayerGameStats> = {};
-      
-      const safeNumber = (val: any) => val !== undefined && val !== null ? Number(val) || 0 : undefined;
-      const safeBool = (val: any) => val !== undefined && val !== null ? Boolean(val) : undefined;
-
-      const setIfFound = (key: keyof PlayerGameStats, val: any) => {
-          if (val !== undefined) playerStats[key] = val as never;
+      mappedStats[player.id] = {
+        kills:                extracted.kills             || 0,
+        deaths:               extracted.deaths            || 0,
+        assists:              extracted.assists           || 0,
+        cs:                   extracted.cs                || 0,
+        isMvp:                extracted.isMvp             || false,
+        firstBlood:           extracted.firstBlood        || false,
+        doubleKills:          extracted.doubleKills        || 0,
+        tripleKills:          extracted.tripleKills        || 0,
+        quadraKills:          extracted.quadraKills        || 0,
+        pentaKills:           extracted.pentaKills         || 0,
+        teamDamagePercentage: dmgPercent,
+        turretDamage:         extracted.turretDamage       || 0,
+        minionsPerMinute:     extracted.minionsPerMinute   || 0,
+        damagePerMinute:      extracted.damagePerMinute    || 0,
+        visionScore:          extracted.visionScore        || 0,
+        dragonsKilled:        extracted.dragonsKilled       || 0,
+        baronsKilled:         extracted.baronsKilled        || 0,
+        firstDragon:          extracted.firstDragon         || false,
       };
-
-      setIfFound("kills", safeNumber(extracted.kills));
-      setIfFound("deaths", safeNumber(extracted.deaths));
-      setIfFound("assists", safeNumber(extracted.assists));
-      setIfFound("cs", safeNumber(extracted.cs));
-      
-      setIfFound("isMvp", safeBool(extracted.isMvp));
-      setIfFound("firstBlood", safeBool(extracted.firstBlood));
-      setIfFound("firstDragon", safeBool(extracted.firstDragon));
-
-      setIfFound("doubleKills", safeNumber(extracted.doubleKills));
-      setIfFound("tripleKills", safeNumber(extracted.tripleKills));
-      setIfFound("quadraKills", safeNumber(extracted.quadraKills));
-      setIfFound("pentaKills", safeNumber(extracted.pentaKills));
-
-      if (dmgPercent > 0) playerStats.teamDamagePercentage = dmgPercent;
-      
-      setIfFound("turretDamage", safeNumber(extracted.turretDamage));
-      setIfFound("minionsPerMinute", safeNumber(extracted.minionsPerMinute));
-      setIfFound("damagePerMinute", safeNumber(extracted.damagePerMinute));
-      setIfFound("visionScore", safeNumber(extracted.visionScore));
-      setIfFound("dragonsKilled", safeNumber(extracted.dragonsKilled));
-      setIfFound("baronsKilled", safeNumber(extracted.baronsKilled));
-
-      mappedStats[player.id] = playerStats;
     }
   });
 
@@ -136,9 +122,8 @@ async function extractWithGemini(prompt: string, apiKey: string): Promise<any[]>
 // ─── Motor Groq ───────────────────────────────────────────────────────────────
 
 async function extractWithGroq(prompt: string, apiKey: string): Promise<any[]> {
-  const systemPrompt = `Eres un asistente experto en League of Legends que extrae estadísticas de partidos profesionales.
-CRÍTICO: A menudo recibirás datos en TRASPOSICIÓN. Una fila puede llamarse 'Player' con los nombres en columnas hacia la derecha. La fila 'Kills' tendrá las kills correspondientes al mismo índice (columna), etc. Une estas columnas verticalmente para extraer estadísticas del jugador correcto.
-Responde ÚNICAMENTE con un objeto JSON válido. Sin texto adicional, sin explicaciones.
+  const systemPrompt = `Eres un asistente experto en League of Legends que extrae estadísticas de partidos.
+Responde ÚNICAMENTE con un objeto JSON válido. Sin texto adicional, sin bloques markdown, sin explicaciones.
 El JSON debe tener exactamente esta estructura:
 {
   "stats": [
@@ -223,25 +208,24 @@ export const extractStatsFromData = async (
   const playerNamesList = availablePlayers.map(p => p.name).join(", ");
 
   const prompt = `
-    Analiza el siguiente texto de un partido de League of Legends correspondiente a gol.gg y extrae las estadísticas.
-
-    ¡ATENCIÓN! LOS DATOS PODRÍAN ESTAR TRASPUESTOS:
-    A menudo, la 1ra palabra de cada línea es la métrica, y las siguientes son sus valores correspondientes para cada uno de los 10 jugadores. Cada columna representa a un jugador.
-    Ejemplo:
-    Player  Pedro   Luis
-    Kills   2       5
-    Significa que Pedro tiene 2 Kills y Luis tiene 5. Enlaza verticalmente usando el índice de columna.
+    Analiza el siguiente texto o HTML de un partido de League of Legends.
+    Extrae las estadísticas de los jugadores.
 
     IMPORTANTE:
-    1. Ajusta los nombres extraídos con esta lista de jugadores permitidos: [${playerNamesList}].
-    2. % de Daño: Necesitas extraer Daño al Campeón individual ('Total damage to Champion' / 'totalDamage') y SUMAR el de su equipo ('teamTotalDamage'). ¡Haz esto para TODOS los jugadores!
-    3. Multikills: Double kills, Triple kills, Quadra kills, Penta kills.
-    4. CS / Súbditos -> usa la métrica 'CS' general. (Ignora CS in Enemy Jungle).
-    5. 'DPM' o 'Damage Per Minute' -> damagePerMinute.
-    6. 'Damage dealt to turrets' -> turretDamage.
-    7. 'CSM' -> minionsPerMinute.
+    1. Intenta coincidir los nombres encontrados con esta lista de jugadores conocidos: [${playerNamesList}].
+    2. Para calcular el % de daño del equipo:
+       - Extrae el daño total (totalDamage) del jugador.
+       - Extrae el daño total del equipo de ese jugador (teamTotalDamage).
+       - Esto aplica a TODOS los roles, incluyendo Top y Mid.
+    3. Busca explícitamente el valor 'DPM' o 'Damage Per Minute' → campo damagePerMinute.
+    4. Para roles específicos:
+       - Top: turretDamage (Damage dealt to turrets) y minionsPerMinute (CSM/Minions per Min).
+       - Mid: turretDamage.
+       - Jungle: dragonsKilled y baronsKilled del equipo.
+       - Support: visionScore y firstDragon.
+    5. Detecta Multikills (doubleKills, tripleKills, quadraKills, pentaKills).
 
-    Devuelve ÚNICAMENTE un JSON con esta estructura exacta:
+    Devuelve un JSON con esta estructura exacta:
     { "stats": [ { "playerName": "...", "kills": 0, "deaths": 0, "assists": 0, ... } ] }
 
     Datos a procesar:
