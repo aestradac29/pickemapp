@@ -310,39 +310,46 @@ export const dataService = {
             const targetDocName = this._getFantasyRoundDocName(newRound, currentSplitId);
             const targetRef = doc(db, "users", userId, "fantasy_rounds", targetDocName);
             
-            // Check if new round already exists (avoid overwriting if re-running manually)
+            // Check if new round already exists.
+            // Only skip if the user manually saved their team for this round (rolledOver !== true).
+            // If it was auto-created by a previous (possibly incorrect) carryOver, overwrite it
+            // with the fresh current snapshot so stale data doesn't persist.
             const targetSnap = await getDoc(targetRef);
-            if (targetSnap.exists()) return; 
+            if (targetSnap.exists() && targetSnap.data()?.rolledOver !== true) return;
 
             // Find best previous team
             let teamToCopy = null;
             let captainToCopy = null;
 
-            // Strategy 1: Look backwards in round history (Priority)
-            for (let r = newRound - 1; r >= 1; r--) {
-                const prevDocName = this._getFantasyRoundDocName(r, currentSplitId);
-                const prevRef = doc(db, "users", userId, "fantasy_rounds", prevDocName);
-                const prevSnap = await getDoc(prevRef);
-                if (prevSnap.exists()) {
-                    const data = prevSnap.data();
-                    if (data.team) {
-                        teamToCopy = data.team;
-                        captainToCopy = data.captain;
-                        break;
-                    }
+            // Strategy 1 (PRIMARY): Check the 'current active' snapshot first.
+            // This document is always updated on every saveFantasyTeam call, so it
+            // always reflects the user's LATEST lineup regardless of which round doc
+            // was written. This avoids the bug where round_(N-1) doesn't exist and
+            // the loop falls back to round_(N-2) or earlier.
+            const mainRef = doc(db, "users", userId, "fantasy", currentSplitId);
+            const mainSnap = await getDoc(mainRef);
+            if (mainSnap.exists()) {
+                const data = mainSnap.data();
+                if (data.team) {
+                    teamToCopy = data.team;
+                    captainToCopy = data.captain;
                 }
             }
 
-            // Strategy 2: If history is broken/missing, check the 'current active' snapshot
-            // This acts as a safety net if round_4 didn't save correctly but fantasy/winter_2026 has data
+            // Strategy 2 (FALLBACK): If current snapshot is missing, look backwards
+            // in round history to find the most recent saved lineup.
             if (!teamToCopy) {
-                const mainRef = doc(db, "users", userId, "fantasy", currentSplitId);
-                const mainSnap = await getDoc(mainRef);
-                if (mainSnap.exists()) {
-                    const data = mainSnap.data();
-                    if (data.team) {
-                        teamToCopy = data.team;
-                        captainToCopy = data.captain;
+                for (let r = newRound - 1; r >= 1; r--) {
+                    const prevDocName = this._getFantasyRoundDocName(r, currentSplitId);
+                    const prevRef = doc(db, "users", userId, "fantasy_rounds", prevDocName);
+                    const prevSnap = await getDoc(prevRef);
+                    if (prevSnap.exists()) {
+                        const data = prevSnap.data();
+                        if (data.team) {
+                            teamToCopy = data.team;
+                            captainToCopy = data.captain;
+                            break;
+                        }
                     }
                 }
             }
