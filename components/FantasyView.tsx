@@ -190,7 +190,11 @@ const PointsBreakdownModal = ({
     const teamInfo = teams[player.teamId];
     const teamColor = teamInfo?.color || '#0ac8b9';
 
-    // Build per-match, per-game breakdown
+    // Build per-match, per-game breakdown.
+    // IMPORTANT: finalScore uses fantasyService.calculatePoints as the single source of truth
+    // so it always matches the backend calculation exactly (correct winBonus, bracket mult, etc).
+    // The entries array is built in parallel for display only — it mirrors the service logic
+    // but the authoritative number shown is always the one from the service.
     const matchBreakdowns = matches
         .filter(m => m.games && m.games.length > 0)
         .map(m => {
@@ -203,72 +207,74 @@ const PointsBreakdownModal = ({
                 if (!pStats) return null;
                 const isWin = game.winnerId === player.teamId;
 
+                // ── Source of truth: use the real service ──────────────────────
+                const finalScore = fantasyService.calculatePoints(
+                    { ...pStats, win: isWin } as any,
+                    player.role,
+                    false, // captain multiplier shown separately in footer
+                    m.bracketStage,
+                    m.stage,
+                    m.splitId,
+                    m.bestOf || 1
+                );
+
+                // ── Display entries (must mirror fantasyService logic exactly) ─
                 const entries: BreakdownEntry[] = [];
-
-                // Win
-                const splitNorm = (m.splitId || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+                const splitNorm = normalizeSplitId(m.splitId || '');
                 const winBonus = splitNorm === 'spring_2026' ? 3 : 1;
-                if (isWin) entries.push({ label: 'Victoria', value: winBonus, color: 'text-green-400' });
 
-                // Base stats
+                if (isWin) entries.push({ label: 'Victoria', value: winBonus, color: 'text-green-400' });
                 if (pStats.kills) entries.push({ label: `Kills (×${pStats.kills})`, value: pStats.kills * 1.5, color: 'text-red-400' });
                 if (pStats.deaths) entries.push({ label: `Muertes (×${pStats.deaths})`, value: pStats.deaths * -1, color: 'text-gray-400' });
                 if (pStats.assists) entries.push({ label: `Asistencias (×${pStats.assists})`, value: pStats.assists * 1, color: 'text-blue-400' });
                 if (pStats.cs) entries.push({ label: `CS (${pStats.cs}×0.01)`, value: parseFloat((pStats.cs * 0.01).toFixed(2)), color: 'text-yellow-300' });
-
-                // Bonuses
                 if (pStats.isMvp) entries.push({ label: 'MVP', value: 3, color: 'text-yellow-400' });
                 if (pStats.firstBlood) entries.push({ label: 'First Blood', value: 1, color: 'text-orange-400' });
                 if (pStats.kills >= 10) entries.push({ label: 'High Kill (10+)', value: 3, color: 'text-red-500' });
                 const kda = (pStats.kills + pStats.assists) / Math.max(1, pStats.deaths);
                 if (pStats.deaths === 0 && kda >= 5) entries.push({ label: 'KDA Perfecto', value: 3, color: 'text-purple-400' });
-
-                // Multikills
                 if (pStats.doubleKills) entries.push({ label: `Double Kill (×${pStats.doubleKills})`, value: pStats.doubleKills * 1, color: 'text-pink-400' });
                 if (pStats.tripleKills) entries.push({ label: `Triple Kill (×${pStats.tripleKills})`, value: pStats.tripleKills * 2, color: 'text-pink-500' });
                 if (pStats.quadraKills) entries.push({ label: `Quadra Kill (×${pStats.quadraKills})`, value: pStats.quadraKills * 3, color: 'text-fuchsia-400' });
                 if (pStats.pentaKills) entries.push({ label: `Penta Kill (×${pStats.pentaKills})`, value: pStats.pentaKills * 4, color: 'text-fuchsia-500' });
 
-                // Role specifics
-                if (player.role === 'TOP') {
+                if (player.role === 'TOP' || player.role === Role.TOP) {
                     if (pStats.teamDamagePercentage >= 25) entries.push({ label: `Daño ≥25% (${pStats.teamDamagePercentage.toFixed(0)}%)`, value: 3, color: 'text-orange-300' });
                     if (pStats.turretDamage >= 5000) entries.push({ label: `Torreta ≥5000 (${pStats.turretDamage})`, value: 1.5, color: 'text-orange-300' });
                     if (pStats.minionsPerMinute >= 8.5) entries.push({ label: `MPM ≥8.5 (${pStats.minionsPerMinute?.toFixed(1)})`, value: 1.5, color: 'text-orange-300' });
                 }
-                if (player.role === 'JUNGLE') {
+                if (player.role === 'JUNGLE' || player.role === Role.JUNGLE) {
                     if (pStats.dragonsKilled >= 4) entries.push({ label: `Alma Dragón (${pStats.dragonsKilled})`, value: 1.5, color: 'text-green-300' });
                     if (pStats.baronsKilled) entries.push({ label: `Barón (×${pStats.baronsKilled})`, value: pStats.baronsKilled * 2, color: 'text-purple-300' });
                 }
-                if (player.role === 'MID') {
+                if (player.role === 'MID' || player.role === Role.MID) {
                     if (pStats.teamDamagePercentage >= 30) entries.push({ label: `Daño ≥30% (${pStats.teamDamagePercentage.toFixed(0)}%)`, value: 3, color: 'text-cyan-300' });
                     if (pStats.turretDamage >= 5000) entries.push({ label: `Torreta ≥5000 (${pStats.turretDamage})`, value: 1.5, color: 'text-cyan-300' });
                 }
-                if (player.role === 'ADC') {
+                if (player.role === 'ADC' || player.role === Role.ADC) {
                     if (pStats.damagePerMinute >= 1000) entries.push({ label: `DPM ≥1000 (${pStats.damagePerMinute?.toFixed(0)})`, value: 3, color: 'text-rose-300' });
                 }
-                if (player.role === 'SUPPORT') {
+                if (player.role === 'SUPPORT' || player.role === Role.SUPPORT) {
                     if (pStats.assists >= 10) entries.push({ label: `Asist. ≥10 (${pStats.assists})`, value: 2, color: 'text-teal-300' });
                     if (pStats.firstDragon) entries.push({ label: 'Primer Dragón', value: 1, color: 'text-teal-300' });
                     if (pStats.visionScore) entries.push({ label: `Visión (${pStats.visionScore}×0.03)`, value: parseFloat((pStats.visionScore * 0.03).toFixed(2)), color: 'text-teal-300' });
                 }
 
-                // Bracket multiplier
+                // Bracket multiplier (for display annotation only — value already in finalScore)
                 let bracketMult = 1.0;
-                const stg = m.stage;
-                const bStg = m.bracketStage;
-                if (stg === Stage.FINALS || bStg === 'finals') bracketMult = 1.25;
-                else if (stg === Stage.PLAYOFFS) bracketMult = bStg === 'winners' ? 1.15 : 1.0;
+                if (m.stage === Stage.FINALS || m.bracketStage === 'finals') bracketMult = 1.25;
+                else if (m.stage === Stage.PLAYOFFS) bracketMult = m.bracketStage === 'winners' ? 1.15 : 1.0;
 
-                const baseScore = entries.reduce((a, e) => a + e.value, 0);
-                const finalScore = parseFloat((baseScore * bracketMult).toFixed(2));
+                // Spring BO5 scaling (for display annotation)
+                const isSpringBo5 = splitNorm === 'spring_2026' && (m.bestOf || 1) === 5;
 
                 return {
                     gameIndex: gi + 1,
                     isWin,
                     entries,
-                    baseScore,
                     bracketMult,
-                    finalScore,
+                    isSpringBo5,
+                    finalScore, // authoritative value from fantasyService
                     stats: pStats
                 };
             }).filter(Boolean);
@@ -359,10 +365,20 @@ const PointsBreakdownModal = ({
                                                         </span>
                                                     </div>
                                                 ))}
-                                                {gb.bracketMult > 1 && (
-                                                    <div className="flex items-center justify-between text-[11px] mt-1 pt-1 border-t border-gray-800">
-                                                        <span className="text-[#c8aa6e]/70">Multiplicador bracket</span>
-                                                        <span className="text-[#c8aa6e] font-bold">×{gb.bracketMult}</span>
+                                                {(gb.bracketMult > 1 || gb.isSpringBo5) && (
+                                                    <div className="mt-1 pt-1 border-t border-gray-800 space-y-0.5">
+                                                        {gb.bracketMult > 1 && (
+                                                            <div className="flex items-center justify-between text-[11px]">
+                                                                <span className="text-[#c8aa6e]/70">Multiplicador bracket</span>
+                                                                <span className="text-[#c8aa6e] font-bold">×{gb.bracketMult}</span>
+                                                            </div>
+                                                        )}
+                                                        {gb.isSpringBo5 && (
+                                                            <div className="flex items-center justify-between text-[11px]">
+                                                                <span className="text-blue-400/70">Ajuste BO5 Spring (×3/5)</span>
+                                                                <span className="text-blue-400 font-bold">×0.6</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
