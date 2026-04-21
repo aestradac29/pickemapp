@@ -743,7 +743,9 @@ export const FantasyView: React.FC<{
                  (m.isCompleted || !!m.stats);
       });
 
-      // Sum points for each player
+      // Sum points across ALL relevant matches in the round.
+      // A player can appear in multiple matches within the same jornada (e.g. spring split
+      // where a round spans several matchdays), so we accumulate rather than overwrite.
       relevantMatches.forEach(match => {
           if (match.stats) {
               Object.values(match.stats).forEach((stat: PlayerGameStats) => {
@@ -754,7 +756,7 @@ export const FantasyView: React.FC<{
       });
 
       return map;
-  }, [allMatches, viewRoundId]);
+  }, [allMatches, viewRoundId, selectedSplit]);
 
 
   // Cargar historial solo cuando se abre la pestaña de historial
@@ -1315,7 +1317,7 @@ export const FantasyView: React.FC<{
                                 teams={teams}
                                 opponents={getOpponentsForPlayer(myTeam[role].playerId)}
                                 locked={isViewLocked}
-                                roundPoints={myTeam[role].playerId ? roundPointsMap[myTeam[role].playerId!] : undefined}
+                                roundPoints={myTeam[role].playerId ? (roundPointsMap[myTeam[role].playerId!] !== undefined ? parseFloat((roundPointsMap[myTeam[role].playerId!] * (myCaptain === myTeam[role].playerId ? 1.5 : 1)).toFixed(1)) : undefined) : undefined}
                                 roundLabel={dynamicRoundLabel}
                                 isHistorical={isHistoricalView}
                             />
