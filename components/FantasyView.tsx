@@ -4,6 +4,7 @@ import { Role, Player, Team, Match, FantasySlot, FantasyTeamState, Stage, User, 
 import { Save, RefreshCw, X, Shield, Zap, Coins, TrendingUp, TrendingDown, AlertTriangle, Swords, Search, ArrowLeft, User as UserIcon, Loader2, CheckCircle2, Crown, Info, Lock, Unlock, DollarSign, History, Layout, ListOrdered, Calendar, Eye, Target, Trophy, EyeOff, Medal, LogOut, RefreshCcw, LockKeyhole, Skull, Crosshair, Droplet } from 'lucide-react';
 import { SearchableSelect, Option } from './ui/SearchableSelect';
 import { dataService } from '../services/dataService';
+import { fantasyService } from '../services/fantasyService';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 
@@ -172,6 +173,235 @@ const RulesModal = ({ onClose, selectedSplit }: { onClose: () => void, selectedS
 );
 };
 
+
+// --- POINTS BREAKDOWN MODAL ---
+interface BreakdownEntry { label: string; value: number; color: string; }
+
+const PointsBreakdownModal = ({
+    player, matches, isCaptain, onClose, roundLabel, teams
+}: {
+    player: Player;
+    matches: Match[];
+    isCaptain: boolean;
+    onClose: () => void;
+    roundLabel: string;
+    teams: Record<string, Team>;
+}) => {
+    const teamInfo = teams[player.teamId];
+    const teamColor = teamInfo?.color || '#0ac8b9';
+
+    // Build per-match, per-game breakdown
+    const matchBreakdowns = matches
+        .filter(m => m.games && m.games.length > 0)
+        .map(m => {
+            const teamA = typeof m.teamA === 'object' ? m.teamA : null;
+            const teamB = typeof m.teamB === 'object' ? m.teamB : null;
+            const opponent = teamA?.id === player.teamId ? teamB : teamA;
+
+            const gameBreakdowns = (m.games || []).map((game, gi) => {
+                const pStats = game.stats?.[player.id];
+                if (!pStats) return null;
+                const isWin = game.winnerId === player.teamId;
+
+                const entries: BreakdownEntry[] = [];
+
+                // Win
+                const splitNorm = (m.splitId || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+                const winBonus = splitNorm === 'spring_2026' ? 3 : 1;
+                if (isWin) entries.push({ label: 'Victoria', value: winBonus, color: 'text-green-400' });
+
+                // Base stats
+                if (pStats.kills) entries.push({ label: `Kills (×${pStats.kills})`, value: pStats.kills * 1.5, color: 'text-red-400' });
+                if (pStats.deaths) entries.push({ label: `Muertes (×${pStats.deaths})`, value: pStats.deaths * -1, color: 'text-gray-400' });
+                if (pStats.assists) entries.push({ label: `Asistencias (×${pStats.assists})`, value: pStats.assists * 1, color: 'text-blue-400' });
+                if (pStats.cs) entries.push({ label: `CS (${pStats.cs}×0.01)`, value: parseFloat((pStats.cs * 0.01).toFixed(2)), color: 'text-yellow-300' });
+
+                // Bonuses
+                if (pStats.isMvp) entries.push({ label: 'MVP', value: 3, color: 'text-yellow-400' });
+                if (pStats.firstBlood) entries.push({ label: 'First Blood', value: 1, color: 'text-orange-400' });
+                if (pStats.kills >= 10) entries.push({ label: 'High Kill (10+)', value: 3, color: 'text-red-500' });
+                const kda = (pStats.kills + pStats.assists) / Math.max(1, pStats.deaths);
+                if (pStats.deaths === 0 && kda >= 5) entries.push({ label: 'KDA Perfecto', value: 3, color: 'text-purple-400' });
+
+                // Multikills
+                if (pStats.doubleKills) entries.push({ label: `Double Kill (×${pStats.doubleKills})`, value: pStats.doubleKills * 1, color: 'text-pink-400' });
+                if (pStats.tripleKills) entries.push({ label: `Triple Kill (×${pStats.tripleKills})`, value: pStats.tripleKills * 2, color: 'text-pink-500' });
+                if (pStats.quadraKills) entries.push({ label: `Quadra Kill (×${pStats.quadraKills})`, value: pStats.quadraKills * 3, color: 'text-fuchsia-400' });
+                if (pStats.pentaKills) entries.push({ label: `Penta Kill (×${pStats.pentaKills})`, value: pStats.pentaKills * 4, color: 'text-fuchsia-500' });
+
+                // Role specifics
+                if (player.role === 'TOP') {
+                    if (pStats.teamDamagePercentage >= 25) entries.push({ label: `Daño ≥25% (${pStats.teamDamagePercentage.toFixed(0)}%)`, value: 3, color: 'text-orange-300' });
+                    if (pStats.turretDamage >= 5000) entries.push({ label: `Torreta ≥5000 (${pStats.turretDamage})`, value: 1.5, color: 'text-orange-300' });
+                    if (pStats.minionsPerMinute >= 8.5) entries.push({ label: `MPM ≥8.5 (${pStats.minionsPerMinute?.toFixed(1)})`, value: 1.5, color: 'text-orange-300' });
+                }
+                if (player.role === 'JUNGLE') {
+                    if (pStats.dragonsKilled >= 4) entries.push({ label: `Alma Dragón (${pStats.dragonsKilled})`, value: 1.5, color: 'text-green-300' });
+                    if (pStats.baronsKilled) entries.push({ label: `Barón (×${pStats.baronsKilled})`, value: pStats.baronsKilled * 2, color: 'text-purple-300' });
+                }
+                if (player.role === 'MID') {
+                    if (pStats.teamDamagePercentage >= 30) entries.push({ label: `Daño ≥30% (${pStats.teamDamagePercentage.toFixed(0)}%)`, value: 3, color: 'text-cyan-300' });
+                    if (pStats.turretDamage >= 5000) entries.push({ label: `Torreta ≥5000 (${pStats.turretDamage})`, value: 1.5, color: 'text-cyan-300' });
+                }
+                if (player.role === 'ADC') {
+                    if (pStats.damagePerMinute >= 1000) entries.push({ label: `DPM ≥1000 (${pStats.damagePerMinute?.toFixed(0)})`, value: 3, color: 'text-rose-300' });
+                }
+                if (player.role === 'SUPPORT') {
+                    if (pStats.assists >= 10) entries.push({ label: `Asist. ≥10 (${pStats.assists})`, value: 2, color: 'text-teal-300' });
+                    if (pStats.firstDragon) entries.push({ label: 'Primer Dragón', value: 1, color: 'text-teal-300' });
+                    if (pStats.visionScore) entries.push({ label: `Visión (${pStats.visionScore}×0.03)`, value: parseFloat((pStats.visionScore * 0.03).toFixed(2)), color: 'text-teal-300' });
+                }
+
+                // Bracket multiplier
+                let bracketMult = 1.0;
+                const stg = m.stage;
+                const bStg = m.bracketStage;
+                if (stg === Stage.FINALS || bStg === 'finals') bracketMult = 1.25;
+                else if (stg === Stage.PLAYOFFS) bracketMult = bStg === 'winners' ? 1.15 : 1.0;
+
+                const baseScore = entries.reduce((a, e) => a + e.value, 0);
+                const finalScore = parseFloat((baseScore * bracketMult).toFixed(2));
+
+                return {
+                    gameIndex: gi + 1,
+                    isWin,
+                    entries,
+                    baseScore,
+                    bracketMult,
+                    finalScore,
+                    stats: pStats
+                };
+            }).filter(Boolean);
+
+            if (gameBreakdowns.length === 0) return null;
+
+            const matchTotal = gameBreakdowns.reduce((a, g) => a + (g?.finalScore || 0), 0);
+            return { match: m, opponent, gameBreakdowns, matchTotal };
+        }).filter(Boolean);
+
+    const grandTotal = matchBreakdowns.reduce((a, m) => a + (m?.matchTotal || 0), 0);
+    const captainTotal = isCaptain ? grandTotal * 1.5 : grandTotal;
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
+            <div
+                className="relative bg-[#0a1428] border border-gray-700 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl"
+                style={{ borderColor: teamColor + '60' }}
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="sticky top-0 z-10 bg-[#0a1428] border-b border-gray-800 px-5 py-4 flex items-center justify-between rounded-t-2xl">
+                    <div className="flex items-center gap-3">
+                        {teamInfo?.logo && <img src={teamInfo.logo} alt="" className="w-7 h-7 object-contain" />}
+                        <div>
+                            <h3 className="text-white font-black text-base leading-none">{player.name}</h3>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider">{roundLabel} · Desglose</span>
+                        </div>
+                        {isCaptain && (
+                            <div className="flex items-center gap-1 bg-yellow-500/20 border border-yellow-500/40 rounded-full px-2 py-0.5">
+                                <Crown className="w-3 h-3 text-yellow-400 fill-current" />
+                                <span className="text-[9px] text-yellow-400 font-bold">CAPITÁN ×1.5</span>
+                            </div>
+                        )}
+                    </div>
+                    <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-800 text-gray-500 hover:text-white transition-colors">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-4 space-y-4">
+                    {matchBreakdowns.length === 0 ? (
+                        <div className="text-center text-gray-500 py-8 text-sm">Sin datos de partidos para esta jornada.</div>
+                    ) : (
+                        matchBreakdowns.map((mb, mi) => mb && (
+                            <div key={mi} className="bg-[#0f1923] rounded-xl border border-gray-800 overflow-hidden">
+                                {/* Match header */}
+                                <div className="flex items-center justify-between px-4 py-2.5 bg-black/30 border-b border-gray-800">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-gray-300">
+                                        {mb.opponent?.logo && <img src={mb.opponent.logo} alt="" className="w-5 h-5 object-contain" />}
+                                        <span>vs {mb.opponent?.shortName || mb.opponent?.name || '?'}</span>
+                                        {mb.match.bestOf && mb.match.bestOf > 1 && (
+                                            <span className="text-[9px] text-gray-600 border border-gray-700 rounded px-1">BO{mb.match.bestOf}</span>
+                                        )}
+                                    </div>
+                                    <span className="text-sm font-black" style={{ color: teamColor }}>
+                                        {mb.matchTotal.toFixed(2)} pts
+                                    </span>
+                                </div>
+
+                                {/* Games */}
+                                <div className="divide-y divide-gray-800/60">
+                                    {mb.gameBreakdowns.map((gb, gi) => gb && (
+                                        <div key={gi} className="px-4 py-3">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[9px] font-bold text-gray-500 uppercase">Juego {gb.gameIndex}</span>
+                                                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${gb.isWin ? 'bg-green-900/40 text-green-400 border border-green-700/50' : 'bg-red-900/40 text-red-400 border border-red-700/50'}`}>
+                                                        {gb.isWin ? 'Victoria' : 'Derrota'}
+                                                    </span>
+                                                    <span className="text-[9px] text-gray-600">{gb.stats.kills}/{gb.stats.deaths}/{gb.stats.assists}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    {gb.bracketMult > 1 && (
+                                                        <span className="text-[9px] text-[#c8aa6e] border border-[#c8aa6e]/30 rounded px-1 font-bold">×{gb.bracketMult}</span>
+                                                    )}
+                                                    <span className="text-sm font-black text-white">{gb.finalScore.toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                            {/* Breakdown rows */}
+                                            <div className="space-y-0.5">
+                                                {gb.entries.map((entry, ei) => (
+                                                    <div key={ei} className="flex items-center justify-between text-[11px]">
+                                                        <span className="text-gray-500">{entry.label}</span>
+                                                        <span className={`font-bold tabular-nums ${entry.color}`}>
+                                                            {entry.value > 0 ? '+' : ''}{entry.value.toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                                {gb.bracketMult > 1 && (
+                                                    <div className="flex items-center justify-between text-[11px] mt-1 pt-1 border-t border-gray-800">
+                                                        <span className="text-[#c8aa6e]/70">Multiplicador bracket</span>
+                                                        <span className="text-[#c8aa6e] font-bold">×{gb.bracketMult}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {/* Footer totals */}
+                <div className="sticky bottom-0 bg-[#0a1428] border-t border-gray-800 px-5 py-3 rounded-b-2xl">
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                <span>Subtotal</span>
+                                <span className="text-gray-300 font-bold">{grandTotal.toFixed(2)} pts</span>
+                            </div>
+                            {isCaptain && (
+                                <div className="flex items-center gap-2 text-xs text-yellow-500/80">
+                                    <Crown className="w-3 h-3 fill-current" />
+                                    <span>×1.5 capitán</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="text-right">
+                            <span className="text-[10px] text-gray-500 uppercase block">Total Jornada</span>
+                            <span className="text-2xl font-black" style={{ color: teamColor }}>
+                                {captainTotal.toFixed(1)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 interface PlayerCardProps {
   role: Role;
   slot: FantasySlot | null;
@@ -186,11 +416,13 @@ interface PlayerCardProps {
   roundPoints?: number; // New prop: Points specific to the selected round
   roundLabel?: string;  // New prop: Label for the round
   isHistorical?: boolean; // New prop: If true, show strictly purchaseCost
+  roundMatches?: Match[]; // Matches for the current round (for breakdown)
+  onShowBreakdown?: (playerId: string) => void; // Callback to show breakdown modal
 }
 
 const PlayerCard: React.FC<PlayerCardProps> = ({ 
     role, slot, onSelect, onSetCaptain, isCaptain, readOnly = false, 
-    players, teams, opponents, locked, roundPoints, roundLabel, isHistorical = false
+    players, teams, opponents, locked, roundPoints, roundLabel, isHistorical = false, roundMatches, onShowBreakdown
 }) => {
   const playerId = slot?.playerId;
   const player = players.find(p => p.id === playerId);
@@ -372,8 +604,15 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
                <div className="w-full mt-auto space-y-1.5">
                   
                   {/* DYNAMIC: POINTS FOR SELECTED ROUND */}
-                  <div className="bg-[#0f1923] p-1.5 rounded border border-gray-700 flex flex-col items-center justify-center h-[40px] relative overflow-hidden transition-colors duration-300">
-                      <span className="text-[8px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">{roundLabel || 'Puntos Jornada'}</span>
+                  <div
+                      className={`bg-[#0f1923] p-1.5 rounded border flex flex-col items-center justify-center h-[40px] relative overflow-hidden transition-colors duration-300 ${hasPlayedRound && onShowBreakdown ? 'border-gray-600 cursor-pointer hover:border-[#0ac8b9]/60 hover:bg-[#0ac8b9]/5 group/pts' : 'border-gray-700'}`}
+                      onClick={hasPlayedRound && onShowBreakdown && playerId ? () => onShowBreakdown(playerId) : undefined}
+                      title={hasPlayedRound ? 'Ver desglose de puntos' : undefined}
+                  >
+                      <span className="text-[8px] text-gray-500 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1">
+                          {roundLabel || 'Puntos Jornada'}
+                          {hasPlayedRound && onShowBreakdown && <Info className="w-2.5 h-2.5 opacity-0 group-hover/pts:opacity-100 text-[#0ac8b9] transition-opacity" />}
+                      </span>
                       <div className="flex items-center gap-1">
                           <span className={`text-lg font-bold leading-none ${hasPlayedRound ? 'text-white' : 'text-gray-600'}`}>
                               {displayPoints}
@@ -571,6 +810,7 @@ export const FantasyView: React.FC<{
   const [originalTeam, setOriginalTeam] = useState<Record<Role, FantasySlot> | null>(null);
 
   const [myCaptain, setMyCaptain] = useState<string | null>(null);
+  const [breakdownPlayerId, setBreakdownPlayerId] = useState<string | null>(null);
   
   const [historyScores, setHistoryScores] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -724,29 +964,29 @@ export const FantasyView: React.FC<{
   }, [viewRoundId, viewingUserId, loadFantasyTeam]);
 
   // NEW: Calculate Points for Specific Selected Round
-  const roundPointsMap = useMemo(() => {
-      const map: Record<string, number> = {};
-      
-      // Get round definition
+  // Matches relevant to the currently viewed round (reused by both roundPointsMap and breakdown)
+  const roundMatches = useMemo(() => {
       const roundConfig = getFantasySchedule(selectedSplit).find(r => r.id === viewRoundId);
-      if (!roundConfig || allMatches.length === 0) return map;
-
-      // Filter matches that belong to this round (matchdays) AND match the stage
-      // Also ensure match has stats (effectively completed)
-      const relevantMatches = allMatches.filter(m => {
-          const isCorrectStage = roundConfig.stage === Stage.GROUPS 
-              ? m.stage === Stage.GROUPS 
+      if (!roundConfig || allMatches.length === 0) return [];
+      return allMatches.filter(m => {
+          const isCorrectStage = roundConfig.stage === Stage.GROUPS
+              ? m.stage === Stage.GROUPS
               : m.stage !== Stage.GROUPS;
-          
-          return isCorrectStage && 
+          return isCorrectStage &&
                  roundConfig.matchdays.includes(m.day || 0) &&
                  (m.isCompleted || !!m.stats);
       });
+  }, [allMatches, viewRoundId, selectedSplit]);
+
+  const roundPointsMap = useMemo(() => {
+      const map: Record<string, number> = {};
+      
+      if (roundMatches.length === 0) return map;
 
       // Sum points across ALL relevant matches in the round.
       // A player can appear in multiple matches within the same jornada (e.g. spring split
       // where a round spans several matchdays), so we accumulate rather than overwrite.
-      relevantMatches.forEach(match => {
+      roundMatches.forEach(match => {
           if (match.stats) {
               Object.values(match.stats).forEach((stat: PlayerGameStats) => {
                   if (!map[stat.playerId]) map[stat.playerId] = 0;
@@ -756,7 +996,7 @@ export const FantasyView: React.FC<{
       });
 
       return map;
-  }, [allMatches, viewRoundId, selectedSplit]);
+  }, [roundMatches]);
 
 
   // Cargar historial solo cuando se abre la pestaña de historial
@@ -1054,11 +1294,25 @@ export const FantasyView: React.FC<{
       ? (currentRoundConfig.stage === Stage.GROUPS ? `Puntos J${currentRoundConfig.matchdays.join('-')}` : `Puntos ${currentRoundConfig.label}`) 
       : `Puntos R${viewRoundId}`;
 
+  const breakdownPlayer = breakdownPlayerId ? players.find(p => p.id === breakdownPlayerId) || null : null;
+
   return (
     <div className="w-[98%] max-w-[2400px] mx-auto animate-in fade-in pb-20 pt-4 relative">
         
       {/* RULES MODAL RENDER */}
       {showRules && <RulesModal onClose={() => setShowRules(false)} selectedSplit={selectedSplit} />}
+
+      {/* POINTS BREAKDOWN MODAL */}
+      {breakdownPlayerId && breakdownPlayer && (
+          <PointsBreakdownModal
+              player={breakdownPlayer}
+              matches={roundMatches}
+              isCaptain={myCaptain === breakdownPlayerId}
+              onClose={() => setBreakdownPlayerId(null)}
+              roundLabel={dynamicRoundLabel}
+              teams={teams}
+          />
+      )}
 
       {/* HEADER BAR */}
       <div className="flex flex-col gap-6 mb-6">
@@ -1320,6 +1574,8 @@ export const FantasyView: React.FC<{
                                 roundPoints={myTeam[role].playerId ? (roundPointsMap[myTeam[role].playerId!] !== undefined ? parseFloat((roundPointsMap[myTeam[role].playerId!] * (myCaptain === myTeam[role].playerId ? 1.5 : 1)).toFixed(1)) : undefined) : undefined}
                                 roundLabel={dynamicRoundLabel}
                                 isHistorical={isHistoricalView}
+                                roundMatches={roundMatches}
+                                onShowBreakdown={setBreakdownPlayerId}
                             />
                         ))}
                     </div>
