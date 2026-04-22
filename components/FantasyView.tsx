@@ -815,6 +815,9 @@ export const FantasyView: React.FC<{
   const [isAdminSaving, setIsAdminSaving] = useState(false);
   const [debugLogs, setDebugLogs] = useState<any[]>([]);
   const [showDebugLogs, setShowDebugLogs] = useState(false);
+  const [roundInspectData, setRoundInspectData] = useState<Record<string, any> | null>(null);
+  const [showRoundInspector, setShowRoundInspector] = useState(false);
+  const [isInspecting, setIsInspecting] = useState(false);
   const [pendingRoundChange, setPendingRoundChange] = useState<number | null>(null);
   const [showRules, setShowRules] = useState(false);
 
@@ -1201,6 +1204,20 @@ export const FantasyView: React.FC<{
        }
    };
 
+   const handleInspectRounds = async () => {
+       if (!isAdmin) return;
+       setIsInspecting(true);
+       try {
+           const data = await dataService.inspectAllFantasyRounds(selectedSplit);
+           setRoundInspectData(data);
+           setShowRoundInspector(true);
+       } catch(e: any) {
+           setAdminMessage("Error al inspeccionar: " + e.message);
+       } finally {
+           setIsInspecting(false);
+       }
+   };
+
    const fetchDebugLogs = async () => {
        try {
            const q = query(collection(db, "debug_logs"), orderBy("timestamp", "desc"), limit(5));
@@ -1463,6 +1480,16 @@ export const FantasyView: React.FC<{
                         {showDebugLogs ? 'Ocultar Logs' : 'Ver Logs'}
                     </button>
 
+                    <button
+                        onClick={handleInspectRounds}
+                        disabled={isInspecting}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold uppercase border bg-orange-900/50 border-orange-600 text-orange-300 hover:bg-orange-900/80 transition-colors disabled:opacity-50"
+                        title="Inspeccionar datos de todas las jornadas"
+                    >
+                        {isInspecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                        Inspeccionar
+                    </button>
+
                     {!isAdmin && currentUserId && (
                         <div className="flex flex-col gap-1">
                             <button 
@@ -1495,6 +1522,59 @@ export const FantasyView: React.FC<{
                       <div key={log.id} className="mb-4 border-b border-gray-800 pb-2">
                           <p className="text-gray-400">{log.timestamp} - Split: {log.splitId}</p>
                           <pre className="text-green-400 whitespace-pre-wrap mt-1">{log.log}</pre>
+                      </div>
+                  ))}
+              </div>
+          )}
+
+          {/* ROUND INSPECTOR PANEL */}
+          {isAdmin && showRoundInspector && roundInspectData && (
+              <div className="mb-6 p-4 bg-black border border-orange-600 rounded-lg overflow-auto max-h-[600px] font-mono text-[10px]">
+                  <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-orange-400 font-bold uppercase text-sm">🔍 Inspector de Jornadas (Admin)</h3>
+                      <button onClick={() => setShowRoundInspector(false)} className="text-gray-500 hover:text-white"><X className="w-4 h-4" /></button>
+                  </div>
+                  <p className="text-gray-500 mb-3 text-[10px]">Muestra todos los documentos fantasy_rounds de cada usuario. Usa esto para identificar qué datos quedan y recuperar manualmente.</p>
+                  {Object.entries(roundInspectData).map(([userId, userData]: [string, any]) => (
+                      <div key={userId} className="mb-4 border border-gray-800 rounded p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                              <span className="text-orange-300 font-bold">{userData.name}</span>
+                              <span className="text-gray-600 text-[9px]">{userId}</span>
+                          </div>
+                          {/* Current snapshot */}
+                          <div className="mb-2 p-2 bg-blue-950/30 border border-blue-800/40 rounded">
+                              <span className="text-blue-400 font-bold text-[9px] uppercase">Snapshot Actual (fantasy/{selectedSplit})</span>
+                              {userData.currentSnapshot ? (
+                                  <div className="mt-1 text-gray-300">
+                                      {Object.entries(userData.currentSnapshot.team || {}).map(([role, pid]: [string, any]) => (
+                                          <span key={role} className="mr-3">{role}: <span className="text-white">{pid || '—'}</span></span>
+                                      ))}
+                                      <span className="text-yellow-400 ml-2">⚑ {userData.currentSnapshot.captain || '—'}</span>
+                                  </div>
+                              ) : <span className="text-gray-600 ml-2">Sin datos</span>}
+                          </div>
+                          {/* All rounds */}
+                          <div className="grid grid-cols-1 gap-1">
+                              {Object.entries(userData.rounds).sort(([a], [b]) => a.localeCompare(b)).map(([docId, roundData]: [string, any]) => (
+                                  <div key={docId} className={`p-2 rounded border ${roundData.rolledOver ? 'border-gray-800 bg-gray-950/30' : 'border-green-800/40 bg-green-950/20'}`}>
+                                      <div className="flex items-center justify-between mb-1">
+                                          <span className={`font-bold text-[9px] uppercase ${roundData.rolledOver ? 'text-gray-500' : 'text-green-400'}`}>
+                                              {docId} {roundData.rolledOver ? '(auto)' : '(manual)'} {roundData.recoveredFrom ? `← ${roundData.recoveredFrom}` : ''}
+                                          </span>
+                                          <span className="text-[#c8aa6e] font-bold">{roundData.score !== null ? `${roundData.score} pts` : '—'}</span>
+                                      </div>
+                                      {roundData.team ? (
+                                          <div className="text-gray-400">
+                                              {Object.entries(roundData.team).map(([role, pid]: [string, any]) => (
+                                                  <span key={role} className="mr-3 text-[9px]">{role}: <span className={pid ? 'text-white' : 'text-gray-700'}>{pid || '—'}</span></span>
+                                              ))}
+                                              {roundData.captain && <span className="text-yellow-400 text-[9px]">⚑ {roundData.captain}</span>}
+                                          </div>
+                                      ) : <span className="text-gray-700">Sin equipo</span>}
+                                      {roundData.updatedAt && <div className="text-gray-700 text-[8px] mt-0.5">{roundData.updatedAt}</div>}
+                                  </div>
+                              ))}
+                          </div>
                       </div>
                   ))}
               </div>

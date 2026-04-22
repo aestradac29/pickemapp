@@ -1168,6 +1168,87 @@ export const dataService = {
     },
     // ... (rest of methods)
 
+
+    // ── ROUND INSPECTOR ──────────────────────────────────────────────────────
+    // Returns a full dump of all fantasy_rounds documents for all users.
+    // Used to manually inspect what data survives after a corruption event.
+    async inspectAllFantasyRounds(splitId?: string): Promise<Record<string, any>> {
+        const currentSplitId = this._normalizeSplitId(splitId);
+        const usersRef = collection(db, "users");
+        const userSnapshot = await getDocs(usersRef);
+        const result: Record<string, any> = {};
+
+        await Promise.all(userSnapshot.docs.map(async (userDoc) => {
+            const userId = userDoc.id;
+            const userName = userDoc.data().username || userDoc.data().name || userId;
+
+            // Read ALL fantasy_rounds documents for this user
+            const roundsRef = collection(db, "users", userId, "fantasy_rounds");
+            const roundsSnap = await getDocs(roundsRef);
+
+            // Read current snapshot
+            const mainRef = doc(db, "users", userId, "fantasy", currentSplitId);
+            const mainSnap = await getDoc(mainRef);
+
+            const rounds: Record<string, any> = {};
+            roundsSnap.docs.forEach(d => {
+                const data = d.data();
+                rounds[d.id] = {
+                    team: data.team ? Object.fromEntries(
+                        Object.entries(data.team).map(([role, slot]: [string, any]) => [
+                            role, slot?.playerId || null
+                        ])
+                    ) : null,
+                    captain: data.captain || null,
+                    score: data.score ?? null,
+                    rolledOver: data.rolledOver ?? false,
+                    recoveredFrom: data.recoveredFrom ?? null,
+                    updatedAt: data.updatedAt ?? null,
+                };
+            });
+
+            result[userId] = {
+                name: userName,
+                currentSnapshot: mainSnap.exists() ? {
+                    team: mainSnap.data().team ? Object.fromEntries(
+                        Object.entries(mainSnap.data().team).map(([role, slot]: [string, any]) => [
+                            role, slot?.playerId || null
+                        ])
+                    ) : null,
+                    captain: mainSnap.data().captain || null,
+                } : null,
+                rounds,
+            };
+        }));
+
+        return result;
+    },
+
+    // Manually set a specific round's team for a user (admin recovery tool)
+    async manuallySetRoundTeam(
+        userId: string,
+        roundId: number,
+        team: Record<string, any>,
+        captain: string | null,
+        splitId?: string
+    ): Promise<void> {
+        const currentSplitId = this._normalizeSplitId(splitId);
+        const roundDocName = this._getFantasyRoundDocName(roundId, currentSplitId);
+        const roundRef = doc(db, "users", userId, "fantasy_rounds", roundDocName);
+        const currentSnap = await getDoc(roundRef);
+        const existingScore = currentSnap.exists() ? (currentSnap.data().score ?? 0) : 0;
+
+        await setDoc(roundRef, {
+            team: cleanPayload(team),
+            captain,
+            score: existingScore,
+            roundId,
+            updatedAt: new Date().toISOString(),
+            rolledOver: false,
+            recoveredFrom: 'manual_admin',
+        }, { merge: false });
+    },
+
     // ── RECOVERY TOOL ────────────────────────────────────────────────────────
     // Attempts to restore a corrupted round by finding the best available team
     // data from: (1) current snapshot fantasy/splitId, (2) adjacent rounds,
