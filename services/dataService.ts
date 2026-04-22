@@ -716,6 +716,8 @@ export const dataService = {
                     return {
                         ...m,
                         day: finalDay,
+                        // Always stamp splitId so fantasyService.calculatePoints uses correct winBonus
+                        splitId: m.splitId || targetSplitId,
                         teamA: (m.teamA && teamsMap[m.teamA.id]) || m.teamA || { id: 'tbd', name: 'TBD', shortName: 'TBD', region: Region.LEC, color: '#6b7280' }, 
                         teamB: (m.teamB && teamsMap[m.teamB.id]) || m.teamB || { id: 'tbd', name: 'TBD', shortName: 'TBD', region: Region.LEC, color: '#6b7280' }
                     };
@@ -1175,6 +1177,7 @@ export const dataService = {
 
         const newMatch: Match = {
             id: `custom-${Date.now()}`,
+            splitId: this._normalizeSplitId(matchData.splitId),
             teamA: teamA,
             teamB: teamB,
             startTime: matchData.start_time,

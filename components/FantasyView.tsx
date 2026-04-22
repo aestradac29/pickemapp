@@ -186,6 +186,7 @@ const PointsBreakdownModal = ({
     onClose: () => void;
     roundLabel: string;
     teams: Record<string, Team>;
+    selectedSplit: string;
 }) => {
     const teamInfo = teams[player.teamId];
     const teamColor = teamInfo?.color || '#0ac8b9';
@@ -214,13 +215,14 @@ const PointsBreakdownModal = ({
                     false, // captain multiplier shown separately in footer
                     m.bracketStage,
                     m.stage,
-                    m.splitId,
+                    m.splitId || selectedSplit, // fallback for legacy matches without splitId
                     m.bestOf || 1
                 );
 
                 // ── Display entries (must mirror fantasyService logic exactly) ─
                 const entries: BreakdownEntry[] = [];
-                const splitNorm = normalizeSplitId(m.splitId || '');
+                // Use match's own splitId; fall back to the active split as safety net for legacy matches with no splitId stored
+                const splitNorm = normalizeSplitId(m.splitId || selectedSplit);
                 const winBonus = splitNorm === 'spring_2026' ? 3 : 1;
 
                 if (isWin) entries.push({ label: 'Victoria', value: winBonus, color: 'text-green-400' });
@@ -1327,6 +1329,7 @@ export const FantasyView: React.FC<{
               onClose={() => setBreakdownPlayerId(null)}
               roundLabel={dynamicRoundLabel}
               teams={teams}
+              selectedSplit={selectedSplit}
           />
       )}
 
