@@ -1142,11 +1142,12 @@ export const dataService = {
 
                 totalFantasyScore += roundScore;
 
-                // Acumular escrituras — se dispararán todas en paralelo al final
+                // IMPORTANT: only update score and inherited flag — NEVER overwrite team/captain.
+                // The team field is the source of truth and must only be written by
+                // saveFantasyTeam / carryOverFantasyTeams. Overwriting it here was the bug
+                // that corrupted round 3 when scoring was triggered from a different round context.
                 writeOps.push(
                     setDoc(roundRef, {
-                        team: cleanPayload(teamToScore),
-                        captain: captainToScore,
                         score: parseFloat(roundScore.toFixed(2)),
                         inherited: isInherited,
                     }, { merge: true })
@@ -1166,6 +1167,90 @@ export const dataService = {
         }));
     },
     // ... (rest of methods)
+
+    // ── RECOVERY TOOL ────────────────────────────────────────────────────────
+    // Attempts to restore a corrupted round by finding the best available team
+    // data from: (1) current snapshot fantasy/splitId, (2) adjacent rounds,
+    // (3) rounds with rolledOver flag. Returns a report of what was found/done.
+    async recoverFantasyRound(targetRound: number, splitId?: string): Promise<{ userId: string; source: string; restored: boolean }[]> {
+        const currentSplitId = this._normalizeSplitId(splitId);
+        const usersRef = collection(db, "users");
+        const userSnapshot = await getDocs(usersRef);
+        const report: { userId: string; source: string; restored: boolean }[] = [];
+
+        await Promise.all(userSnapshot.docs.map(async (userDoc) => {
+            const userId = userDoc.id;
+            const targetDocName = this._getFantasyRoundDocName(targetRound, currentSplitId);
+            const targetRef = doc(db, "users", userId, "fantasy_rounds", targetDocName);
+
+            // Read what's currently in the corrupted round
+            const currentSnap = await getDoc(targetRef);
+            const currentData = currentSnap.exists() ? currentSnap.data() : null;
+
+            // Source 1: current active snapshot (most reliable — updated on every save)
+            let bestTeam = null;
+            let bestCaptain = null;
+            let source = 'none';
+
+            const mainRef = doc(db, "users", userId, "fantasy", currentSplitId);
+            const mainSnap = await getDoc(mainRef);
+            if (mainSnap.exists() && mainSnap.data().team) {
+                bestTeam = mainSnap.data().team;
+                bestCaptain = mainSnap.data().captain;
+                source = 'current_snapshot';
+            }
+
+            // Source 2: check adjacent rounds (targetRound-1 and targetRound+1)
+            // Prefer a round that was NOT marked rolledOver (= manually saved by user)
+            if (!bestTeam || source === 'current_snapshot') {
+                const schedule = getFantasySchedule(currentSplitId);
+                const maxRound = schedule.length;
+                const candidates = [targetRound - 1, targetRound + 1, targetRound - 2, targetRound + 2]
+                    .filter(r => r >= 1 && r <= maxRound && r !== targetRound);
+
+                for (const r of candidates) {
+                    const docName = this._getFantasyRoundDocName(r, currentSplitId);
+                    const snap = await getDoc(doc(db, "users", userId, "fantasy_rounds", docName));
+                    if (snap.exists() && snap.data().team) {
+                        const d = snap.data();
+                        // Prefer manually saved rounds (rolledOver !== true)
+                        if (!d.rolledOver) {
+                            bestTeam = d.team;
+                            bestCaptain = d.captain;
+                            source = `round_${r}_manual`;
+                            break;
+                        } else if (source === 'current_snapshot') {
+                            // Keep current_snapshot as better source
+                        } else {
+                            bestTeam = d.team;
+                            bestCaptain = d.captain;
+                            source = `round_${r}_rolledover`;
+                        }
+                    }
+                }
+            }
+
+            if (bestTeam) {
+                // Preserve the existing score if it was calculated correctly
+                const existingScore = currentData?.score || 0;
+                await setDoc(targetRef, {
+                    team: cleanPayload(bestTeam),
+                    captain: bestCaptain || null,
+                    score: existingScore,
+                    roundId: targetRound,
+                    updatedAt: new Date().toISOString(),
+                    rolledOver: true,
+                    recoveredFrom: source,
+                }, { merge: false }); // full overwrite to replace corrupted data
+                report.push({ userId, source, restored: true });
+            } else {
+                report.push({ userId, source: 'not_found', restored: false });
+            }
+        }));
+
+        return report;
+    },
+
     async createMatch(matchData: any) {
         const docRef = doc(db, "admin_data", this._getDocName("matches"));
         const docSnap = await getDoc(docRef);

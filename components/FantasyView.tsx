@@ -1175,6 +1175,32 @@ export const FantasyView: React.FC<{
       }
   };
 
+   const handleRecoverRound = async (roundToRecover: number) => {
+       if (!isAdmin) return;
+       const confirmed = window.confirm(
+           `¿Recuperar Jornada ${roundToRecover}?\n\n` +
+           `Esto intentará restaurar el equipo de cada usuario para la jornada ${roundToRecover} ` +
+           `usando la mejor fuente disponible (snapshot actual, rondas adyacentes).\n\n` +
+           `Solo afecta al campo "team" — las puntuaciones NO se modifican.`
+       );
+       if (!confirmed) return;
+       setIsAdminSaving(true);
+       setAdminMessage(`Recuperando jornada ${roundToRecover}...`);
+       try {
+           const report = await dataService.recoverFantasyRound(roundToRecover, selectedSplit);
+           const restored = report.filter(r => r.restored).length;
+           const failed = report.filter(r => !r.restored).length;
+           setAdminMessage(`Jornada ${roundToRecover} recuperada: ${restored} usuarios restaurados, ${failed} sin datos.`);
+           await loadData();
+           setTimeout(() => setAdminMessage(null), 8000);
+       } catch(e: any) {
+           setAdminMessage("Error en recuperación: " + e.message);
+           setTimeout(() => setAdminMessage(null), 8000);
+       } finally {
+           setIsAdminSaving(false);
+       }
+   };
+
    const fetchDebugLogs = async () => {
        try {
            const q = query(collection(db, "debug_logs"), orderBy("timestamp", "desc"), limit(5));
@@ -1407,6 +1433,21 @@ export const FantasyView: React.FC<{
                     >
                         <RefreshCcw className={`w-3 h-3 ${isAdminSaving ? 'animate-spin' : ''}`} /> Recalcular
                     </button>
+
+                    <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-red-400 font-bold uppercase">Recuperar J:</span>
+                        {getFantasySchedule(selectedSplit).filter(r => r.stage === Stage.GROUPS).map(r => (
+                            <button
+                                key={r.id}
+                                onClick={() => handleRecoverRound(r.id)}
+                                disabled={isAdminSaving}
+                                className="px-2 py-1 rounded text-[10px] font-bold border bg-red-900/30 border-red-700/50 text-red-300 hover:bg-red-900/70 transition-colors disabled:opacity-40"
+                                title={`Recuperar ${r.label}`}
+                            >
+                                {r.id}
+                            </button>
+                        ))}
+                    </div>
 
                     {adminMessage && (
                         <div className="absolute top-full right-0 mt-2 p-2 bg-gray-900 border border-hextech-500 rounded text-[10px] text-hextech-400 z-50 whitespace-nowrap animate-in fade-in slide-in-from-top-1">
