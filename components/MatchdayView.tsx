@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MatchCard } from './MatchCard';
 import { DaySelector } from './DaySelector';
@@ -268,15 +267,18 @@ export const MatchdayView: React.FC<MatchdayViewProps> = ({
 
   const now = new Date();
   const firstMatchTime = matches.length > 0 && matches[0].startTime ? new Date(matches[0].startTime) : null;
-  
-  // A day is time-locked if the first match has started
-  const isTimeLocked = firstMatchTime && !isNaN(firstMatchTime.getTime()) ? now >= firstMatchTime : false;
-  
-  // Final lock logic: 
+
+  // A day is time-locked only when ALL matches have started (no picks possible at all).
+  // Previously this used the first match time, which blocked picks on unstarted matches
+  // the moment any single match in the day kicked off.
+  const hasAnyUnstartedMatch = matches.some(m => m.startTime && new Date(m.startTime) > now);
+  const isTimeLocked = !hasAnyUnstartedMatch && firstMatchTime != null;
+
+  // Final lock logic:
   // 1. If manually closed -> Locked
   // 2. If explicitly opened -> Open (overrides time lock)
-  // 3. If time passed -> Locked
-  // 4. Otherwise -> Open
+  // 3. If ALL matches have started -> Locked (nothing left to pick)
+  // 4. Otherwise -> Open (at least one match hasn't started yet)
   const isLockedForUser = isManuallyClosed || (isTimeLocked && !isExplicitlyOpened);
 
   
