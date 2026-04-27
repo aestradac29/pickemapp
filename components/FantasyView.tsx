@@ -804,6 +804,7 @@ export const FantasyView: React.FC<{
   const [activeConfigRound, setActiveConfigRound] = useState(1);
   const [viewRoundId, setViewRoundId] = useState(1);
   const [roundLocked, setRoundLocked] = useState(false);
+  const [disabledFantasyRounds, setDisabledFantasyRounds] = useState<number[]>([]);
 
   const [activeTab, setActiveTab] = useState<'lineup' | 'history'>('lineup');
   const [viewingUserId, setViewingUserId] = useState<string | null>(currentUserId || null);
@@ -885,6 +886,7 @@ export const FantasyView: React.FC<{
         setActiveConfigRound(currentRound);
         setViewRoundId(currentRound);
         setRoundLocked(config.fantasyLocked || false);
+        setDisabledFantasyRounds(config.disabledFantasyRounds || []);
 
         // viewingUserId se inicializa aquí solo si es la primera carga
         if (currentUserId && !viewingUserId) {
@@ -1178,6 +1180,36 @@ export const FantasyView: React.FC<{
       }
   };
 
+   const handleToggleDisabledRound = async (roundId: number) => {
+       if (!isAdmin) return;
+       const isCurrentlyDisabled = disabledFantasyRounds.includes(roundId);
+       const action = isCurrentlyDisabled ? 'habilitar' : 'deshabilitar';
+       const confirmed = window.confirm(
+           `¿${action.charAt(0).toUpperCase() + action.slice(1)} la Jornada ${roundId}?\n\n` +
+           (isCurrentlyDisabled
+               ? `Los puntos de la J${roundId} volverán a contar en el ranking.`
+               : `Los puntos de la J${roundId} quedarán excluidos del ranking.\nLos datos NO se borran y se puede reactivar en cualquier momento.`)
+       );
+       if (!confirmed) return;
+       setIsAdminSaving(true);
+       try {
+           await dataService.toggleFantasyRoundDisabled(roundId, !isCurrentlyDisabled, selectedSplit);
+           // Refresh config
+           const config = await dataService.getGlobalConfig(selectedSplit);
+           setDisabledFantasyRounds(config.disabledFantasyRounds || []);
+           // Recalculate so scoreBreakdown in DB is updated immediately
+           await dataService.forceRecalculateAll(selectedSplit);
+           setAdminMessage(`Jornada ${roundId} ${isCurrentlyDisabled ? 'habilitada' : 'deshabilitada'}. Puntuaciones actualizadas.`);
+           await loadData();
+           setTimeout(() => setAdminMessage(null), 6000);
+       } catch(e: any) {
+           setAdminMessage("Error: " + e.message);
+           setTimeout(() => setAdminMessage(null), 6000);
+       } finally {
+           setIsAdminSaving(false);
+       }
+   };
+
    const handleRecoverRound = async (roundToRecover: number) => {
        if (!isAdmin) return;
        const confirmed = window.confirm(
@@ -1354,6 +1386,7 @@ export const FantasyView: React.FC<{
   const dynamicRoundLabel = currentRoundConfig 
       ? (currentRoundConfig.stage === Stage.GROUPS ? `Puntos J${currentRoundConfig.matchdays.join('-')}` : `Puntos ${currentRoundConfig.label}`) 
       : `Puntos R${viewRoundId}`;
+  const isViewedRoundDisabled = disabledFantasyRounds.includes(viewRoundId);
 
   const breakdownPlayer = breakdownPlayerId ? players.find(p => p.id === breakdownPlayerId) || null : null;
 
@@ -1464,6 +1497,28 @@ export const FantasyView: React.FC<{
                                 {r.id}
                             </button>
                         ))}
+                    </div>
+
+                    <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
+                        <span className="text-[9px] text-amber-400 font-bold uppercase">Anular J:</span>
+                        {getFantasySchedule(selectedSplit).filter(r => r.stage === Stage.GROUPS).map(r => {
+                            const isDisabled = disabledFantasyRounds.includes(r.id);
+                            return (
+                                <button
+                                    key={r.id}
+                                    onClick={() => handleToggleDisabledRound(r.id)}
+                                    disabled={isAdminSaving}
+                                    className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors disabled:opacity-40 ${
+                                        isDisabled
+                                            ? 'bg-amber-500/30 border-amber-400 text-amber-200 line-through'
+                                            : 'bg-gray-900/30 border-gray-600 text-gray-400 hover:border-amber-500/60 hover:text-amber-400'
+                                    }`}
+                                    title={isDisabled ? `Jornada ${r.id} anulada — pulsa para reactivar` : `Anular puntos de Jornada ${r.id}`}
+                                >
+                                    {r.id}
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {adminMessage && (
@@ -1610,9 +1665,14 @@ export const FantasyView: React.FC<{
                               onChange={(e) => setViewRoundId(Number(e.target.value))}
                               className="bg-[#0f1923] text-white border border-gray-600 text-sm rounded-lg px-3 py-2 outline-none focus:border-[#0ac8b9]"
                           >
-                              {getFantasySchedule(selectedSplit).map(r => (
-                                  <option key={r.id} value={r.id}>{r.label} {r.id === activeConfigRound ? '(Actual)' : ''}</option>
-                              ))}
+                              {getFantasySchedule(selectedSplit).map(r => {
+                                  const isDisabled = disabledFantasyRounds.includes(r.id);
+                                  return (
+                                      <option key={r.id} value={r.id}>
+                                          {isDisabled ? '⊘ ' : ''}{r.label}{r.id === activeConfigRound ? ' (Actual)' : ''}{isDisabled ? ' — ANULADA' : ''}
+                                      </option>
+                                  );
+                              })}
                           </select>
                       </div>
                   )}
@@ -1646,6 +1706,17 @@ export const FantasyView: React.FC<{
 
       {activeTab === 'lineup' ? (
           <>
+            {/* DISABLED ROUND BANNER */}
+            {isViewedRoundDisabled && (
+                <div className="flex items-center justify-center gap-3 px-4 py-3 mb-4 rounded-lg bg-amber-900/20 border border-amber-500/40 text-amber-300 animate-in slide-in-from-top-2">
+                    <span className="text-2xl leading-none">⊘</span>
+                    <div>
+                        <p className="font-black uppercase tracking-wider text-sm">Jornada Anulada</p>
+                        <p className="text-[11px] text-amber-400/70 mt-0.5">Los puntos de esta jornada no cuentan en el ranking por decisión del administrador.</p>
+                    </div>
+                </div>
+            )}
+
             {!canViewTeam ? (
                 <div className="flex flex-col items-center justify-center py-20 bg-[#091428]/50 border-2 border-dashed border-gray-700 rounded-xl animate-in fade-in">
                     <div className="p-4 bg-black/40 rounded-full mb-4 border border-gray-700">

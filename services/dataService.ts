@@ -65,7 +65,8 @@ export const dataService = {
         playoffRounds?: number, 
         playoffsAccessible?: boolean,
         fantasyRound?: number, // Current active fantasy round
-        fantasyLocked?: boolean // Is current fantasy round locked?
+        fantasyLocked?: boolean, // Is current fantasy round locked?
+        disabledFantasyRounds?: number[] // Rounds excluded from score totals
     }> {
         const docName = this._getDocName("config", splitId);
         const path = `admin_data/${docName}`;
@@ -78,7 +79,7 @@ export const dataService = {
                 visibleDays: [1], closedDays: [], openedDays: [],
                 playoffVisibleDays: [1], playoffClosedDays: [],
                 playoffRounds: 3, playoffsAccessible: false,
-                fantasyRound: 1, fantasyLocked: false
+                fantasyRound: 1, fantasyLocked: false, disabledFantasyRounds: []
             };
 
             if (docSnap.exists()) {
@@ -92,7 +93,8 @@ export const dataService = {
                     playoffRounds: data.playoffRounds || 3, 
                     playoffsAccessible: data.playoffsAccessible || false,
                     fantasyRound: data.fantasyRound || 1,
-                    fantasyLocked: data.fantasyLocked || false // Manual Override
+                    fantasyLocked: data.fantasyLocked || false, // Manual Override
+                    disabledFantasyRounds: data.disabledFantasyRounds || []
                 };
             }
 
@@ -1067,6 +1069,10 @@ export const dataService = {
         const currentSplitId = this._normalizeSplitId(splitId); // Use explicit splitId, not localStorage
         const schedule = getFantasySchedule(currentSplitId);
 
+        // Load disabled rounds from admin config so they are excluded from totals
+        const adminConfig = await this.getGlobalConfig(currentSplitId);
+        const disabledRounds: number[] = adminConfig.disabledFantasyRounds || [];
+
         // Mapa precomputado: matchId → playerId → puntos (sin Firestore)
         const matchStatsMap: Record<string, Record<string, number>> = {};
         allMatches.forEach(m => {
@@ -1140,7 +1146,11 @@ export const dataService = {
                     roundScore += pts;
                 });
 
-                totalFantasyScore += roundScore;
+                // Only add to total if this round is not disabled by admin
+                const isRoundDisabled = (disabledRounds || []).includes(roundConfig.id);
+                if (!isRoundDisabled) {
+                    totalFantasyScore += roundScore;
+                }
 
                 // IMPORTANT: only update score and inherited flag — NEVER overwrite team/captain.
                 // The team field is the source of truth and must only be written by
@@ -1247,6 +1257,20 @@ export const dataService = {
             rolledOver: false,
             recoveredFrom: 'manual_admin',
         }, { merge: false });
+    },
+
+
+    // Toggle a fantasy round as disabled (excluded from score totals).
+    // Does NOT delete data — the round score is preserved in Firestore,
+    // it is simply skipped when calculating totals and leaderboard.
+    async toggleFantasyRoundDisabled(roundId: number, disabled: boolean, splitId?: string): Promise<void> {
+        const currentSplitId = this._normalizeSplitId(splitId);
+        const config = await this.getGlobalConfig(currentSplitId);
+        const current: number[] = config.disabledFantasyRounds || [];
+        const updated = disabled
+            ? [...new Set([...current, roundId])]
+            : current.filter(r => r !== roundId);
+        await this.updateGlobalConfig({ disabledFantasyRounds: updated }, currentSplitId);
     },
 
     // ── RECOVERY TOOL ────────────────────────────────────────────────────────
@@ -1479,14 +1503,21 @@ export const dataService = {
                 const roundsMap: Record<string, any> = {};
                 allRoundsSnap.docs.forEach(d => { roundsMap[d.id] = d.data(); });
 
+                // Load disabled rounds once for this split
+                const adminConf = await this.getGlobalConfig(targetSplitId);
+                const disabledFantasyRounds: number[] = adminConf.disabledFantasyRounds || [];
+
                 for(const roundConfig of schedule) {
                     const r = roundConfig.id;
                     const roundDocName = this._getFantasyRoundDocName(r, targetSplitId);
                     const roundData = roundsMap[roundDocName];
-                    const points = roundData ? (roundData.score || 0) : 0;
-                    
+                    const rawPoints = roundData ? (roundData.score || 0) : 0;
+                    const isDisabled = disabledFantasyRounds.includes(r);
+                    const points = isDisabled ? 0 : rawPoints;
+
                     const label = roundConfig.stage === Stage.GROUPS ? `J${roundConfig.matchdays.join('-')}` : roundConfig.label.replace('Playoffs R', 'PO R');
-                    fantasyHistory.push({ day: label, points: points });
+                    // Show disabled rounds in history with 0 so users can see it was voided
+                    fantasyHistory.push({ day: label, points: points, disabled: isDisabled });
                     fantasyTotal += points;
                 }
 
