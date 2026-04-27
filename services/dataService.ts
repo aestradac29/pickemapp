@@ -24,7 +24,7 @@ export const dataService = {
     },
 
     _normalizeSplitId(splitId?: string): string {
-        if (!splitId) return this._getCurrentSplitId();
+        if (!splitId) return dataService._getCurrentSplitId();
         const s = splitId.toLowerCase();
         if (s.includes('spring')) return 'spring_2026';
         if (s.includes('summer')) return 'summer_2026';
@@ -32,7 +32,7 @@ export const dataService = {
     },
 
     _getDocName(baseName: string, splitId?: string): string {
-        const targetSplitId = this._normalizeSplitId(splitId);
+        const targetSplitId = dataService._normalizeSplitId(splitId);
         if (targetSplitId === 'winter_2026') {
             return baseName;
         }
@@ -68,7 +68,7 @@ export const dataService = {
         fantasyLocked?: boolean, // Is current fantasy round locked?
         disabledFantasyRounds?: number[] // Rounds excluded from score totals
     }> {
-        const docName = this._getDocName("config", splitId);
+        const docName = dataService._getDocName("config", splitId);
         const path = `admin_data/${docName}`;
         try {
             const docRef = doc(db, "admin_data", docName);
@@ -101,9 +101,9 @@ export const dataService = {
             // --- AUTOMATIC LOCK LOGIC ---
             // If manual lock is FALSE, check the time of the first match of the current fantasy round
             if (!config.fantasyLocked) {
-                const currentRoundDef = getFantasySchedule(splitId || this._getCurrentSplitId()).find(r => r.id === config.fantasyRound);
+                const currentRoundDef = getFantasySchedule(splitId || dataService._getCurrentSplitId()).find(r => r.id === config.fantasyRound);
                 if (currentRoundDef) {
-                    const matches = await this.getMatches();
+                    const matches = await dataService.getMatches();
                     // Filter matches belonging to this fantasy round
                     const roundMatches = matches.filter(m => 
                         (currentRoundDef.stage === Stage.GROUPS ? m.stage === Stage.GROUPS : m.stage !== Stage.GROUPS) &&
@@ -140,13 +140,13 @@ export const dataService = {
     },
 
     async updateGlobalConfig(config: any, splitId?: string) {
-        const docRef = doc(db, "admin_data", this._getDocName("config", splitId));
+        const docRef = doc(db, "admin_data", dataService._getDocName("config", splitId));
         await setDoc(docRef, cleanPayload(config), { merge: true });
     },
 
     // Helper to get points for a playoff match based on its position
     getPlayoffMatchPoints(match: Match, allPlayoffMatches: Match[], splitId?: string): number {
-        const isSpring = this._normalizeSplitId(splitId) === 'spring_2026';
+        const isSpring = dataService._normalizeSplitId(splitId) === 'spring_2026';
         const sorted = [...allPlayoffMatches].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         const winners = sorted.filter(m => m.bracketStage === 'winners' && m.stage !== Stage.FINALS);
         const losers = sorted.filter(m => m.bracketStage === 'losers');
@@ -195,9 +195,9 @@ export const dataService = {
     // NEW: Handle Round Transitions (Price Updates)
     async processRoundTransition(newRound: number, splitId?: string) {
         // 1. Get current state (Using fresh stats)
-        const currentPlayers = await this.getPlayers(false, splitId);
-        const matches = await this.getMatches(undefined, splitId);
-        const schedule = getFantasySchedule(this._normalizeSplitId(splitId));
+        const currentPlayers = await dataService.getPlayers(false, splitId);
+        const matches = await dataService.getMatches(undefined, splitId);
+        const schedule = getFantasySchedule(dataService._normalizeSplitId(splitId));
         const previousRound = newRound - 1;
         const roundConfig = schedule.find(r => r.id === previousRound);
         
@@ -272,7 +272,7 @@ export const dataService = {
         });
 
         // 3. Save new player list
-        const targetSplitId = this._normalizeSplitId(splitId);
+        const targetSplitId = dataService._normalizeSplitId(splitId);
         const docName = targetSplitId === 'winter_2026' ? 'players' : `players_${targetSplitId}`;
         const playersDocRef = doc(db, "admin_data", docName);
         await setDoc(playersDocRef, { list: cleanPayload(updatedPlayers) }, { merge: true });
@@ -281,11 +281,11 @@ export const dataService = {
         // This ensures every user starts the new round with their previous team physically saved.
         // Pass updatedPlayers so carryOver uses the NEW prices (already saved to DB),
         // avoiding the stale-price bug that showed Jornada 1 lineup on Jornada 3.
-        await this.carryOverFantasyTeams(newRound, splitId, updatedPlayers);
+        await dataService.carryOverFantasyTeams(newRound, splitId, updatedPlayers);
 
         // 4. Update Config to new round & UNLOCK explicitly (admin triggers next round, so it starts open)
         // IMPORTANT: pass splitId so the correct split config document is updated.
-        await this.updateGlobalConfig({ 
+        await dataService.updateGlobalConfig({ 
             fantasyRound: newRound,
             fantasyLocked: false // Reset manual lock if it was set
         }, splitId);
@@ -299,17 +299,17 @@ export const dataService = {
 
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
-        const currentSplitId = this._normalizeSplitId(splitId || this._getCurrentSplitId());
+        const currentSplitId = dataService._normalizeSplitId(splitId || dataService._getCurrentSplitId());
         
         // Use the freshly-updated player list if provided; otherwise fetch from DB.
         // IMPORTANT: avoids stale-price bug where purchaseCost ended up as (newCost - priceChange)
         // = old price, causing Jornada 3 to show Jornada 1 lineup/prices.
-        const players = updatedPlayers || await this.getPlayers(false, currentSplitId);
+        const players = updatedPlayers || await dataService.getPlayers(false, currentSplitId);
         const playerMap = new Map<string, Player>(players.map(p => [p.id, p]));
         
         const updates = userSnapshot.docs.map(async (userDoc) => {
             const userId = userDoc.id;
-            const targetDocName = this._getFantasyRoundDocName(newRound, currentSplitId);
+            const targetDocName = dataService._getFantasyRoundDocName(newRound, currentSplitId);
             const targetRef = doc(db, "users", userId, "fantasy_rounds", targetDocName);
             
             // Check if new round already exists.
@@ -342,7 +342,7 @@ export const dataService = {
             // in round history to find the most recent saved lineup.
             if (!teamToCopy) {
                 for (let r = newRound - 1; r >= 1; r--) {
-                    const prevDocName = this._getFantasyRoundDocName(r, currentSplitId);
+                    const prevDocName = dataService._getFantasyRoundDocName(r, currentSplitId);
                     const prevRef = doc(db, "users", userId, "fantasy_rounds", prevDocName);
                     const prevSnap = await getDoc(prevRef);
                     if (prevSnap.exists()) {
@@ -412,7 +412,7 @@ export const dataService = {
     // --- TEAMS ---
     async getTeams(ignoreSplit: boolean = false, splitId?: string): Promise<Record<string, Team>> {
         try {
-            const targetSplitId = this._normalizeSplitId(splitId);
+            const targetSplitId = dataService._normalizeSplitId(splitId);
             const docName = targetSplitId === 'winter_2026' ? 'teams' : `teams_${targetSplitId}`;
             const docRef = doc(db, "admin_data", docName);
             const docSnap = await getDoc(docRef);
@@ -468,7 +468,7 @@ export const dataService = {
         } catch (e) {
             console.error("Error getting teams:", e);
             const result = { ...TEAMS };
-            const targetSplitId = this._normalizeSplitId(splitId);
+            const targetSplitId = dataService._normalizeSplitId(splitId);
             if (!ignoreSplit && targetSplitId === 'spring_2026') {
                 if (result['rat']) delete result['rat'];
                 if (result['kcb']) delete result['kcb'];
@@ -493,7 +493,7 @@ export const dataService = {
     // --- PLAYERS & PRICES ---
     async getPlayers(ignoreSplit: boolean = false, splitId?: string): Promise<Player[]> {
         try {
-            const targetSplitId = this._normalizeSplitId(splitId);
+            const targetSplitId = dataService._normalizeSplitId(splitId);
             const docName = targetSplitId === 'winter_2026' ? 'players' : `players_${targetSplitId}`;
             const playersDocRef = doc(db, "admin_data", docName);
             const playersSnap = await getDoc(playersDocRef);
@@ -571,7 +571,7 @@ export const dataService = {
                 playersList = playersList.filter(p => p.teamId !== 'rat' && p.teamId !== 'kcb');
             }
 
-            const matches = await this.getMatches();
+            const matches = await dataService.getMatches();
             
             const updatedPlayers = playersList.map(player => {
                 let totalKills = 0, totalDeaths = 0, totalAssists = 0, totalPoints = 0, gamesPlayed = 0;
@@ -644,7 +644,7 @@ export const dataService = {
     },
 
     async updatePlayer(playerId: string, updates: Partial<Player>) {
-        const docRef = doc(db, "admin_data", this._getDocName("players"));
+        const docRef = doc(db, "admin_data", dataService._getDocName("players"));
         const docSnap = await getDoc(docRef);
         if (!docSnap.exists()) return;
         let currentList: Player[] = docSnap.data().list || [];
@@ -656,7 +656,7 @@ export const dataService = {
 
     // NEW: Bulk update for Players to avoid Race Conditions
     async updatePlayersBulk(updates: { id: string, data: Partial<Player> }[]) {
-        const docRef = doc(db, "admin_data", this._getDocName("players"));
+        const docRef = doc(db, "admin_data", dataService._getDocName("players"));
         const docSnap = await getDoc(docRef);
         if (!docSnap.exists()) return;
         
@@ -676,13 +676,13 @@ export const dataService = {
 
     // --- MATCHES ---
     async getMatches(day?: number, splitId?: string): Promise<Match[]> {
-        const targetSplitId = this._normalizeSplitId(splitId);
-        const matchesDocName = this._getDocName("matches", targetSplitId);
+        const targetSplitId = dataService._normalizeSplitId(splitId);
+        const matchesDocName = dataService._getDocName("matches", targetSplitId);
         const path = `admin_data/${matchesDocName}`;
         try {
             const [matchesSnap, teamsSnap] = await Promise.all([
                 getDoc(doc(db, "admin_data", matchesDocName)),
-                getDoc(doc(db, "admin_data", this._getDocName("teams", targetSplitId)))
+                getDoc(doc(db, "admin_data", dataService._getDocName("teams", targetSplitId)))
             ]);
             
             let teamsMap: Record<string, Team> = TEAMS; 
@@ -782,7 +782,7 @@ export const dataService = {
                     generatedMatches = [...generatedMatches, ...dayMatches];
                 }
                 allMatches = [...seedMatches, ...generatedMatches];
-                await setDoc(doc(db, "admin_data", this._getDocName("matches", targetSplitId)), { allMatches: cleanPayload(allMatches) });
+                await setDoc(doc(db, "admin_data", dataService._getDocName("matches", targetSplitId)), { allMatches: cleanPayload(allMatches) });
             }
 
             if (day) {
@@ -800,7 +800,7 @@ export const dataService = {
     },
 
     async updateMatch(matchId: string, updates: any) {
-        const docRef = doc(db, "admin_data", this._getDocName("matches"));
+        const docRef = doc(db, "admin_data", dataService._getDocName("matches"));
         const docSnap = await getDoc(docRef);
         
         if (!docSnap.exists()) return;
@@ -811,7 +811,7 @@ export const dataService = {
         if (index === -1) throw new Error("Match not found in DB");
 
         const currentMatch = allMatches[index];
-        const teamsRef = await this.getTeams();
+        const teamsRef = await dataService.getTeams();
 
         const newTeamA = updates.team_a_id ? teamsRef[updates.team_a_id] : currentMatch.teamA;
         const newTeamB = updates.team_b_id ? teamsRef[updates.team_b_id] : currentMatch.teamB;
@@ -835,7 +835,7 @@ export const dataService = {
     },
 
     _getFantasyRoundDocName(round: number, splitId: string): string {
-        const normalized = this._normalizeSplitId(splitId);
+        const normalized = dataService._normalizeSplitId(splitId);
         if (normalized === 'winter_2026') {
             return `round_${round}`;
         }
@@ -848,18 +848,18 @@ export const dataService = {
     // --- FANTASY SCORING SYSTEM & STORAGE ---
     
     async saveFantasyTeam(userId: string, team: Record<Role, FantasySlot>, captain: string | null, round: number, splitId: string) {
-        const roundDocName = this._getFantasyRoundDocName(round, splitId);
+        const roundDocName = dataService._getFantasyRoundDocName(round, splitId);
         const roundDocRef = doc(db, "users", userId, "fantasy_rounds", roundDocName);
         await setDoc(roundDocRef, { team: cleanPayload(team), captain, roundId: round, updatedAt: new Date().toISOString() }, { merge: true });
         
-        const normalizedSplitId = this._normalizeSplitId(splitId);
+        const normalizedSplitId = dataService._normalizeSplitId(splitId);
         const currentRef = doc(db, "users", userId, "fantasy", normalizedSplitId);
         await setDoc(currentRef, { team: cleanPayload(team), captain }, { merge: true });
     },
 
     async getFantasyTeam(userId: string, round: number, splitId: string): Promise<FantasyTeamState | null> {
         try {
-            const roundDocName = this._getFantasyRoundDocName(round, splitId);
+            const roundDocName = dataService._getFantasyRoundDocName(round, splitId);
             const roundDocRef = doc(db, "users", userId, "fantasy_rounds", roundDocName);
             const roundSnap = await getDoc(roundDocRef);
             
@@ -890,7 +890,7 @@ export const dataService = {
                 // FALLBACK: INHERITANCE FROM ANY PREVIOUS ROUND (WITHIN SAME SPLIT)
                 // If current round doesn't exist, search backwards for the most recent submitted lineup
                 for (let r = round - 1; r >= 1; r--) {
-                    const prevDocName = this._getFantasyRoundDocName(r, splitId);
+                    const prevDocName = dataService._getFantasyRoundDocName(r, splitId);
                     const prevDocRef = doc(db, "users", userId, "fantasy_rounds", prevDocName);
                     const prevSnap = await getDoc(prevDocRef);
 
@@ -929,16 +929,16 @@ export const dataService = {
 
     // MANUAL FORCE RECALCULATION WRAPPER
     async forceRecalculateAll(splitId?: string) {
-        const matches = await this.getMatches(undefined, splitId);
-        await this.recalculateAllFantasyScores(matches, splitId);
+        const matches = await dataService.getMatches(undefined, splitId);
+        await dataService.recalculateAllFantasyScores(matches, splitId);
     },
 
     // ** MAJOR UPDATE ** : Supports aggregation of multiple games in BO3/BO5
     async saveMatchStatsAndCalculate(matchId: string, games: MatchGame[], splitId?: string) {
         // 1. Get Match & Players
         const [docSnap, players] = await Promise.all([
-            getDoc(doc(db, "admin_data", this._getDocName("matches", splitId))),
-            this.getPlayers(undefined, splitId)
+            getDoc(doc(db, "admin_data", dataService._getDocName("matches", splitId))),
+            dataService.getPlayers(undefined, splitId)
         ]);
         if (!docSnap.exists()) return;
 
@@ -1055,10 +1055,10 @@ export const dataService = {
         };
         allMatches[index] = updatedMatch;
         
-        await setDoc(doc(db, "admin_data", this._getDocName("matches")), { allMatches: cleanPayload(allMatches) }, { merge: true });
+        await setDoc(doc(db, "admin_data", dataService._getDocName("matches")), { allMatches: cleanPayload(allMatches) }, { merge: true });
 
         // 4. Trigger Recalculation
-        await this.recalculateAllFantasyScores(allMatches, splitId);
+        await dataService.recalculateAllFantasyScores(allMatches, splitId);
     },
 
     async recalculateAllFantasyScores(allMatches: Match[], splitId?: string) {
@@ -1066,12 +1066,12 @@ export const dataService = {
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
         const users = userSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        const currentSplitId = this._normalizeSplitId(splitId); // Use explicit splitId, not localStorage
+        const currentSplitId = dataService._normalizeSplitId(splitId); // Use explicit splitId, not localStorage
         const schedule = getFantasySchedule(currentSplitId);
 
         // Load disabled rounds from admin config so they are excluded from totals.
         // Called BEFORE the per-user Promise.all to avoid `this` binding loss in callbacks.
-        const _recalcAdminConf = await this.getGlobalConfig(currentSplitId);
+        const _recalcAdminConf = await dataService.getDaysConfig(currentSplitId);
         const disabledRounds: number[] = _recalcAdminConf.disabledFantasyRounds || [];
 
         // Mapa precomputado: matchId → playerId → puntos (sin Firestore)
@@ -1102,7 +1102,7 @@ export const dataService = {
 
             for (const roundConfig of schedule) {
                 const roundId = roundConfig.id;
-                const roundDocName = this._getFantasyRoundDocName(roundId, currentSplitId);
+                const roundDocName = dataService._getFantasyRoundDocName(roundId, currentSplitId);
                 const roundRef = doc(db, "users", user.id, "fantasy_rounds", roundDocName);
 
                 // Buscar el equipo: ronda actual o heredado hacia atrás (sin Firestore)
@@ -1116,7 +1116,7 @@ export const dataService = {
                 } else {
                     // Herencia hacia atrás dentro del mismo split (solo en memoria)
                     for (let r = roundId - 1; r >= 1; r--) {
-                        const prevDocName = this._getFantasyRoundDocName(r, currentSplitId);
+                        const prevDocName = dataService._getFantasyRoundDocName(r, currentSplitId);
                         if (roundsMap[prevDocName]) {
                             teamToScore    = roundsMap[prevDocName].team;
                             captainToScore = roundsMap[prevDocName].captain;
@@ -1184,7 +1184,7 @@ export const dataService = {
     // Returns a full dump of all fantasy_rounds documents for all users.
     // Used to manually inspect what data survives after a corruption event.
     async inspectAllFantasyRounds(splitId?: string): Promise<Record<string, any>> {
-        const currentSplitId = this._normalizeSplitId(splitId);
+        const currentSplitId = dataService._normalizeSplitId(splitId);
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
         const result: Record<string, any> = {};
@@ -1243,8 +1243,8 @@ export const dataService = {
         captain: string | null,
         splitId?: string
     ): Promise<void> {
-        const currentSplitId = this._normalizeSplitId(splitId);
-        const roundDocName = this._getFantasyRoundDocName(roundId, currentSplitId);
+        const currentSplitId = dataService._normalizeSplitId(splitId);
+        const roundDocName = dataService._getFantasyRoundDocName(roundId, currentSplitId);
         const roundRef = doc(db, "users", userId, "fantasy_rounds", roundDocName);
         const currentSnap = await getDoc(roundRef);
         const existingScore = currentSnap.exists() ? (currentSnap.data().score ?? 0) : 0;
@@ -1265,13 +1265,13 @@ export const dataService = {
     // Does NOT delete data — the round score is preserved in Firestore,
     // it is simply skipped when calculating totals and leaderboard.
     async toggleFantasyRoundDisabled(roundId: number, disabled: boolean, splitId?: string): Promise<void> {
-        const currentSplitId = this._normalizeSplitId(splitId);
-        const config = await this.getGlobalConfig(currentSplitId);
+        const currentSplitId = dataService._normalizeSplitId(splitId);
+        const config = await dataService.getDaysConfig(currentSplitId);
         const current: number[] = config.disabledFantasyRounds || [];
         const updated = disabled
             ? [...new Set([...current, roundId])]
             : current.filter(r => r !== roundId);
-        await this.updateGlobalConfig({ disabledFantasyRounds: updated }, currentSplitId);
+        await dataService.updateGlobalConfig({ disabledFantasyRounds: updated }, currentSplitId);
     },
 
     // ── RECOVERY TOOL ────────────────────────────────────────────────────────
@@ -1279,14 +1279,14 @@ export const dataService = {
     // data from: (1) current snapshot fantasy/splitId, (2) adjacent rounds,
     // (3) rounds with rolledOver flag. Returns a report of what was found/done.
     async recoverFantasyRound(targetRound: number, splitId?: string): Promise<{ userId: string; source: string; restored: boolean }[]> {
-        const currentSplitId = this._normalizeSplitId(splitId);
+        const currentSplitId = dataService._normalizeSplitId(splitId);
         const usersRef = collection(db, "users");
         const userSnapshot = await getDocs(usersRef);
         const report: { userId: string; source: string; restored: boolean }[] = [];
 
         await Promise.all(userSnapshot.docs.map(async (userDoc) => {
             const userId = userDoc.id;
-            const targetDocName = this._getFantasyRoundDocName(targetRound, currentSplitId);
+            const targetDocName = dataService._getFantasyRoundDocName(targetRound, currentSplitId);
             const targetRef = doc(db, "users", userId, "fantasy_rounds", targetDocName);
 
             // Read what's currently in the corrupted round
@@ -1315,7 +1315,7 @@ export const dataService = {
                     .filter(r => r >= 1 && r <= maxRound && r !== targetRound);
 
                 for (const r of candidates) {
-                    const docName = this._getFantasyRoundDocName(r, currentSplitId);
+                    const docName = dataService._getFantasyRoundDocName(r, currentSplitId);
                     const snap = await getDoc(doc(db, "users", userId, "fantasy_rounds", docName));
                     if (snap.exists() && snap.data().team) {
                         const d = snap.data();
@@ -1358,17 +1358,17 @@ export const dataService = {
     },
 
     async createMatch(matchData: any) {
-        const docRef = doc(db, "admin_data", this._getDocName("matches"));
+        const docRef = doc(db, "admin_data", dataService._getDocName("matches"));
         const docSnap = await getDoc(docRef);
         let allMatches: Match[] = (docSnap.exists() ? docSnap.data().allMatches : []) || [];
 
-        const teamsRef = await this.getTeams();
+        const teamsRef = await dataService.getTeams();
         const teamA = teamsRef[matchData.team_a_id];
         const teamB = teamsRef[matchData.team_b_id];
 
         const newMatch: Match = {
             id: `custom-${Date.now()}`,
-            splitId: this._normalizeSplitId(matchData.splitId),
+            splitId: dataService._normalizeSplitId(matchData.splitId),
             teamA: teamA,
             teamB: teamB,
             startTime: matchData.start_time,
@@ -1385,7 +1385,7 @@ export const dataService = {
     },
 
     async deleteMatch(matchId: string) {
-        const docRef = doc(db, "admin_data", this._getDocName("matches"));
+        const docRef = doc(db, "admin_data", dataService._getDocName("matches"));
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
             let allMatches: Match[] = docSnap.data().allMatches || [];
@@ -1396,11 +1396,11 @@ export const dataService = {
 
     async getAllUsers(splitId?: string): Promise<User[]> {
         try {
-            const targetSplitId = this._normalizeSplitId(splitId);
+            const targetSplitId = dataService._normalizeSplitId(splitId);
             const [allMatches, adminRanking, config] = await Promise.all([
-                this.getMatches(undefined, targetSplitId),
-                this.getAdminRanking(targetSplitId),
-                this.getDaysConfig(targetSplitId)
+                dataService.getMatches(undefined, targetSplitId),
+                dataService.getAdminRanking(targetSplitId),
+                dataService.getDaysConfig(targetSplitId)
             ]);
 
             const usersRef = collection(db, "users");
@@ -1408,9 +1408,9 @@ export const dataService = {
             const snapshot = await getDocs(q);
 
             // Hoist disabledFantasyRounds fetch OUTSIDE the per-user loop.
-            // Calling this.getGlobalConfig inside Promise.all callbacks loses `this` binding
+            // Calling dataService.getDaysConfig inside Promise.all callbacks loses `this` binding
             // in some bundler/runtime contexts, causing "getGlobalConfig is not a function".
-            const _adminConf = await this.getGlobalConfig(targetSplitId);
+            const _adminConf = await dataService.getDaysConfig(targetSplitId);
             const _disabledFantasyRounds: number[] = _adminConf.disabledFantasyRounds || [];
 
             const users: User[] = await Promise.all(snapshot.docs.map(async (userDoc) => {
@@ -1437,7 +1437,7 @@ export const dataService = {
                     if (pick && pick.predictedWinnerId) {
                         predictedWinnerId = pick.predictedWinnerId;
                     } else {
-                        predictedWinnerId = this.getDeterministicWinner(userId, m);
+                        predictedWinnerId = dataService.getDeterministicWinner(userId, m);
                         isRandom = true;
                     }
 
@@ -1469,7 +1469,7 @@ export const dataService = {
                     if (pick && pick.predictedWinnerId) {
                         predictedWinnerId = pick.predictedWinnerId;
                     } else {
-                        predictedWinnerId = this.getDeterministicWinner(userId, m);
+                        predictedWinnerId = dataService.getDeterministicWinner(userId, m);
                         isRandom = true;
                     }
 
@@ -1483,7 +1483,7 @@ export const dataService = {
                     }
 
                     if (predictedWinnerId === m.winnerId) {
-                        playoffsScore += this.getPlayoffMatchPoints(m, playoffMatches, targetSplitId);
+                        playoffsScore += dataService.getPlayoffMatchPoints(m, playoffMatches, targetSplitId);
                     }
                 });
 
@@ -1514,7 +1514,7 @@ export const dataService = {
 
                 for(const roundConfig of schedule) {
                     const r = roundConfig.id;
-                    const roundDocName = this._getFantasyRoundDocName(r, targetSplitId);
+                    const roundDocName = dataService._getFantasyRoundDocName(r, targetSplitId);
                     const roundData = roundsMap[roundDocName];
                     const rawPoints = roundData ? (roundData.score || 0) : 0;
                     const isDisabled = disabledFantasyRounds.includes(r);
@@ -1542,7 +1542,7 @@ export const dataService = {
                         if (pick && pick.predictedWinnerId) {
                             predictedWinnerId = pick.predictedWinnerId;
                         } else {
-                            predictedWinnerId = this.getDeterministicWinner(userId, m);
+                            predictedWinnerId = dataService.getDeterministicWinner(userId, m);
                             isRandom = true;
                         }
 
@@ -1578,7 +1578,7 @@ export const dataService = {
                         if (pick && pick.predictedWinnerId) {
                             predictedWinnerId = pick.predictedWinnerId;
                         } else {
-                            predictedWinnerId = this.getDeterministicWinner(userId, m);
+                            predictedWinnerId = dataService.getDeterministicWinner(userId, m);
                             isRandom = true;
                         }
 
@@ -1591,7 +1591,7 @@ export const dataService = {
                         }
 
                         if (predictedWinnerId === m.winnerId) {
-                            dayPoints += this.getPlayoffMatchPoints(m, playoffMatches, targetSplitId);
+                            dayPoints += dataService.getPlayoffMatchPoints(m, playoffMatches, targetSplitId);
                         }
                      });
 
@@ -1640,7 +1640,7 @@ export const dataService = {
                             if (pick && pick.predictedWinnerId) {
                                 predictedWinnerId = pick.predictedWinnerId;
                             } else {
-                                predictedWinnerId = this.getDeterministicWinner(userId, m);
+                                predictedWinnerId = dataService.getDeterministicWinner(userId, m);
                                 isRandom = true;
                             }
 
@@ -1683,7 +1683,7 @@ export const dataService = {
                     const updates: any = {};
                     if (hasBadgeChanges) updates.badges = Array.from(currentBadges);
                     if (hasScoreChanges) updates.splitScores = splitScores;
-                    this.updateUserProfile(userId, updates).catch(console.error);
+                    dataService.updateUserProfile(userId, updates).catch(console.error);
                 }
 
                 return {
@@ -1776,7 +1776,7 @@ export const dataService = {
 
     async getUserPredictions(userId: string, splitId?: string) {
         try {
-            const docRef = doc(db, "users", userId, "picks", this._normalizeSplitId(splitId));
+            const docRef = doc(db, "users", userId, "picks", dataService._normalizeSplitId(splitId));
             const docSnap = await getDoc(docRef);
             return docSnap.exists() ? docSnap.data().list || [] : [];
         } catch (e) { return []; }
@@ -1784,7 +1784,7 @@ export const dataService = {
     async savePredictions(predictions: any[], splitId?: string) {
         if (!predictions.length) return;
         const userId = predictions[0].user_id;
-        const docRef = doc(db, "users", userId, "picks", this._normalizeSplitId(splitId));
+        const docRef = doc(db, "users", userId, "picks", dataService._normalizeSplitId(splitId));
         const docSnap = await getDoc(docRef);
         let currentPreds = docSnap.exists() ? docSnap.data().list || [] : [];
         predictions.forEach(newP => {
@@ -1796,25 +1796,25 @@ export const dataService = {
     },
     async getUserRanking(userId: string, splitId?: string) {
         try {
-            const targetSplitId = this._normalizeSplitId(splitId);
+            const targetSplitId = dataService._normalizeSplitId(splitId);
             const snap = await getDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`));
             return snap.exists() ? snap.data().order || [] : [];
         } catch (e) { return []; }
     },
     async saveUserRanking(userId: string, teamIds: string[], splitId?: string) {
-        const targetSplitId = this._normalizeSplitId(splitId);
+        const targetSplitId = dataService._normalizeSplitId(splitId);
         await setDoc(doc(db, "users", userId, "picks", `${targetSplitId}_ranking`), { order: cleanPayload(teamIds) }, { merge: true });
     },
     async getAdminRanking(splitId?: string) {
         try {
-            const targetSplitId = this._normalizeSplitId(splitId);
-            const snap = await getDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)));
+            const targetSplitId = dataService._normalizeSplitId(splitId);
+            const snap = await getDoc(doc(db, "admin_data", dataService._getDocName("results", targetSplitId)));
             return snap.exists() ? snap.data()[`${targetSplitId}_ranking`] || [] : [];
         } catch (e) { return []; }
     },
     async saveAdminRanking(teamIds: string[], splitId?: string) {
-        const targetSplitId = this._normalizeSplitId(splitId);
-        await setDoc(doc(db, "admin_data", this._getDocName("results", targetSplitId)), { [`${targetSplitId}_ranking`]: cleanPayload(teamIds) }, { merge: true });
+        const targetSplitId = dataService._normalizeSplitId(splitId);
+        await setDoc(doc(db, "admin_data", dataService._getDocName("results", targetSplitId)), { [`${targetSplitId}_ranking`]: cleanPayload(teamIds) }, { merge: true });
     },
 
     // --- CARD COLLECTION SYSTEM ---

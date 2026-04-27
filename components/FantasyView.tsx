@@ -1195,7 +1195,7 @@ export const FantasyView: React.FC<{
        try {
            await dataService.toggleFantasyRoundDisabled(roundId, !isCurrentlyDisabled, selectedSplit);
            // Refresh config
-           const config = await dataService.getGlobalConfig(selectedSplit);
+           const config = await dataService.getDaysConfig(selectedSplit);
            setDisabledFantasyRounds(config.disabledFantasyRounds || []);
            // Recalculate so scoreBreakdown in DB is updated immediately
            await dataService.forceRecalculateAll(selectedSplit);
