@@ -1069,9 +1069,10 @@ export const dataService = {
         const currentSplitId = this._normalizeSplitId(splitId); // Use explicit splitId, not localStorage
         const schedule = getFantasySchedule(currentSplitId);
 
-        // Load disabled rounds from admin config so they are excluded from totals
-        const adminConfig = await this.getGlobalConfig(currentSplitId);
-        const disabledRounds: number[] = adminConfig.disabledFantasyRounds || [];
+        // Load disabled rounds from admin config so they are excluded from totals.
+        // Called BEFORE the per-user Promise.all to avoid `this` binding loss in callbacks.
+        const _recalcAdminConf = await this.getGlobalConfig(currentSplitId);
+        const disabledRounds: number[] = _recalcAdminConf.disabledFantasyRounds || [];
 
         // Mapa precomputado: matchId → playerId → puntos (sin Firestore)
         const matchStatsMap: Record<string, Record<string, number>> = {};
@@ -1406,6 +1407,12 @@ export const dataService = {
             const q = query(usersRef, orderBy("username"), limit(50));
             const snapshot = await getDocs(q);
 
+            // Hoist disabledFantasyRounds fetch OUTSIDE the per-user loop.
+            // Calling this.getGlobalConfig inside Promise.all callbacks loses `this` binding
+            // in some bundler/runtime contexts, causing "getGlobalConfig is not a function".
+            const _adminConf = await this.getGlobalConfig(targetSplitId);
+            const _disabledFantasyRounds: number[] = _adminConf.disabledFantasyRounds || [];
+
             const users: User[] = await Promise.all(snapshot.docs.map(async (userDoc) => {
                 const userData = userDoc.data();
                 const userId = userDoc.id;
@@ -1503,9 +1510,7 @@ export const dataService = {
                 const roundsMap: Record<string, any> = {};
                 allRoundsSnap.docs.forEach(d => { roundsMap[d.id] = d.data(); });
 
-                // Load disabled rounds once for this split
-                const adminConf = await this.getGlobalConfig(targetSplitId);
-                const disabledFantasyRounds: number[] = adminConf.disabledFantasyRounds || [];
+                const disabledFantasyRounds: number[] = _disabledFantasyRounds;
 
                 for(const roundConfig of schedule) {
                     const r = roundConfig.id;
