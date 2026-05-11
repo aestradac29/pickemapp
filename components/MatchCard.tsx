@@ -35,7 +35,7 @@ const TeamButton = ({
 }) => {
   const isWinner    = match.winnerId === team.id;
   const isWrongPick = match.isCompleted && isSelected && !!match.winnerId && !isWinner;
-  const isPending   = match.status === MatchStatus.SCHEDULED && !isLocked;
+  const isPending   = (!match.status || match.status.toUpperCase() === MatchStatus.SCHEDULED) && !isLocked;
   const canInteract = isPending && !isEditing;
 
   // Estado visual dominante
