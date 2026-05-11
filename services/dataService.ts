@@ -736,6 +736,10 @@ export const dataService = {
                 allMatches = allMatches.map(m => {
                     if (m.stage !== Stage.PLAYOFFS && m.stage !== Stage.FINALS) return m;
 
+                    // If the match already has a valid day stored in DB, respect it.
+                    // Only auto-assign when day is missing or 0.
+                    if (m.day && m.day > 0) return m;
+
                     let assignedDay = m.day;
                     const isSpring = targetSplitId === 'spring_2026';
 

@@ -291,8 +291,9 @@ export const MatchCard: React.FC<MatchCardProps> = ({
           </div>
           <div>
             <label className="text-[9px] text-gray-500 uppercase font-bold block mb-1">Jornada</label>
-            <input type="number" disabled value={editState.day}
-              className="w-full bg-black/20 border border-gray-800 rounded-lg p-2 text-sm text-gray-500 cursor-not-allowed" />
+            <input type="number" min={1} max={10} value={editState.day}
+              onChange={e => setEditState({ ...editState, day: Number(e.target.value) })}
+              className="w-full bg-black/40 border border-gray-700 rounded-lg p-2 text-sm text-white focus:border-red-500 outline-none" />
           </div>
           <div>
             <label className="text-[9px] text-gray-500 uppercase font-bold block mb-1">Equipo A</label>

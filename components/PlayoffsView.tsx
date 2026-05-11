@@ -194,12 +194,14 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({
   const isDayVisible = visibleDays.includes(currentDay);
   const isManuallyClosed = closedDays.includes(currentDay);
   
-  // Logic for Global Lock (Manual Only for flexibility)
+  // Logic for Global Lock (used only by Bracket view to lock already-played matches)
   const isGlobalPlayoffLock = useMemo(() => {
       return closedDays.includes(1);
   }, [closedDays]);
 
-  const isLockedForUser = isManuallyClosed || isGlobalPlayoffLock;
+  // isLockedForUser: only based on the CURRENT day being closed, not globally.
+  // This ensures J2/J3 picks remain possible even when J1 is already closed.
+  const isLockedForUser = isManuallyClosed;
 
   // VISIBILITY LOGIC FOR SPECTATING
   const visiblePredictions = useMemo(() => {
